@@ -1,0 +1,16 @@
+{
+  "name": "helpdesk",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "shared/*"
+  ],
+  "scripts": {
+    "mobile": "pnpm --filter mobile start",
+    "web": "pnpm --filter web start",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint"
+  }
+}
