@@ -12,5 +12,9 @@
     "web": "pnpm --filter web start",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "opencode-autoskills": "^1.2.0",
+    "supabase": "^2.115.0"
   }
 }
