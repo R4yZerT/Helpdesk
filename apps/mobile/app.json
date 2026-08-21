@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "HelpDesk",
+    "slug": "helpdesk-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "helpdesk",
+    "platforms": ["ios", "android", "web"],
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0f172a",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}

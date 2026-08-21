@@ -21,6 +21,14 @@ supabase/.branches/
 .DS_Store
 *.log
 
+# TypeScript cache
+*.tsbuildinfo
+
 # IDE
 .idea/
 .vscode/
+# Agentes y tooling local
+.agents/
+.opencode/
+skills-lock.json
+.opencode-*

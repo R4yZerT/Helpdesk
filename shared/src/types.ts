@@ -1,17 +1,12 @@
 // Tipos de dominio espejo de la base de datos (enums de schema_inicial.sql).
 // Prototipo: esqueleto inicial.
 
-export type RolUsuario = "empleado" | "tecnico" | "jefe" | "administrador";
+export type RolUsuario = 'empleado' | 'tecnico' | 'jefe' | 'administrador';
 
 export type EstadoTicket =
-  | "abierto"
-  | "en_proceso"
-  | "solucionado"
-  | "cerrado"
-  | "devuelto"
-  | "programado";
+  'abierto' | 'en_proceso' | 'solucionado' | 'cerrado' | 'devuelto' | 'programado';
 
-export type PrioridadTicket = "baja" | "media" | "alta" | "critica";
+export type PrioridadTicket = 'baja' | 'media' | 'alta' | 'critica';
 
 export interface Ticket {
   id: string;

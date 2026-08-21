@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["App.tsx", "src/**/*", "types/**/*"],
+  "exclude": ["node_modules", "web-build"]
+}

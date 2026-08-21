@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "HelpDesk Web",
+    "slug": "helpdesk-web",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "helpdesk",
+    "platforms": ["web"],
+    "userInterfaceStyle": "light",
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}
