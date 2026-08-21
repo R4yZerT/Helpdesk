@@ -5,3 +5,5 @@ export * from './roles.js';
 export * from './permissions.js';
 export * from './supabase.js';
 export * from './auth.js';
+export * from './ui/theme.js';
+export * from './ui/components.js';

@@ -11,7 +11,9 @@
     "mobile": "pnpm --filter mobile start",
     "web": "pnpm --filter web start",
     "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint"
+    "lint": "pnpm -r lint",
+    "gen:types": "supabase gen types typescript --linked --schema public > shared/src/supabase.types.ts",
+    "test": "pnpm -r test"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.18.0",
