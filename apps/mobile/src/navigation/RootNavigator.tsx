@@ -6,6 +6,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
+import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import type {
   AdminStackParamList,
   AuthStackParamList,
@@ -46,9 +47,7 @@ function EmpleadoNavigator() {
       <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }}>
         {() => <Placeholder title="Mis solicitudes" subtitle="RF-08 listado con filtros y búsqueda" />}
       </EmpleadoStack.Screen>
-      <EmpleadoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }}>
-        {() => <Placeholder title="Crear solicitud" subtitle="RF-06 categoría, asunto, descripción, prioridad" />}
-      </EmpleadoStack.Screen>
+      <EmpleadoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
       <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }}>
         {() => <Placeholder title="Detalle" subtitle="RF-09 historial + comentarios" />}
       </EmpleadoStack.Screen>
@@ -62,6 +61,7 @@ function TecnicoNavigator() {
       <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }}>
         {() => <Placeholder title="Bandeja técnico" subtitle="RF-12 orden por prioridad/antigüedad · RF-13 estados" />}
       </TecnicoStack.Screen>
+      <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
       <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Ticket' }}>
         {() => <Placeholder title="Detalle técnico" subtitle="RF-13 transiciones · RF-15 comentarios" />}
       </TecnicoStack.Screen>
@@ -75,6 +75,7 @@ function JefeNavigator() {
       <JefeStack.Screen name="Dashboard" options={{ title: 'Dashboard (RF-16)' }}>
         {() => <Placeholder title="Dashboard jefe" subtitle="RF-16 tiempo real · RF-17 filtros · RF-21 alertas IA" />}
       </JefeStack.Screen>
+      <JefeStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
       <JefeStack.Screen name="Reportes" options={{ title: 'Reportes (RF-18)' }}>
         {() => <Placeholder title="Reportes" subtitle="RF-18 exportación PDF/CSV" />}
       </JefeStack.Screen>

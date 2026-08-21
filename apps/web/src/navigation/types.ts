@@ -12,11 +12,13 @@ export type EmpleadoStackParamList = {
 
 export type TecnicoStackParamList = {
   Bandeja: undefined;
+  CrearTicket: undefined;
   DetalleTicket: { id: string };
 };
 
 export type JefeStackParamList = {
   Dashboard: undefined;
+  CrearTicket: undefined;
   Reportes: undefined;
   Alertas: undefined;
 };
