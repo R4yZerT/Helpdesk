@@ -1,20 +1,43 @@
-// Pantalla inicial HelpDesk — verifica que Expo + shared compilan
+// Pantalla inicial HelpDesk — RF-04 sesion persistente + RF-05 control por rol
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import type { RolUsuario } from '@helpdesk/shared';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ROLES } from '@helpdesk/shared';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-// Roles del sistema (RF-05)
-const ROLES: RolUsuario[] = ['empleado', 'tecnico', 'jefe', 'administrador'];
-
-export default function App() {
+function AppInner() {
+  const { profile, loading, error } = useAuth();
   return (
     <View style={styles.container}>
       <Text style={styles.title}>HelpDesk — IUE</Text>
       <Text style={styles.subtitle}>Mesa de Servicio con IA · Expo 52</Text>
-      <Text style={styles.body}>Roles: {ROLES.join(' · ')}</Text>
-      <Text style={styles.muted}>Supabase stzcqexdivuzmfizvbwp · 4 migraciones OK</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 16 }} />
+      ) : profile ? (
+        <>
+          <Text style={styles.body}>
+            Sesión: {profile.email} · {profile.rol}
+          </Text>
+          <Text style={styles.muted}>Mesa: {profile.mesa_id ?? '—'}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.body}>Roles: {ROLES.join(' · ')}</Text>
+          <Text style={styles.muted}>
+            {error ? `Error: ${error}` : 'Sin sesión — inicia sesión para ver tu rol'}
+          </Text>
+        </>
+      )}
+      <Text style={styles.muted}>Supabase 5 migraciones · RLS RF-05 OK</Text>
       <StatusBar style="auto" />
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }
 

@@ -1,4 +1,7 @@
 // Contratos tipados compartidos entre mobile y web.
-// Prototipo: solo el esqueleto. Se completa en la implementacion.
 
 export * from './types.js';
+export * from './roles.js';
+export * from './permissions.js';
+export * from './supabase.js';
+export * from './auth.js';

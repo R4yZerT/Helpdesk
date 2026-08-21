@@ -1,24 +1,39 @@
-// Pantalla inicial web — react-native-web sobre el mismo codigo de mobile
-import { StyleSheet, Text, View } from 'react-native';
-import type { EstadoTicket } from '@helpdesk/shared';
+// Pantalla inicial web — RF-04 + RF-05 (mismo codigo que mobile)
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ROLES } from '@helpdesk/shared';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 
-const ESTADOS: EstadoTicket[] = [
-  'abierto',
-  'en_proceso',
-  'solucionado',
-  'cerrado',
-  'devuelto',
-  'programado',
-];
-
-export default function App() {
+function AppInner() {
+  const { profile, loading, error } = useAuth();
   return (
     <View style={styles.container}>
       <Text style={styles.title}>HelpDesk — Web</Text>
       <Text style={styles.subtitle}>react-native-web · mismo codigo que mobile</Text>
-      <Text style={styles.body}>Estados: {ESTADOS.join(' · ')}</Text>
-      <Text style={styles.muted}>Supabase RLS + search_path OK</Text>
+      {loading ? (
+        <ActivityIndicator style={{ marginTop: 12 }} />
+      ) : profile ? (
+        <>
+          <Text style={styles.body}>
+            Sesión: {profile.email} · {profile.rol}
+          </Text>
+          <Text style={styles.muted}>Mesa: {profile.mesa_id ?? '—'}</Text>
+        </>
+      ) : (
+        <>
+          <Text style={styles.body}>Roles: {ROLES.join(' · ')}</Text>
+          <Text style={styles.muted}>{error ? `Error: ${error}` : 'Sin sesión'}</Text>
+        </>
+      )}
+      <Text style={styles.muted}>Supabase 5 migraciones · RLS RF-05 OK</Text>
     </View>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   );
 }
 
