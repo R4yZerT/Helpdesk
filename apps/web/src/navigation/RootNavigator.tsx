@@ -7,6 +7,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
+import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
+import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
 import type {
   AdminStackParamList,
   AuthStackParamList,
@@ -44,13 +46,9 @@ function AuthNavigator() {
 function EmpleadoNavigator() {
   return (
     <EmpleadoStack.Navigator>
-      <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }}>
-        {() => <Placeholder title="Mis solicitudes" subtitle="RF-08 listado con filtros y búsqueda" />}
-      </EmpleadoStack.Screen>
+      <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }} component={MisSolicitudesScreen} />
       <EmpleadoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }}>
-        {() => <Placeholder title="Detalle" subtitle="RF-09 historial + comentarios" />}
-      </EmpleadoStack.Screen>
+      <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }} component={TicketDetailScreen} />
     </EmpleadoStack.Navigator>
   );
 }

@@ -7,12 +7,15 @@ import { isRolUsuario } from './roles.js';
 
 export type Profile = {
   id: string;
-  email: string;
+  // public.profiles usa full_name / mesa_id / creado_en (schema_inicial.sql:29)
+  full_name: string | null;
+  // compat: algunos callers esperan `nombre` — se mapea desde full_name
   nombre: string | null;
+  email: string | null;
   rol: RolUsuario;
-  mesa_id: string | null;
+  mesa_id: number | null;
   activo: boolean;
-  created_at: string;
+  creado_en: string;
 };
 
 export type AuthState = {
@@ -22,23 +25,41 @@ export type AuthState = {
 };
 
 // Lee el perfil desde public.profiles por id de auth
+// Esquema real: id, full_name, rol, mesa_id, activo, creado_en (+ email via auth.users join si existe)
 export async function fetchProfile(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, email, nombre, rol, mesa_id, activo, created_at')
+    .select('id, full_name, rol, mesa_id, activo, creado_en')
     .eq('id', userId)
     .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
-  // Guard de rol por si la DB tiene valor inesperado
-  if (!isRolUsuario(data.rol)) {
-    throw new Error(`Rol inválido en DB: ${data.rol}`);
+  if (!isRolUsuario((data as unknown as { rol: unknown }).rol)) {
+    throw new Error(`Rol inválido en DB: ${(data as unknown as { rol: unknown }).rol}`);
   }
-  return data as Profile;
+  const row = data as unknown as { id: string; full_name: string | null; rol: RolUsuario; mesa_id: number | null; activo: boolean; creado_en: string };
+  // Intenta enriquecer email desde auth si está disponible (no crítico)
+  let email: string | null = null;
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.user?.id === userId) email = sessionData.session.user.email ?? null;
+  } catch {
+    // ignorar
+  }
+  return {
+    id: row.id,
+    full_name: row.full_name,
+    nombre: row.full_name,
+    email,
+    rol: row.rol,
+    mesa_id: row.mesa_id,
+    activo: row.activo,
+    creado_en: row.creado_en,
+  };
 }
 
 // Conviene para guards: obtiene sesión + perfil en un paso

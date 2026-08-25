@@ -2,6 +2,8 @@
 
 export type AuthStackParamList = {
   Login: undefined;
+  ForgotPassword: undefined;
+  ChangePassword: undefined;
 };
 
 export type EmpleadoStackParamList = {

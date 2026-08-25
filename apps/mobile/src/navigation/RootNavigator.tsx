@@ -1,12 +1,16 @@
-// Navegacion raiz — gatea por sesion y rol (RF-05)
-// Usa @react-navigation/native-stack; cada rol tiene su stack.
+// Navegacion raiz — gatea por sesion y rol (RF-04/05) (Atributos: Seguridad + Usabilidad)
+// RF-04: idle warning banner + reset en interacción; RF-05: gating por rol es solo UX, la verdad es RLS
 
-import { ActivityIndicator, Button, Text, View } from 'react-native';
+import { ActivityIndicator, Button, Pressable, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
+import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
+import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
+import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
+import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
 import type {
   AdminStackParamList,
   AuthStackParamList,
@@ -37,6 +41,8 @@ function AuthNavigator() {
   return (
     <AuthStack.Navigator>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar contraseña' }} />
+      <AuthStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Cambiar contraseña' }} />
     </AuthStack.Navigator>
   );
 }
@@ -44,13 +50,9 @@ function AuthNavigator() {
 function EmpleadoNavigator() {
   return (
     <EmpleadoStack.Navigator>
-      <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }}>
-        {() => <Placeholder title="Mis solicitudes" subtitle="RF-08 listado con filtros y búsqueda" />}
-      </EmpleadoStack.Screen>
+      <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }} component={MisSolicitudesScreen} />
       <EmpleadoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }}>
-        {() => <Placeholder title="Detalle" subtitle="RF-09 historial + comentarios" />}
-      </EmpleadoStack.Screen>
+      <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }} component={TicketDetailScreen} />
     </EmpleadoStack.Navigator>
   );
 }
@@ -106,7 +108,7 @@ function AdminNavigator() {
 }
 
 export function RootNavigator() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
 
   if (loading) {
     return (
@@ -118,18 +120,31 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      {!session || !profile ? (
-        <AuthNavigator />
-      ) : profile.rol === 'empleado' ? (
-        <EmpleadoNavigator />
-      ) : profile.rol === 'tecnico' ? (
-        <TecnicoNavigator />
-      ) : profile.rol === 'jefe' ? (
-        <JefeNavigator />
-      ) : (
-        <AdminNavigator />
-      )}
-    </NavigationContainer>
+    <View style={{ flex: 1 }} onTouchStart={resetIdle}>
+      {idleWarning ? (
+        <View style={{ backgroundColor: '#f59e0b', padding: 8, alignItems: 'center' }}>
+          <Text style={{ color: 'white', fontWeight: '700', fontSize: 12 }}>{idleWarning}</Text>
+          <Pressable onPress={resetIdle}><Text style={{ color: 'white', textDecorationLine: 'underline', fontSize: 12 }}>Seguir activo</Text></Pressable>
+        </View>
+      ) : null}
+      {error ? (
+        <View style={{ backgroundColor: '#ef4444', padding: 6, alignItems: 'center' }}>
+          <Text style={{ color: 'white', fontSize: 11 }}>{error}</Text>
+        </View>
+      ) : null}
+      <NavigationContainer>
+        {!session || !profile ? (
+          <AuthNavigator />
+        ) : profile.rol === 'empleado' ? (
+          <EmpleadoNavigator />
+        ) : profile.rol === 'tecnico' ? (
+          <TecnicoNavigator />
+        ) : profile.rol === 'jefe' ? (
+          <JefeNavigator />
+        ) : (
+          <AdminNavigator />
+        )}
+      </NavigationContainer>
+    </View>
   );
 }

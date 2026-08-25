@@ -1,4 +1,4 @@
-// RF-06 — Crear solicitud de mesa de ayuda
+// RF-06 — Crear solicitud (Opción A Directo RLS + RF-02 Alert nativo) (Calidad: Performance/USabilidad/Seguridad)
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
@@ -47,6 +47,13 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     load();
   }, [load]);
 
+  const humanizeError = (msg: string) => {
+    if (/row-level security|violates.*policy|not.*authorized/i.test(msg)) return 'No autorizado — verifica tu sesión y permisos';
+    if (/usuario_id requerido/i.test(msg)) return 'Sesión expirada — inicia sesión de nuevo';
+    if (/mesa_id.*not-null|dependencia/i.test(msg)) return 'Selecciona una dependencia válida';
+    return msg;
+  };
+
   const onSubmit = async () => {
     const errs = validateCreateTicket(form);
     setErrors(errs);
@@ -55,7 +62,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     setSubmitting(true);
     try {
       const res = await createTicket(supabase, form);
-      // RF-02 modal de confirmación
+      // RF-02 modal de confirmación (Alert nativo elegido)
       Alert.alert('Solicitud creada', `Ticket #${res.numero} creado correctamente`, [
         {
           text: 'OK',
@@ -68,7 +75,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
         },
       ]);
     } catch (e) {
-      Alert.alert('Error al crear', e instanceof Error ? e.message : String(e));
+      Alert.alert('Error al crear', humanizeError(e instanceof Error ? e.message : String(e)));
     } finally {
       setSubmitting(false);
     }
@@ -79,6 +86,21 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       <View style={s.center}>
         <ActivityIndicator />
         <Text style={s.muted}>Cargando catálogos…</Text>
+      </View>
+    );
+  }
+
+  // Empty states — Calidad: Usabilidad/Confiabilidad (no deja pantalla vacía)
+  if (!categorias.length || !mesas.length) {
+    return (
+      <View style={s.center} accessible accessibilityRole="alert">
+        <Text style={s.title}>Catálogos no disponibles</Text>
+        <Text style={s.muted}>
+          {!categorias.length && !mesas.length ? 'Categorías y dependencias vacías' : !categorias.length ? 'Categorías vacías' : 'Dependencias vacías'} — verifica RLS/seed.
+        </Text>
+        <Pressable onPress={load} accessibilityRole="button" accessibilityLabel="Reintentar cargar catálogos" style={[s.button, { paddingHorizontal: 24 }]}>
+          <Text style={s.buttonText}>Reintentar</Text>
+        </Pressable>
       </View>
     );
   }
@@ -174,7 +196,13 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       <Text style={s.hint}>{form.descripcion.length}/5000</Text>
       {touched.descripcion && errors.descripcion ? <Text style={s.error}>{errors.descripcion}</Text> : null}
 
-      <Pressable onPress={onSubmit} disabled={submitting} style={[s.button, submitting && { opacity: 0.6 }]}>
+      <Pressable
+        onPress={onSubmit}
+        disabled={submitting}
+        accessibilityRole="button"
+        accessibilityLabel="Crear solicitud"
+        accessibilityState={{ disabled: submitting }}
+        style={[s.button, submitting && { opacity: 0.6 }]}>
         {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.buttonText}>Crear solicitud</Text>}
       </Pressable>
     </ScrollView>

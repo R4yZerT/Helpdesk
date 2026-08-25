@@ -1,0 +1,9 @@
+node_modules
+.git
+.gitignore
+.supabase
+apps/mobile
+apps/web/node_modules
+apps/web/dist
+supabase/.temp
+.env

@@ -1,10 +1,10 @@
-// RF-01 / RF-04 — Login placeholder (UI real en siguiente iteracion)
+// RF-01 / RF-04 — Login con hint NIST 8 y enlaces recuperación/cambio
 import { useState } from 'react';
-import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Button, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
 
-export function LoginScreen() {
+export function LoginScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
   const { signIn, error, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,6 +44,12 @@ export function LoginScreen() {
       />
       {(localError || error) && <Text style={styles.error}>{localError ?? error}</Text>}
       <Button title={loading ? 'Ingresando…' : 'Ingresar'} onPress={onSubmit} disabled={loading} />
+      <View style={styles.links}>
+        <Pressable onPress={() => navigation?.navigate('ForgotPassword' as never)}>
+          <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
+        </Pressable>
+        <Text style={styles.hint}>Sesión 12h / inactividad 30m · MFA disponible para jefe/admin</Text>
+      </View>
     </View>
   );
 }
@@ -61,4 +67,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
   },
   error: { color: theme.colors.danger, marginTop: 8, fontSize: 12 },
+  links: { marginTop: 16, gap: 8, alignItems: 'center' },
+  link: { color: theme.colors.primary, fontSize: 13, fontWeight: '600' },
+  hint: { fontSize: 10, color: theme.colors.muted, textAlign: 'center' },
 });

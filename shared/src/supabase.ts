@@ -7,6 +7,13 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 export type SupabaseOptions = {
   url: string;
   anonKey: string;
+  // RF-04 — storage cifrado opcional (mobile: SecureStore, web: localStorage)
+  // Calidades: Seguridad (cifrado) + Disponibilidad (persistencia)
+  storage?: {
+    getItem: (key: string) => Promise<string | null> | string | null;
+    setItem: (key: string, value: string) => Promise<void> | void;
+    removeItem: (key: string) => Promise<void> | void;
+  };
 };
 
 export function createSupabaseClient(options: SupabaseOptions): SupabaseClient {
@@ -19,6 +26,8 @@ export function createSupabaseClient(options: SupabaseOptions): SupabaseClient {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: false,
+      storage: options.storage as unknown as undefined,
     },
   });
 }
