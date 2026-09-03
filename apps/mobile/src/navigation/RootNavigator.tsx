@@ -9,6 +9,7 @@ import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
+import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
 import { Card, theme } from '@helpdesk/shared';
 import type { AdminStackParamList, AuthStackParamList, EmpleadoStackParamList, UsuarioStackParamList, JefeStackParamList, TecnicoStackParamList } from './types';
 
@@ -84,9 +85,9 @@ function EmpleadoNavigator() {
 function TecnicoNavigator() {
   return (
     <TecnicoStack.Navigator screenOptions={screenOpts}>
-      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja' }}>{() => <Placeholder title="Bandeja técnico" subtitle="RF-12 orden por prioridad y antigüedad · RF-13 transiciones de estado" />}</TecnicoStack.Screen>
+      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
       <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }}>{() => <Placeholder title="Detalle técnico" subtitle="RF-13 transiciones · RF-15 hilo de avances" />}</TecnicoStack.Screen>
+      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
     </TecnicoStack.Navigator>
   );
 }

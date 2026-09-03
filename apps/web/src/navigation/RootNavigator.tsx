@@ -9,6 +9,7 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
+import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
 import type {
   AdminStackParamList,
   AuthStackParamList,
@@ -61,13 +62,9 @@ function EmpleadoNavigator() {
 function TecnicoNavigator() {
   return (
     <TecnicoStack.Navigator>
-      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }}>
-        {() => <Placeholder title="Bandeja técnico" subtitle="RF-12 orden por prioridad/antigüedad · RF-13 estados" />}
-      </TecnicoStack.Screen>
+      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} />
       <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Ticket' }}>
-        {() => <Placeholder title="Detalle técnico" subtitle="RF-13 transiciones · RF-15 comentarios" />}
-      </TecnicoStack.Screen>
+      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
     </TecnicoStack.Navigator>
   );
 }

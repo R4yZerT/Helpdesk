@@ -72,6 +72,7 @@ export type Ticket = {
   estado: EstadoTicket;
   tecnicoAsignadoId: string | null;
   fechaResolucion: string | null;
+  solucionAplicada: string | null;
   creadoEn: string;
   actualizadoEn: string;
 };
@@ -125,6 +126,7 @@ function mapTicket(row: Record<string, unknown>): Ticket {
     estado: row.estado as EstadoTicket,
     tecnicoAsignadoId: (row.tecnico_asignado_id as string | null) ?? null,
     fechaResolucion: (row.fecha_resolucion as string | null) ?? null,
+    solucionAplicada: (row.solucion_aplicada as string | null) ?? null,
     creadoEn: row.creado_en as string,
     actualizadoEn: row.actualizado_en as string,
   };
@@ -230,7 +232,7 @@ export async function listMyTickets(
 
   let query = client
     .from('tickets')
-    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,creado_en,actualizado_en', { count: 'exact' })
+    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en', { count: 'exact' })
     .order('creado_en', { ascending: false })
     .order('id', { ascending: false })
     .range(from, to);
@@ -295,6 +297,178 @@ export async function addComentario(
   return mapComentario(data as unknown as Record<string, unknown>);
 }
 
+
+// RF-10 — Editar/cancelar propia mientras no asignada (RLS refuerza)
+// RF-11 — solucion_aplicada + fechaResolucion
+
+export type UpdateTicketInput = {
+  asunto?: string;
+  descripcion?: string;
+  prioridad?: PrioridadTicket;
+  categoriaId?: number;
+  mesaId?: number;
+};
+
+export function validateUpdateTicket(input: UpdateTicketInput): Partial<Record<keyof UpdateTicketInput, string>> {
+  const e: Partial<Record<keyof UpdateTicketInput, string>> = {};
+  if (input.asunto !== undefined) {
+    const a = input.asunto.trim();
+    if (a.length < 5) e.asunto = 'Asunto mínimo 5 caracteres';
+    else if (a.length > 200) e.asunto = 'Asunto máximo 200 caracteres';
+  }
+  if (input.descripcion !== undefined) {
+    const d = input.descripcion.trim();
+    if (d.length < 10) e.descripcion = 'Descripción mínimo 10 caracteres';
+    else if (d.length > 5000) e.descripcion = 'Descripción máximo 5000 caracteres';
+  }
+  if (input.prioridad !== undefined && !isPrioridadTicket(input.prioridad)) e.prioridad = 'Prioridad inválida';
+  if (input.categoriaId !== undefined && (!Number.isInteger(input.categoriaId) || input.categoriaId <= 0)) e.categoriaId = 'Categoría inválida';
+  if (input.mesaId !== undefined && (!Number.isInteger(input.mesaId) || input.mesaId <= 0)) e.mesaId = 'Dependencia inválida';
+  return e;
+}
+
+export async function updateTicket(client: SupabaseClient, ticketId: string, patch: UpdateTicketInput): Promise<Ticket> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  const errs = validateUpdateTicket(patch);
+  if (Object.keys(errs).length) throw new Error(Object.values(errs)[0]);
+  const payload: Record<string, unknown> = {};
+  if (patch.asunto !== undefined) payload.asunto = patch.asunto.trim();
+  if (patch.descripcion !== undefined) payload.descripcion = patch.descripcion.trim();
+  if (patch.prioridad !== undefined) payload.prioridad = patch.prioridad;
+  if (patch.categoriaId !== undefined) payload.categoria_id = patch.categoriaId;
+  if (patch.mesaId !== undefined) payload.mesa_id = patch.mesaId;
+  if (!Object.keys(payload).length) throw new Error('Sin cambios');
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  if (error) {
+    const m = error.message;
+    if (/row-level security|policy/i.test(m)) throw new Error('No puedes editar este ticket (solo abierto y sin asignar)');
+    throw new Error(m);
+  }
+  return mapTicket(data as unknown as Record<string, unknown>);
+}
+
+export async function cancelTicket(client: SupabaseClient, ticketId: string): Promise<Ticket> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  const { data, error } = await client.from('tickets').update({ estado: 'cerrado' }).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  if (error) {
+    const m = error.message;
+    if (/row-level security|policy/i.test(m)) throw new Error('No puedes cancelar este ticket');
+    throw new Error(m);
+  }
+  return mapTicket(data as unknown as Record<string, unknown>);
+}
+
+// RF-11/13 — Transición de estado con FSM y solución aplicada
+const ESTADOS_TRANSICION: Record<EstadoTicket, readonly EstadoTicket[]> = {
+  abierto: ['en_proceso', 'cerrado', 'programado'],
+  en_proceso: ['solucionado', 'cerrado', 'devuelto', 'programado'],
+  solucionado: ['cerrado', 'devuelto'],
+  cerrado: [],
+  devuelto: ['en_proceso', 'cerrado'],
+  programado: ['en_proceso', 'cerrado'],
+};
+
+export function canTransition(de: EstadoTicket, a: EstadoTicket): boolean {
+  return (ESTADOS_TRANSICION[de] ?? []).includes(a);
+}
+
+export async function transitionTicket(
+  client: SupabaseClient,
+  ticketId: string,
+  nuevoEstado: EstadoTicket,
+  opts?: { solucionAplicada?: string; comentario?: string },
+): Promise<Ticket> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  if (!isEstadoTicket(nuevoEstado)) throw new Error('Estado inválido');
+  // Validar solución requerida para solucionado/cerrado si se aporta comentario
+  if ((nuevoEstado === 'solucionado' || nuevoEstado === 'cerrado') && opts?.solucionAplicada !== undefined) {
+    const s = opts.solucionAplicada.trim();
+    if (s.length > 0 && s.length < 5) throw new Error('Solución mínimo 5 caracteres');
+    if (s.length > 5000) throw new Error('Solución máximo 5000 caracteres');
+  }
+  // Obtener estado actual para validar FSM (fail-fast)
+  const cur = await client.from('tickets').select('estado').eq('id', ticketId).single();
+  if (cur.error) throw new Error(cur.error.message);
+  const actual = cur.data.estado as EstadoTicket;
+  if (!canTransition(actual, nuevoEstado)) {
+    throw new Error(`Transición no permitida: ${actual} → ${nuevoEstado}`);
+  }
+  const payload: Record<string, unknown> = { estado: nuevoEstado };
+  if (opts?.solucionAplicada !== undefined) payload.solucion_aplicada = opts.solucionAplicada.trim() || null;
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  if (error) throw new Error(error.message);
+  if (opts?.comentario?.trim()) {
+    try { await addComentario(client, ticketId, opts.comentario.trim()); } catch { /* no bloquea transición */ }
+  }
+  return mapTicket(data as unknown as Record<string, unknown>);
+}
+
+// RF-14 — Reasignar a otro técnico o mesa
+export async function reassignTicket(
+  client: SupabaseClient,
+  ticketId: string,
+  patch: { tecnicoId?: string | null; mesaId?: number | null },
+): Promise<Ticket> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  if (patch.tecnicoId === undefined && patch.mesaId === undefined) throw new Error('Nada que reasignar');
+  const payload: Record<string, unknown> = {};
+  if (patch.tecnicoId !== undefined) payload.tecnico_asignado_id = patch.tecnicoId;
+  if (patch.mesaId !== undefined) {
+    if (patch.mesaId !== null && (!Number.isInteger(patch.mesaId) || patch.mesaId <= 0)) throw new Error('Mesa inválida');
+    payload.mesa_id = patch.mesaId;
+  }
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  if (error) throw new Error(error.message);
+  return mapTicket(data as unknown as Record<string, unknown>);
+}
+
+// RF-12 — Bandeja técnico: tickets asignados ordenados prioridad/antigüedad
+export const PRIORIDAD_PESO: Record<PrioridadTicket, number> = { critica: 4, alta: 3, media: 2, baja: 1 };
+
+export type ListAssignedParams = {
+  estado?: EstadoTicket;
+  prioridad?: PrioridadTicket;
+  q?: string;
+  mesaId?: number;
+  page?: number;
+  pageSize?: number;
+};
+
+export async function listAssignedTickets(client: SupabaseClient, params: ListAssignedParams = {}): Promise<ListMyTicketsResult> {
+  const page = Math.max(0, params.page ?? 0);
+  const pageSize = Math.min(50, Math.max(1, params.pageSize ?? DEFAULT_PAGE_SIZE));
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+  // Trae técnico asignado = auth.uid() implícito por RLS; filtramos explícitamente para claridad
+  const { data: user } = await client.auth.getUser();
+  const uid = user.user?.id;
+  let query = client.from('tickets').select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en', { count: 'exact' });
+  if (uid) query = query.eq('tecnico_asignado_id', uid);
+  // Orden base por antigüedad; prioridad se ordena en memoria para respetar peso sin depender de orden alfabético
+  query = query.order('creado_en', { ascending: true }).order('id', { ascending: true }).range(from, to);
+  if (params.estado && isEstadoTicket(params.estado)) query = query.eq('estado', params.estado);
+  if (params.prioridad && isPrioridadTicket(params.prioridad)) query = query.eq('prioridad', params.prioridad);
+  if (params.mesaId) query = query.eq('mesa_id', params.mesaId);
+  const q = params.q?.trim();
+  if (q) {
+    const esc = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
+    query = query.ilike('asunto', `%${esc}%`);
+  }
+  const { data, error, count } = await query;
+  if (error) throw new Error(error.message);
+  let rows = (data ?? []) as Record<string, unknown>[];
+  // Orden prioridad descendente + antigüedad ascendente (memoria, page ya acotado)
+  rows = [...rows].sort((a, b) => {
+    const pa = PRIORIDAD_PESO[a.prioridad as PrioridadTicket] ?? 0;
+    const pb = PRIORIDAD_PESO[b.prioridad as PrioridadTicket] ?? 0;
+    if (pb !== pa) return pb - pa;
+    return String(a.creado_en).localeCompare(String(b.creado_en));
+  });
+  const total = count ?? rows.length;
+  return { data: rows.map(mapTicket), total, hasMore: from + rows.length < total, page, pageSize };
+}
+
+
 // RF-09 — Detalle paralelo 3 queries (Software/Usuario: bloquea solo lo necesario)
 export async function getTicketDetail(
   client: SupabaseClient,
@@ -303,7 +477,7 @@ export async function getTicketDetail(
   if (!ticketId) throw new Error('ticketId requerido');
   const ticketPromise = client
     .from('tickets')
-    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,creado_en,actualizado_en')
+    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en')
     .eq('id', ticketId)
     .single();
   const estadosPromise = client

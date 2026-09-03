@@ -1,7 +1,7 @@
-// RF-09/15 — Detalle paralelo 3 queries + inline comentario (A+A: interno solo tecnico/jefe)
+// RF-09/10/11/13/14/15 — Detalle con edición, cancelación, transiciones, reasignación y comentarios
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { addComentario, getTicketDetail, validateComentario, type TicketDetail } from '@helpdesk/shared';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +34,23 @@ export function TicketDetailScreen({ route }: Props) {
   const [interno, setInterno] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  // RF-10 edición
+  const [editing, setEditing] = useState(false);
+  const [editAsunto, setEditAsunto] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  // RF-13 transición
+  const [showTrans, setShowTrans] = useState(false);
+  const [solucion, setSolucion] = useState('');
+  const [transLoading, setTransLoading] = useState<string | null>(null);
+  const [transError, setTransError] = useState<string | null>(null);
+  // RF-14 reasignar
+  const [showReassign, setShowReassign] = useState(false);
+  const [reassignTecnico, setReassignTecnico] = useState('');
+  const [reassignMesa, setReassignMesa] = useState('');
+  const [reassignLoading, setReassignLoading] = useState(false);
+  const [reassignError, setReassignError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +96,58 @@ export function TicketDetailScreen({ route }: Props) {
     }
   };
 
+  const startEdit = () => {
+    if (!detail) return;
+    setEditAsunto(detail.ticket.asunto);
+    setEditDesc(detail.ticket.descripcion);
+    setEditing(true);
+    setEditError(null);
+  };
+  const onSaveEdit = async () => {
+    const v = validateUpdateTicket({ asunto: editAsunto, descripcion: editDesc });
+    if (Object.keys(v).length) { setEditError(Object.values(v)[0]!); return; }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      await updateTicket(supabase, id, { asunto: editAsunto, descripcion: editDesc });
+      setEditing(false);
+      await load();
+    } catch (e) { setEditError(e instanceof Error ? e.message : String(e)); } finally { setEditSaving(false); }
+  };
+  const onCancelTicket = () => {
+    Alert.alert('Cancelar solicitud', '¿Seguro que quieres cerrar esta solicitud?', [
+      { text: 'No', style: 'cancel' },
+      { text: 'Sí, cerrar', style: 'destructive', onPress: async () => {
+        try { await cancelTicket(supabase, id); await load(); } catch (e) { Alert.alert('Error', e instanceof Error ? e.message : String(e)); }
+      }},
+    ]);
+  };
+  const onTransition = async (estado: string) => {
+    setTransLoading(estado);
+    setTransError(null);
+    try {
+      await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined });
+      setShowTrans(false);
+      setSolucion('');
+      await load();
+    } catch (e) { setTransError(e instanceof Error ? e.message : String(e)); } finally { setTransLoading(null); }
+  };
+  const onReassign = async () => {
+    setReassignLoading(true);
+    setReassignError(null);
+    try {
+      const patch: any = {};
+      if (reassignTecnico.trim()) patch.tecnicoId = reassignTecnico.trim() === 'null' ? null : reassignTecnico.trim();
+      if (reassignMesa.trim()) patch.mesaId = reassignMesa.trim() === 'null' ? null : Number(reassignMesa.trim());
+      if (!Object.keys(patch).length) { setReassignError('Ingresa técnico UUID o mesa ID'); return; }
+      await reassignTicket(supabase, id, patch);
+      setShowReassign(false);
+      setReassignTecnico('');
+      setReassignMesa('');
+      await load();
+    } catch (e) { setReassignError(e instanceof Error ? e.message : String(e)); } finally { setReassignLoading(false); }
+  };
+
   if (loading && !detail) {
     return <View style={s.center}><View style={s.loadingDot} /><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando expediente…</Text></View>;
   }
@@ -88,6 +157,13 @@ export function TicketDetailScreen({ route }: Props) {
   if (!detail) return <View style={s.center}><Text style={s.muted}>Sin datos</Text></View>;
 
   const { ticket, estados, comentarios } = detail;
+  const isOwner = profile?.id === ticket.usuarioId;
+  const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;
+  const canCancel = canEdit;
+  const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
+  const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
+  const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
+  const nextEstados = ESTADOS.filter((e) => canTransition(ticket.estado as any, e as any));
   const charCount = mensaje.length;
 
   return (
@@ -95,8 +171,22 @@ export function TicketDetailScreen({ route }: Props) {
       {/* Hero expediente */}
       <View style={s.hero}>
         <View style={s.kickerRow}><View style={s.kickerHairline} /><Text style={s.kicker}>Expediente  ·  #{String(ticket.numero).padStart(4, '0')}</Text></View>
-        <Text style={s.asunto}>{ticket.asunto}</Text>
-        <Text style={s.desc}>{ticket.descripcion}</Text>
+        {editing ? (
+          <>
+            <TextInput value={editAsunto} onChangeText={setEditAsunto} style={s.editInput} placeholder="Asunto (5-200)" maxLength={200} />
+            <TextInput value={editDesc} onChangeText={setEditDesc} style={[s.editInput, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Descripción (10-5000)" multiline maxLength={5000} />
+            {editError ? <Text style={s.error}>{editError}</Text> : null}
+            <View style={s.actionRow}>
+              <Pressable onPress={() => setEditing(false)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
+              <Pressable onPress={onSaveEdit} disabled={editSaving} style={[s.btn, s.btnPrimary, editSaving && { opacity: 0.6 }]}>{editSaving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Guardar</Text>}</Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={s.asunto}>{ticket.asunto}</Text>
+            <Text style={s.desc}>{ticket.descripcion}</Text>
+          </>
+        )}
         <View style={s.badges}><Badge label={ticket.estado} tone={tonoEstado(ticket.estado)} /><Badge label={ticket.prioridad} tone={tonoPrioridad(ticket.prioridad)} /></View>
         <Divider />
         <View style={s.metaGrid}>
@@ -105,7 +195,53 @@ export function TicketDetailScreen({ route }: Props) {
           <Text style={s.meta}>Mesa {ticket.mesaId ?? '—'}  ·  Cat {ticket.categoriaId}</Text>
         </View>
         {ticket.tecnicoAsignadoId ? <Text style={s.metaSoft}>Técnico {ticket.tecnicoAsignadoId.slice(0, 8)}…</Text> : <Text style={s.metaSoft}>Sin técnico asignado</Text>}
+        {ticket.solucionAplicada ? <View style={s.solBox}><Text style={s.solLabel}>Solución aplicada</Text><Text style={s.solText}>{ticket.solucionAplicada}</Text></View> : null}
+        {ticket.fechaResolucion ? <Text style={s.metaSoft}>Resuelto {new Date(ticket.fechaResolucion).toLocaleString('es-ES')}</Text> : null}
       </View>
+
+      {/* Acciones RF-10/13/14 */}
+      <Card>
+        <Text style={s.section}>Acciones</Text>
+        {canEdit && !editing ? (
+          <View style={s.actionRow}>
+            <Pressable onPress={startEdit} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Editar</Text></Pressable>
+            <Pressable onPress={onCancelTicket} style={[s.btn, s.btnDanger]}><Text style={s.btnDangerText}>Cancelar solicitud</Text></Pressable>
+          </View>
+        ) : null}
+        {nextEstados.length > 0 && isTecnicoLike ? (
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnPrimary]}><Text style={s.btnPrimaryText}>{showTrans ? 'Ocultar transiciones' : 'Cambiar estado'}</Text></Pressable>
+            {showTrans ? (
+              <View style={{ gap: 8 }}>
+                <Text style={s.mutedSmall}>Solución (opcional, se guarda al pasar a solucionado/cerrado):</Text>
+                <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución…" style={s.input} multiline maxLength={5000} />
+                {transError ? <Text style={s.error}>{transError}</Text> : null}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {nextEstados.map((e) => (
+                    <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                      {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {canReassign ? (
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <Pressable onPress={() => setShowReassign((v) => !v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar…'}</Text></Pressable>
+            {showReassign ? (
+              <View style={{ gap: 8 }}>
+                <TextInput value={reassignTecnico} onChangeText={setReassignTecnico} placeholder="UUID técnico (o 'null' para desasignar)" style={s.input} autoCapitalize="none" />
+                <TextInput value={reassignMesa} onChangeText={setReassignMesa} placeholder="ID mesa (número)" style={s.input} keyboardType="numeric" />
+                {reassignError ? <Text style={s.error}>{reassignError}</Text> : null}
+                <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && { opacity: 0.6 }]}>{reassignLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Confirmar reasignación</Text>}</Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+        {!canEdit && nextEstados.length === 0 && !canReassign ? <Text style={s.muted}>Sin acciones disponibles para tu rol/estado</Text> : null}
+      </Card>
 
       <Card>
         <Text style={s.section}>Historial  ·  {estados.length}</Text>
@@ -206,12 +342,24 @@ const s = StyleSheet.create({
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   rowTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.primary },
   composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 10, ...theme.shadow.soft },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 12, fontSize: 13, color: theme.colors.text, minHeight: 84, textAlignVertical: 'top', backgroundColor: theme.colors.surfaceAlt },
+  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 12, fontSize: 13, color: theme.colors.text, minHeight: 44, textAlignVertical: 'top', backgroundColor: theme.colors.surfaceAlt },
+  editInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt },
+  solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.colors.border, gap: 4 },
+  solLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: theme.colors.primary },
+  solText: { fontSize: 12, color: theme.colors.textSoft, lineHeight: 16 },
   hint: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'right' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.bg, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: theme.colors.border },
   switchLabel: { fontSize: 12, color: theme.colors.primary, fontWeight: '600' },
   sendBtn: { backgroundColor: theme.colors.primary, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
   sendText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
+  btn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  btnPrimary: { backgroundColor: theme.colors.primary },
+  btnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  btnGhost: { backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
+  btnGhostText: { color: theme.colors.primary, fontWeight: '700', fontSize: 12 },
+  btnDanger: { backgroundColor: theme.colors.danger },
+  btnDangerText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  actionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   retryBtn: { marginTop: 10, backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignSelf: 'flex-start' },
   retryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 });
