@@ -5,12 +5,12 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "helpdesk",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "userInterfaceStyle": "light",
-    "splash": {
-      "backgroundColor": "#0f172a",
-      "resizeMode": "contain"
-    },
     "ios": {
       "supportsTablet": true
     },
@@ -22,6 +22,15 @@
     "web": {
       "bundler": "metro"
     },
-    "plugins": []
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0f172a",
+          "imageWidth": 200
+        }
+      ]
+    ]
   }
 }

@@ -1,6 +1,6 @@
 # HelpDesk — Mesa de Servicio (WIP)
 
-Monorepo Expo + Supabase. 4 roles (empleado/técnico/jefe/admin). En desarrollo — faltan RF y Docker aún no funciona.
+Monorepo Expo + Supabase. 4 roles (usuario/técnico/jefe/admin). En desarrollo — faltan RF y Docker aún no funciona.
 
 ## Estructura
 ```

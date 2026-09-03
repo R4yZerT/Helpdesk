@@ -1,7 +1,7 @@
-// RF-03 robusto — Cambio de contraseña con validación NIST + HIBP fail-closed + reauth
+// RF-03 robusto — Cambio elegante con fortaleza
 import { useState, useMemo } from 'react';
-import { Alert, Button, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
-import { theme, validatePasswordSync, validatePassword } from '@helpdesk/shared';
+import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme, validatePasswordSync, validatePassword, Card, Button } from '@helpdesk/shared';
 import { PasswordStrength } from '../../components/PasswordStrength';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -27,12 +27,9 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
 
     setLoading(true);
     try {
-      // Fail-closed HIBP via shared (usa pwnedpasswords API directo desde cliente)
-      // En producción también vía Edge Function auth-validate para no exponer lógica; aquí validamos cliente robusto
       const full = await validatePassword(next, ctx);
       if (!full.ok) { setServerError(full.reasons[0]); return; }
 
-      // Reautenticación requerida por secure_password_change=true: verifica current si hay sesión email
       if (profile?.email && current) {
         const { error: reauthErr } = await supabase.auth.signInWithPassword({ email: profile.email, password: current });
         if (reauthErr) { setServerError('Contraseña actual incorrecta'); return; }
@@ -47,26 +44,41 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
   };
 
   return (
-    <View style={s.container}>
-      <Text style={s.title}>Cambiar contraseña</Text>
-      <Text style={s.subtitle}>NIST 800-63B · 8–64 chars · verificación contra filtraciones</Text>
-
-      <TextInput placeholder="Contraseña actual" secureTextEntry value={current} onChangeText={setCurrent} style={s.input} />
-      <TextInput placeholder="Nueva contraseña (mín. 8)" secureTextEntry value={next} onChangeText={setNext} style={s.input} />
-      <PasswordStrength validation={sync} />
-      <TextInput placeholder="Confirmar nueva" secureTextEntry value={confirm} onChangeText={setConfirm} style={[s.input, next && confirm && next !== confirm ? s.inputError : null]} />
-      {next && confirm && next !== confirm ? <Text style={s.error}>No coinciden</Text> : null}
-      {serverError ? <Text style={s.error}>{serverError}</Text> : null}
-      {loading ? <ActivityIndicator /> : <Button title="Actualizar contraseña" onPress={onSubmit} disabled={loading || !next || !confirm} />}
-    </View>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+      <View style={s.hero}>
+        <View style={s.hairline} />
+        <Text style={s.eyebrow}>Seguridad · NIST 800-63B</Text>
+        <Text style={s.title}>Cambiar contraseña</Text>
+        <Text style={s.subtitle}>8–64 caracteres · sin composición forzada · verificada contra filtraciones (HIBP fail-closed)</Text>
+      </View>
+      <View style={s.body}>
+        <Card style={s.card}>
+          <Text style={s.label}>Contraseña actual</Text>
+          <TextInput placeholder="••••••••" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry value={current} onChangeText={setCurrent} style={s.input} />
+          <Text style={s.label}>Nueva contraseña</Text>
+          <TextInput placeholder="Mín. 8 caracteres" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry value={next} onChangeText={setNext} style={s.input} />
+          <PasswordStrength validation={sync} />
+          <TextInput placeholder="Confirmar nueva" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry value={confirm} onChangeText={setConfirm} style={[s.input, next && confirm && next !== confirm ? s.inputError : null]} />
+          {next && confirm && next !== confirm ? <Text style={s.error}>No coinciden</Text> : null}
+          {serverError ? <View style={s.errorBox}><Text style={s.error}>{serverError}</Text></View> : null}
+          {loading ? <ActivityIndicator /> : <Button title="Actualizar contraseña" onPress={onSubmit} variant="brass" disabled={loading || !next || !confirm} />}
+        </Card>
+      </View>
+    </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: theme.colors.bg, justifyContent: 'center', gap: 4 },
-  title: { fontSize: 20, fontWeight: '700', color: theme.colors.primary },
-  subtitle: { fontSize: 11, color: theme.colors.muted, marginBottom: 12 },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: 12, backgroundColor: theme.colors.surface },
-  inputError: { borderColor: theme.colors.danger },
-  error: { color: theme.colors.danger, fontSize: 11 },
+  hero: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12, gap: 6 },
+  hairline: { height: 2, width: 32, backgroundColor: theme.colors.accent, borderRadius: 999 },
+  eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: theme.colors.accentStrong },
+  title: { fontSize: 26, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: theme.colors.muted, lineHeight: 18 },
+  body: { paddingHorizontal: 16, paddingTop: 8 },
+  card: { gap: 10, padding: 18, borderRadius: theme.radius.xl },
+  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: theme.colors.textSoft },
+  input: { borderWidth: 1.2, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 14, paddingVertical: 13, backgroundColor: '#FFFEFB', fontSize: 14, color: theme.colors.text },
+  inputError: { borderColor: '#FCA5A5' },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 12, padding: 10 },
+  error: { color: '#7F1D1D', fontSize: 12, fontWeight: '600' },
 });

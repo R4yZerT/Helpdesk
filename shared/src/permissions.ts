@@ -40,7 +40,7 @@ export type Permission =
 
 // Matriz: rol -> permisos (Set para lookup O(1))
 const PERMISSIONS: Record<RolUsuario, ReadonlySet<Permission>> = {
-  empleado: new Set<Permission>([
+  usuario: new Set<Permission>([
     'ticket:create',
     'ticket:listOwn',
     'ticket:viewOwn',
@@ -144,7 +144,7 @@ export function canAll(
 
 // Rutas por rol — para guards de navegación
 export const HOME_BY_ROLE: Record<RolUsuario, string> = {
-  empleado: '/(empleado)/tickets',
+  usuario: '/(usuario)/tickets',
   tecnico: '/(tecnico)/bandeja',
   jefe: '/(jefe)/dashboard',
   administrador: '/(admin)/usuarios',
@@ -152,8 +152,8 @@ export const HOME_BY_ROLE: Record<RolUsuario, string> = {
 
 // Rutas permitidas (prefijos). Se usa en RequireRole / middleware.
 export const ALLOWED_PREFIXES: Record<RolUsuario, readonly string[]> = {
-  empleado: ['/(empleado)', '/tickets', '/perfil'],
-  tecnico: ['/(tecnico)', '/(empleado)', '/tickets', '/perfil'],
-  jefe: ['/(jefe)', '/(tecnico)', '/(empleado)', '/tickets', '/perfil', '/dashboard'],
+  usuario: ['/(usuario)', '/tickets', '/perfil'],
+  tecnico: ['/(tecnico)', '/(usuario)', '/tickets', '/perfil'],
+  jefe: ['/(jefe)', '/(tecnico)', '/(usuario)', '/tickets', '/perfil', '/dashboard'],
   administrador: ['/(admin)', '/perfil', '/mesas', '/categorias', '/usuarios', '/import'],
 };

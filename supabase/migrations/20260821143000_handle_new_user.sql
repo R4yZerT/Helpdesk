@@ -1,5 +1,6 @@
 -- RF-04 + RF-27 — Autocreacion de profile al registrar usuario
--- Crea public.profiles a partir de auth.users; rol por defecto empleado (se exige RLS y anon key expone).
+-- Crea public.profiles a partir de auth.users; rol por defecto usuario
+-- Schema real: profiles(id, full_name, rol, mesa_id, activo)
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -8,12 +9,11 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, nombre, rol, activo)
+  insert into public.profiles (id, full_name, rol, activo)
   values (
     new.id,
-    new.email,
-    coalesce(new.raw_user_meta_data->>'nombre', split_part(new.email, '@', 1)),
-    coalesce((new.raw_user_meta_data->>'rol')::rol_usuario, 'empleado'::rol_usuario),
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'nombre', split_part(new.email, '@', 1)),
+    coalesce((new.raw_user_meta_data->>'rol')::rol_usuario, 'usuario'::rol_usuario),
     true
   )
   on conflict (id) do nothing;

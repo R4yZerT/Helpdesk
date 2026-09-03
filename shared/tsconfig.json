@@ -4,7 +4,10 @@
     "composite": true,
     "outDir": "dist",
     "rootDir": "src",
-    "noEmit": true
+    "noEmit": true,
+    "ignoreDeprecations": "6.0"
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

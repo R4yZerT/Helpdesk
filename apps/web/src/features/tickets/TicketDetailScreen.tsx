@@ -11,7 +11,7 @@ type Props = { route: { params: { id: string } } };
 export function TicketDetailScreen({ route }: Props) {
   const { id } = route.params;
   const { profile } = useAuth();
-  const canComment = !!profile && ['empleado', 'tecnico', 'jefe'].includes(profile.rol);
+  const canComment = !!profile && ['usuario', 'tecnico', 'jefe'].includes(profile.rol);
   const canInternal = !!profile && ['tecnico', 'jefe', 'administrador'].includes(profile.rol);
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [loading, setLoading] = useState(true);

@@ -6,11 +6,14 @@ export type AuthStackParamList = {
   ChangePassword: undefined;
 };
 
-export type EmpleadoStackParamList = {
+export type UsuarioStackParamList = {
   MisSolicitudes: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
 };
+// Alias compatibilidad
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type EmpleadoStackParamList = UsuarioStackParamList;
 
 export type TecnicoStackParamList = {
   Bandeja: undefined;

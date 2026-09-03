@@ -1,17 +1,17 @@
 # Documento de Requisitos — Sistema de Mesa de Ayuda (HelpDesk)
 
 > **Etapa 1 del SLC:** Análisis y Definición de Requisitos.
-> Aplicación móvil de mesa de ayuda con modelos predictivos de IA. Usuarios **solo internos** (empleados de la empresa).
+> Aplicación móvil de mesa de ayuda con modelos predictivos de IA. Usuarios **solo internos** (funcionarios de la empresa (usuarios internos)).
 
 ---
 
 ## 1. Visión y alcance
 
-Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y dar seguimiento a solicitudes de soporte, a los técnicos gestionar su bandeja de trabajo y al jefe supervisar la operación en tiempo real, apoyado por modelos de IA que predicen picos de carga, detectan patrones por categoría y alertan anomalías.
+Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar seguimiento a solicitudes de soporte, a los técnicos gestionar su bandeja de trabajo y al jefe supervisar la operación en tiempo real, apoyado por modelos de IA que predicen picos de carga, detectan patrones por categoría y alertan anomalías.
 
 **Datos para IA:** provienen de la propia aplicación y de fuentes externas.
 
-**Alcance de la versión 1:** empleado, técnico, jefe y administrador con las funciones descritas en los requisitos funcionales (RF). Stack móvil y backend **aún en análisis** (React Native / Flutter / nativo; Supabase / API propia / Firebase).
+**Alcance de la versión 1:** usuario, técnico, jefe y administrador con las funciones descritas en los requisitos funcionales (RF). Stack móvil y backend **aún en análisis** (React Native / Flutter / nativo; Supabase / API propia / Firebase).
 
 ---
 
@@ -19,7 +19,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y da
 
 | Rol | Descripción |
 |---|---|
-| **Empleado** | Crea y da seguimiento a sus solicitudes, recibe notificaciones de cambios de estado. |
+| **Usuario** | Crea y da seguimiento a sus solicitudes (funcionario solicitante), recibe notificaciones de cambios de estado. |
 | **Técnico** | Gestiona la bandeja de tickets asignados, cambia estados, resuelve solicitudes y comenta. |
 | **Jefe** | Supervisa la operación en tiempo real mediante dashboard con filtros y recibe alertas del sistema de IA. |
 | **Administrador** | Crea usuarios, asigna roles y mesas, gestiona las mesas y el catálogo de categorías. No gestiona tickets ni recibe alertas de IA. |
@@ -32,11 +32,11 @@ Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y da
 
 | ID | Requisito | Prio |
 |---|---|---|
-| RF-01 | Inicio de sesión del empleado con correo corporativo + contraseña siguiendo NIST SP 800-63B (mín. 8 chars, sin composición forzada, check contra listas de contraseñas comprometidas) | M |
+| RF-01 | Inicio de sesión del usuario con correo corporativo + contraseña siguiendo NIST SP 800-63B (mín. 8 chars, sin composición forzada, check contra listas de contraseñas comprometidas) | M |
 | RF-02 | Modales de confirmación/error tras cada creación o modificación | M |
 | RF-03 | Cambio y recuperación de contraseña con validación de la política segura en el front | M |
 | RF-04 | Sesión persistente con token (JWT) y cierre de sesión | M |
-| RF-05 | Control de acceso por rol: **empleado**, **técnico**, **jefe**, **administrador** | M |
+| RF-05 | Control de acceso por rol: **usuario**, **técnico**, **jefe**, **administrador** | M |
 
 ### Módulo 2 — Gestión de tickets
 
@@ -56,7 +56,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y da
 | RF-12 | Bandeja de tickets asignados al técnico con orden por prioridad/antigüedad | M |
 | RF-13 | Transiciones de estado: Abierto → En Proceso → Solucionado / Cerrado / Devuelto / Programado | M |
 | RF-14 | Reasignar ticket a otro técnico o mesa | M |
-| RF-15 | Comentarios internos (técnico ↔ empleado) visibles en el detalle | M |
+| RF-15 | Comentarios internos (técnico ↔ usuario) visibles en el detalle | M |
 
 ### Módulo 4 — Dashboard del jefe (tiempo real)
 
@@ -79,7 +79,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y da
 
 | ID | Requisito | Prio |
 |---|---|---|
-| RF-23 | Notificaciones push al empleado ante cambios de estado | S |
+| RF-23 | Notificaciones push al usuario ante cambios de estado | S |
 | RF-24 | Alertas del sistema de IA dirigidas al jefe | S |
 | RF-25 | Administración de catálogos: categorías, dependencias, técnicos | S |
 | RF-26 | Importación del histórico CSV normalizado (latin-1 → UTF-8, NFD) como datos de entrenamiento | M |
@@ -88,7 +88,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los empleados crear y da
 
 | ID | Requisito | Prio |
 |---|---|---|
-| RF-27 | Crear, editar y desactivar usuarios del sistema (empleados, técnicos, jefes) | M |
+| RF-27 | Crear, editar y desactivar usuarios del sistema (usuarios solicitantes, técnicos, jefes) | M |
 | RF-28 | Asignar y reasignar a cada usuario su rol y su mesa | M |
 | RF-29 | Crear y gestionar las **mesas** (dependencias: TIC, Comunicaciones, Infraestructura Física, EAPSA, etc.) | M |
 | RF-30 | Ver **todas** las mesas y su configuración, independientemente de su cargo | M |

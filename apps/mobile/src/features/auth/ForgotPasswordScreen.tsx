@@ -1,7 +1,7 @@
-// RF-03 — Recuperación con validación y rate limit 60s
+// RF-03 — Recuperación elegante
 import { useState } from 'react';
-import { Button, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
-import { theme } from '@helpdesk/shared';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
+import { theme, Card, Button } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: (r: string) => void; goBack: () => void } }) {
@@ -24,22 +24,42 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
   };
 
   return (
-    <View style={s.container}>
-      <Text style={s.title}>Recuperar contraseña</Text>
-      <Text style={s.subtitle}>Enviaremos un enlace de recuperación (confirmación requerida). Rate limit 60s.</Text>
-      <TextInput placeholder="correo@iue.edu.co" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={s.input} />
-      {error ? <Text style={s.error}>{error}</Text> : null}
-      <Button title={loading ? 'Enviando…' : sent ? 'Reenviar' : 'Enviar enlace'} onPress={onSubmit} disabled={loading} />
-      {sent ? <Text style={s.hint}>Si no llega, espera 60s y reintenta. Revisa spam.</Text> : null}
-    </View>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }} style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+      <View style={s.hero}>
+        <View style={s.hairline} />
+        <Text style={s.eyebrow}>Recuperación segura</Text>
+        <Text style={s.title}>Restablece tu acceso</Text>
+        <Text style={s.subtitle}>Te enviamos un enlace único a tu correo corporativo. Válido 1 hora · límite 60s entre envíos.</Text>
+      </View>
+      <View style={s.body}>
+        <Card style={s.card}>
+          <Text style={s.label}>Correo corporativo</Text>
+          <TextInput placeholder="correo@iue.edu.co" placeholderTextColor={theme.colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={s.input} />
+          {error ? <View style={s.errorBox}><Text style={s.error}>{error}</Text></View> : null}
+          <Button title={loading ? 'Enviando…' : sent ? 'Reenviar enlace' : 'Enviar enlace'} onPress={onSubmit} variant="brass" disabled={loading} />
+          {sent ? <Text style={s.hint}>Si no llega, espera 60s y reintenta. Revisa spam y la bandeja de Inbucket si estás en local.</Text> : null}
+          <Pressable onPress={() => (navigation as unknown as { goBack?: () => void })?.goBack?.()} style={s.back}>
+            <Text style={s.backText}>← Volver al ingreso</Text>
+          </Pressable>
+        </Card>
+      </View>
+    </ScrollView>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, padding: 24, justifyContent: 'center', backgroundColor: theme.colors.bg, gap: 8 },
-  title: { fontSize: 20, fontWeight: '700', color: theme.colors.primary },
-  subtitle: { fontSize: 11, color: theme.colors.muted },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: 12, backgroundColor: theme.colors.surface },
-  error: { color: theme.colors.danger, fontSize: 11 },
-  hint: { fontSize: 11, color: theme.colors.muted },
+  hero: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12, gap: 6 },
+  hairline: { height: 2, width: 32, backgroundColor: theme.colors.accent, borderRadius: 999 },
+  eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: theme.colors.accentStrong },
+  title: { fontSize: 26, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.5 },
+  subtitle: { fontSize: 13, color: theme.colors.muted, lineHeight: 18 },
+  body: { paddingHorizontal: 16, paddingTop: 8 },
+  card: { gap: 12, padding: 18, borderRadius: theme.radius.xl },
+  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: theme.colors.textSoft },
+  input: { borderWidth: 1.2, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 14, paddingVertical: 13, backgroundColor: '#FFFEFB', fontSize: 14, color: theme.colors.text },
+  errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 12, padding: 10 },
+  error: { color: '#7F1D1D', fontSize: 12, fontWeight: '600' },
+  hint: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
+  back: { alignItems: 'center', paddingVertical: 8, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt },
+  backText: { color: theme.colors.primary, fontWeight: '700', fontSize: 13 },
 });

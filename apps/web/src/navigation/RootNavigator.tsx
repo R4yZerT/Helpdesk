@@ -13,6 +13,7 @@ import type {
   AdminStackParamList,
   AuthStackParamList,
   EmpleadoStackParamList,
+  UsuarioStackParamList,
   JefeStackParamList,
   TecnicoStackParamList,
 } from './types';
@@ -30,7 +31,8 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const EmpleadoStack = createNativeStackNavigator<EmpleadoStackParamList>();
+const UsuarioStack = createNativeStackNavigator<UsuarioStackParamList>();
+const EmpleadoStack = UsuarioStack;
 const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
 const AdminStack = createNativeStackNavigator<AdminStackParamList>();
@@ -43,14 +45,17 @@ function AuthNavigator() {
   );
 }
 
-function EmpleadoNavigator() {
+function UsuarioNavigator() {
   return (
-    <EmpleadoStack.Navigator>
-      <EmpleadoStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }} component={MisSolicitudesScreen} />
-      <EmpleadoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <EmpleadoStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }} component={TicketDetailScreen} />
-    </EmpleadoStack.Navigator>
+    <UsuarioStack.Navigator>
+      <UsuarioStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }} component={MisSolicitudesScreen} />
+      <UsuarioStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
+      <UsuarioStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }} component={TicketDetailScreen} />
+    </UsuarioStack.Navigator>
   );
+}
+function EmpleadoNavigator() {
+  return <UsuarioNavigator />;
 }
 
 function TecnicoNavigator() {
@@ -119,8 +124,8 @@ export function RootNavigator() {
     <NavigationContainer>
       {!session || !profile ? (
         <AuthNavigator />
-      ) : profile.rol === 'empleado' ? (
-        <EmpleadoNavigator />
+      ) : profile.rol === 'usuario' ? (
+        <UsuarioNavigator />
       ) : profile.rol === 'tecnico' ? (
         <TecnicoNavigator />
       ) : profile.rol === 'jefe' ? (

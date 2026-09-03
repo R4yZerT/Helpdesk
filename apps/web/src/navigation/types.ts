@@ -4,11 +4,12 @@ export type AuthStackParamList = {
   Login: undefined;
 };
 
-export type EmpleadoStackParamList = {
+export type UsuarioStackParamList = {
   MisSolicitudes: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
 };
+export type EmpleadoStackParamList = UsuarioStackParamList;
 
 export type TecnicoStackParamList = {
   Bandeja: undefined;

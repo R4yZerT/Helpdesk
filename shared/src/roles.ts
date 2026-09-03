@@ -5,7 +5,7 @@ import type { RolUsuario } from './types.js';
 
 // Todos los roles válidos (orden de menor a mayor privilegio operativo)
 export const ROLES: readonly RolUsuario[] = [
-  'empleado',
+  'usuario',
   'tecnico',
   'jefe',
   'administrador',

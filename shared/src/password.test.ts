@@ -22,7 +22,7 @@ describe('password — NIST 800-63B', () => {
 
   it('bloquea contenido de email/nombre/rol', () => {
     expect(validatePasswordSync('juan12345', { email: 'juan@iue.edu.co' }).ok).toBe(false);
-    expect(validatePasswordSync('Empleado2024!', { rol: 'empleado' }).ok).toBe(false);
+    expect(validatePasswordSync('Usuario2024!', { rol: 'usuario' }).ok).toBe(false);
     expect(validatePasswordSync('Garcia2024!', { nombre: 'García' }).ok).toBe(false);
   });
 
