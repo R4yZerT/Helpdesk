@@ -45,9 +45,9 @@ services:
       # Expo cache
       - web_dev_expo:/app/apps/web/.expo
     restart: unless-stopped
-    # Healthcheck simple: espera a que Expo responda
+    # Healthcheck simple: espera a que Expo responda (127.0.0.1 evita resolución IPv6 ::1)
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:19006/ | grep -qi '<html' || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:19006/ | grep -qi '<html' || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10
