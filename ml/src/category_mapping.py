@@ -197,14 +197,44 @@ FALLBACK_KEYWORDS: list[tuple[str, tuple[str, str]]] = [
 ]
 
 
+
+import unicodedata, re
+
+def _norm(s: str) -> str:
+    s = s.replace("\ufeff","").replace("ï»¿","").strip()
+    # reparar mojibake Ã -> utf8
+    if "Ã" in s:
+        try:
+            s = s.encode("latin1").decode("utf-8")
+        except: pass
+    # quitar �
+    s = s.replace("�","").replace("�","")
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = s.lower()
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+# índice normalizado para matching robusto
+_NORM_MAP = {_norm(k): v for k, v in CATEGORY_MAP.items()}
+_NORM_FALLBACK = [(_norm(kw), cat) for kw, cat in FALLBACK_KEYWORDS]
+
 def resolve_category(tipo_raw: str) -> tuple[str, str]:
-    """Resuelve (dominio, subcategoria) con fallback por keywords."""
+    """Resuelve (dominio, subcategoria) robusto a mojibake y acentos."""
     if not tipo_raw or not tipo_raw.strip():
         return ("general", "Sin clasificar / Otros")
     key = tipo_raw.strip()
+    # intento exacto primero
     if key in CATEGORY_MAP:
         return CATEGORY_MAP[key]
-    # fallback case-insensitive por keywords
+    nk = _norm(key)
+    if nk in _NORM_MAP:
+        return _NORM_MAP[nk]
+    # fallback por keywords normalizados
+    for kw_norm, cat in _NORM_FALLBACK:
+        if kw_norm in nk:
+            return cat
+    # último intento: sin normalizar pero case-insensitive
     low = key.lower()
     for kw, cat in FALLBACK_KEYWORDS:
         if kw in low:

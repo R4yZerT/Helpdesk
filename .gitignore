@@ -45,3 +45,5 @@ models/
 *.bin
 *.onnx
 *.pt
+__pycache__/
+*.pyc

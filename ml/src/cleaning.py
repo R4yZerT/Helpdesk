@@ -94,34 +94,68 @@ def validate_row(row: pd.Series) -> list[str]:
 
 
 def load_raw(path: Path) -> pd.DataFrame:
-    # El archivo viene en latin1/windows-1252 con ; como separador
-    # Intentamos latin1 primero, fallback utf-8-sig
-    for enc in ("latin1", "utf-8-sig", "cp1252"):
-        try:
-            df = pd.read_csv(
-                path,
-                sep=";",
-                encoding=enc,
-                dtype=str,
-                keep_default_na=False,
-                quoting=1,  # QUOTE_MINIMAL
-                engine="python",
-                on_bad_lines="skip",
-            )
-            # verificar que tenga columnas reconocibles
-            if any("Asunto" in c for c in df.columns):
-                print(f"[ingesta] leído con encoding={enc} filas={len(df)}")
-                break
-        except Exception as e:
-            print(f"[ingesta] fallo {enc}: {e}")
-            continue
-    else:
-        raise RuntimeError("No se pudo leer el CSV con ningún encoding")
-
-    # limpiar BOM del header
-    df.columns = [c.replace("\ufeff", "").strip() for c in df.columns]
-    # renombrar a snake_case para procesar
-    col_map = {c: c for c in df.columns}
+    # Archivo mixto utf-8 + cp1252 con BOM y separador ;
+    # Usamos csv.DictReader con decodificación robusta (utf-8 errors=replace -> latin1)
+    import csv
+    # Leer bytes y decodificar: primero intentar utf-8-sig, luego latin1 para filas problemáticas
+    # Estrategia: abrir en modo texto con utf-8 y errors='replace' deja � pero recupera columnas
+    # Mejora: detectar BOM y limpiar nombres
+    rows = []
+    fieldnames = None
+    # Prueba 1: csv con utf-8 errors replace (recupera 8095 filas como antes)
+    # cp1252/latin1 preserva tildes (el archivo es mixto pero body es cp1252, header utf-8 BOM -> ï»¿ se limpia)
+    with open(path, encoding="latin1", newline="") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        # limpiar BOM del header
+        if reader.fieldnames:
+            reader.fieldnames = [c.replace("\ufeff", "").replace("ï»¿", "").strip().strip('"').strip("'") for c in reader.fieldnames]
+            # también limpiar artefacto latin1 de header (DescripciÃ³n -> Descripción si quedó mal)
+            fixed = []
+            for c in reader.fieldnames:
+                # si contiene Ã, es utf-8 mal decodificado como latin1 -> recodificar
+                if "Ã" in c:
+                    try:
+                        c = c.encode("latin1").decode("utf-8")
+                    except Exception:
+                        pass
+                fixed.append(c)
+            reader.fieldnames = fixed
+            fieldnames = reader.fieldnames
+        for r in reader:
+            # limpiar llaves con BOM residual
+            clean_r = {}
+            for k, v in r.items():
+                if k is None:
+                    continue
+                nk = k.replace("\ufeff", "").replace("ï»¿", "").strip().strip('"').strip("'")
+                if "Ã" in nk:
+                    try:
+                        nk = nk.encode("latin1").decode("utf-8")
+                    except Exception:
+                        pass
+                # valores: reparar mojibake común (Ã³ -> ó)
+                if v and "Ã" in v:
+                    try:
+                        v = v.encode("latin1").decode("utf-8")
+                    except Exception:
+                        pass
+                clean_r[nk] = v if v is not None else ""
+            rows.append(clean_r)
+    df = pd.DataFrame(rows, dtype=str).fillna("")
+    # Asegurar que todas las columnas esperadas existan (crear vacías si faltan)
+    for col in EXPECTED_COLS:
+        if col not in df.columns:
+            # intentar match sin tildes / case-insensitive
+            found = None
+            for c in df.columns:
+                if c.lower().replace("ó","o").replace("í","i").replace("é","e") == col.lower().replace("ó","o").replace("í","i").replace("é","e"):
+                    found = c
+                    break
+            if found:
+                df[col] = df[found]
+            else:
+                df[col] = ""
+    print(f"[ingesta] leído filas={len(df)} cols={list(df.columns)[:4]}...")
     return df
 
 
