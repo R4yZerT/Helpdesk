@@ -42,7 +42,7 @@ export function AppShell({
 
   // Mobile/Tablet: drawer overlay
   return (
-    <View style={s.root}>
+    <View style={s.rootMobile}>
       {topBar ? (
         <View style={s.mobileTopBarWrap}>
           <Pressable onPress={() => setDrawerOpen((v) => !v)} style={s.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
@@ -67,6 +67,7 @@ export function AppShell({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.bg, flexDirection: 'row' },
+  rootMobile: { flex: 1, backgroundColor: theme.colors.bg, flexDirection: 'column' },
   sidebarDesktop: {
     width: SIDEBAR_W,
     backgroundColor: theme.colors.surface,

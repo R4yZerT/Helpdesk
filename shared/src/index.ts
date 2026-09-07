@@ -25,3 +25,4 @@ export * from './ui/charts/TimelineAlertas.js';
 export * from './dashboard.js';
 export * from './export.js';
 export * from './ia.js';
+export * from './admin.js';

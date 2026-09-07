@@ -10,7 +10,8 @@ import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
-import type { AdminStackParamList, AuthStackParamList, JefeStackParamList } from './types';
+import { AdminNavigator } from '../features/admin/AdminNavigator';
+import type { AuthStackParamList, JefeStackParamList } from './types';
 
 function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
   const { profile, signOut } = useAuth();
@@ -26,7 +27,6 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
-const AdminStack = createNativeStackNavigator<AdminStackParamList>();
 
 function AuthNavigator() {
   return (
@@ -57,24 +57,7 @@ function JefeNavigator() {
   );
 }
 
-function AdminNavigator() {
-  return (
-    <AdminStack.Navigator>
-      <AdminStack.Screen name="Usuarios" options={{ title: 'Usuarios (RF-27)' }}>
-        {() => <Placeholder title="Usuarios" subtitle="RF-27/28 crear, editar, desactivar, asignar rol+mesa" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Mesas" options={{ title: 'Mesas (RF-29)' }}>
-        {() => <Placeholder title="Mesas" subtitle="RF-29/31 mesas y respaldo" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Categorias" options={{ title: 'Categorías (RF-32)' }}>
-        {() => <Placeholder title="Categorías" subtitle="RF-32 catálogo normalizado (19)" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Import" options={{ title: 'Import (RF-26)' }}>
-        {() => <Placeholder title="Import histórico" subtitle="RF-26 latin-1 → UTF-8 NFD" />}
-      </AdminStack.Screen>
-    </AdminStack.Navigator>
-  );
-}
+
 
 export function RootNavigator() {
   const { session, profile, loading } = useAuth();
