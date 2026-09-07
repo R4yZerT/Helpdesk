@@ -12,6 +12,7 @@ apps/*/web-build/
 .env
 .env.*
 !.env.example
+!.env.local.example
 
 # Supabase local
 supabase/.temp/

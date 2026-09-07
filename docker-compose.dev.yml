@@ -1,10 +1,14 @@
 # HelpDesk — dev con HMR (automatiza pnpm web dentro de Docker)
-# Uso:
+# Uso NUBE (default, usa .env con https://stzcqex...):
 #   docker compose -f docker-compose.dev.yml up --build          # HMR en http://localhost:19006
-#   docker compose -f docker-compose.dev.yml up --build --watch  # + sync con Compose Watch (Docker Desktop 4.24+)
+#   pnpm docker:dev        # alias
+# Uso LOCAL (Supabase en Docker via `npx supabase start`):
+#   pnpm supa:start        # levanta stack Supabase local (54321/54322/54323/54324)
+#   pnpm supa:env          # genera .env.local/.env con URL+ANON_KEY locales
+#   pnpm dev:local         # supa:start + supa:env + web-dev contra http://host.docker.internal:54321
+#   docker compose -f docker-compose.dev.yml up --build --watch  # + sync con Compose Watch
 #   docker compose -f docker-compose.dev.yml down
-#
-# No necesitas dejar `pnpm web` corriendo fuera: este servicio hace `expo start --web --host` con volumes.
+#   pnpm supa:stop         # apaga stack Supabase local
 # Para prod sigue usando: docker compose up --build  (nginx en http://localhost:3000)
 services:
   web-dev:
@@ -16,6 +20,10 @@ services:
       - "19000:19000" # Expo devtools (opcional)
     env_file:
       - .env
+    extra_hosts:
+      # Permite que el contenedor alcance Supabase local en el host (127.0.0.1:54321)
+      # Uso local: EXPO_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+      - "host.docker.internal:host-gateway"
     environment:
       EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY}
