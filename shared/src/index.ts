@@ -11,3 +11,16 @@ export type { TicketCategoria, Mesa, Ticket, TicketEstado, TicketComentario, Tic
 export { PRIORIDADES, ESTADOS, isPrioridadTicket, isEstadoTicket, validateCreateTicket, isCreateTicketValid, validateComentario, fetchCategorias, fetchMesas, createTicket, listMyTickets, getTicketDetail, addComentario, updateTicket, cancelTicket, transitionTicket, canTransition, reassignTicket, listAssignedTickets, PRIORIDAD_PESO, validateUpdateTicket } from './tickets.js';
 export * from './ui/theme.js';
 export * from './ui/components.js';
+export * from './ui/layout/AppShell.js';
+export * from './ui/layout/TopBar.js';
+export * from './ui/layout/FilterBar.js';
+export * from './ui/layout/Sidebar.js';
+export * from './ui/charts/KpiCard.js';
+export * from './ui/charts/DonutEstado.js';
+export * from './ui/charts/BarsPrioridad.js';
+export * from './ui/charts/AreaEvolucion.js';
+export * from './ui/charts/HeatmapCarga.js';
+export * from './ui/charts/TimelineAlertas.js';
+export * from './dashboard.js';
+export * from './export.js';
+export * from './ia.js';

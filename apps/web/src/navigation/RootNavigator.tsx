@@ -7,9 +7,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
 import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
+import { DashboardScreen } from '../features/dashboard/DashboardScreen';
+import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import type {
   AdminStackParamList,
   AuthStackParamList,
@@ -32,8 +33,6 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const UsuarioStack = createNativeStackNavigator<UsuarioStackParamList>();
-const EmpleadoStack = UsuarioStack;
 const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
 const AdminStack = createNativeStackNavigator<AdminStackParamList>();
@@ -46,15 +45,6 @@ function AuthNavigator() {
   );
 }
 
-function UsuarioNavigator() {
-  return (
-    <UsuarioStack.Navigator>
-      <UsuarioStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes (RF-08)' }} component={MisSolicitudesScreen} />
-      <UsuarioStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <UsuarioStack.Screen name="DetalleTicket" options={{ title: 'Detalle (RF-09)' }} component={TicketDetailScreen} />
-    </UsuarioStack.Navigator>
-  );
-}
 function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
@@ -71,10 +61,8 @@ function TecnicoNavigator() {
 
 function JefeNavigator() {
   return (
-    <JefeStack.Navigator>
-      <JefeStack.Screen name="Dashboard" options={{ title: 'Dashboard (RF-16)' }}>
-        {() => <Placeholder title="Dashboard jefe" subtitle="RF-16 tiempo real · RF-17 filtros · RF-21 alertas IA" />}
-      </JefeStack.Screen>
+    <JefeStack.Navigator screenOptions={{ headerShown: false }}>
+      <JefeStack.Screen name="Dashboard" component={DashboardScreen} />
       <JefeStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
       <JefeStack.Screen name="Reportes" options={{ title: 'Reportes (RF-18)' }}>
         {() => <Placeholder title="Reportes" subtitle="RF-18 exportación PDF/CSV" />}

@@ -1,5 +1,4 @@
-// Tokens de diseño — IUE HelpDesk · tech moderno (Stitch: #0E87E2 / #FD7C06)
-// Fuente: projects/8538278466542593758 HelpDesk IUE Design System
+// Tokens de diseño — HelpDesk · tech moderno (Stitch: #0E87E2 / #FD7C06)
 export const theme = {
   colors: {
     // Brand — azul operativo (nav, CTA primario, focus)

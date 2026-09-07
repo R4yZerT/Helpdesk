@@ -1,152 +1,186 @@
-// RF-01 / RF-04 — Login IUE elegante (warm paper + ink + brass)
+// RF-01 / RF-04 — Login Corporativo Stitch (HelpDesk - Login Corporativo 0500513c)
+// Screenshot 0500513c Desktop & Mobile — fidelity #0E87E2 / #FD7C06 / #F6F8FB / Inter+JetBrains
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
-import { theme, Card, Button } from '@helpdesk/shared';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { theme } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
 
 export function LoginScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
   const { signIn, error, loading } = useAuth();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 768;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const onSubmit = async () => {
     setLocalError(null);
-    if (!email || !password) {
-      setLocalError('Correo y contraseña requeridos');
-      return;
-    }
-    try {
-      await signIn(email.trim().toLowerCase(), password);
-    } catch (e) {
-      setLocalError(e instanceof Error ? e.message : 'Error de autenticación');
-    }
+    if (!email || !password) { setLocalError('Correo y contraseña requeridos'); return; }
+    try { await signIn(email.trim().toLowerCase(), password); } catch (e) { setLocalError(e instanceof Error ? e.message : 'Error de autenticación'); }
   };
 
   return (
-    <ScrollView contentContainerStyle={s.scroll} style={{ flex: 1, backgroundColor: theme.colors.bg }} keyboardShouldPersistTaps="handled">
-      {/* Header hero */}
-      <View style={s.hero}>
-        <View style={s.heroHairline} />
-        {/* Imagen hero — pon tu archivo en apps/mobile/assets/login-hero.png y descomenta la línea */}
-        {/* Descomenta cuando el archivo exista: */}
-        {/* <Image source={require('../../../assets/login-hero.png')} style={s.heroImage} resizeMode="cover" /> */}
-        <View style={s.brandRow}>
-          <View style={s.mark}>
-            <Text style={s.markText}>IUE</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.eyebrow}>Institución Universitaria de Envigado</Text>
-            <Text style={s.heroTitle}>Mesa de Ayuda</Text>
-            <Text style={s.heroSub}>Soporte TIC · elegante, rápido, trazable</Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={s.body}>
-        <Card style={s.card}>
-          <View style={s.cardHeader}>
-            <Text style={s.title}>Bienvenido</Text>
-            <Text style={s.subtitle}>Ingresa con tu correo corporativo</Text>
-          </View>
-
-          <View style={s.field}>
-            <Text style={s.label}>Correo</Text>
-            <TextInput
-              placeholder="nombre@iue.edu.co"
-              placeholderTextColor={theme.colors.mutedSoft}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-              style={s.input}
-            />
-          </View>
-
-          <View style={s.field}>
-            <Text style={s.label}>Contraseña</Text>
-            <TextInput
-              placeholder="••••••••"
-              placeholderTextColor={theme.colors.mutedSoft}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              style={s.input}
-            />
-            <Text style={s.hint}>Mín. 8 caracteres · NIST 800-63B</Text>
-          </View>
-
-          {(localError || error) ? (
-            <View style={s.errorBox}>
-              <Text style={s.errorText}>{localError ?? error}</Text>
+    <View style={s.page}>
+      <ScrollView contentContainerStyle={[s.scroll, isDesktop && s.scrollDesktop]} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
+        {/* Top brand bar — Stitch header */}
+        <View style={s.topBar}>
+          <View style={s.topBarInner}>
+            <View style={s.brandRow}>
+              <View style={s.mark}><Text style={s.markText}>◈</Text></View>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.brandTitle}>HelpDesk</Text>
+                  <Text style={s.badge}>v4.8-PROD</Text>
+                </View>
+                <Text style={s.brandSub}>Gestión de solicitudes</Text>
+              </View>
             </View>
-          ) : null}
-
-          <View style={{ marginTop: 4 }}>
-            <Button title={loading ? 'Ingresando…' : 'Ingresar'} onPress={onSubmit} variant="primary" disabled={loading} />
+            <View style={s.topRightPill}><Text style={s.topRightText}>● Sistemas Operativos</Text></View>
           </View>
-
-          <View style={s.dividerRow}>
-            <View style={s.divider} />
-            <Text style={s.dividerText}>o</Text>
-            <View style={s.divider} />
-          </View>
-
-          <Pressable onPress={() => navigation?.navigate('ForgotPassword' as never)} style={s.linkBtn}>
-            <Text style={s.link}>¿Olvidaste tu contraseña?</Text>
-            <Text style={s.linkSub}>Te enviamos un enlace seguro · expira en 1h</Text>
-          </Pressable>
-        </Card>
-
-        <View style={s.footer}>
-          <Text style={s.footerText}>Sesión 12h · Inactividad 30m · MFA para jefe / admin</Text>
-          <Text style={s.footerDot}>—</Text>
-          <Text style={s.footerTextSoft}>Hecho con cuidado en Envigado</Text>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Center card — max 440 */}
+        <View style={[s.centerWrap, isDesktop && { paddingVertical: 32 }]}>
+          <View style={[s.card, isDesktop ? { width: 440 } : { width: '100%' }]}>
+            <View style={s.kickerRow}>
+              <Text style={s.kicker}>ACCESO SEGURO</Text>
+              <Text style={s.kickerDot}>·</Text>
+              <Text style={s.kickerSoft}>v4.8</Text>
+            </View>
+            <Text style={s.h1}>Inicia sesión</Text>
+            <Text style={s.sub}>Accede con tu cuenta corporativa</Text>
+
+            {(localError || error) ? (
+              <View style={s.errorBox} accessible accessibilityRole="alert">
+                <Text style={s.errorText}>{localError ?? error}</Text>
+              </View>
+            ) : null}
+
+            <View style={s.field}>
+              <Text style={s.label}>Correo corporativo *</Text>
+              <View style={s.inputWrap}>
+                <Text style={s.inputIcon}>✉</Text>
+                <TextInput
+                  placeholder="tu.correo@empresa.com"
+                  placeholderTextColor={theme.colors.mutedSoft}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                  style={s.input}
+                  accessibilityLabel="Correo corporativo"
+                />
+              </View>
+            </View>
+
+            <View style={s.field}>
+              <View style={s.labelRow}>
+                <Text style={s.label}>Contraseña *</Text>
+                <Pressable onPress={() => navigation?.navigate('ForgotPassword' as never)}><Text style={s.forgotLink}>¿Olvidaste tu contraseña?</Text></Pressable>
+              </View>
+              <View style={s.inputWrap}>
+                <Text style={s.inputIcon}>🔒</Text>
+                <TextInput
+                  placeholder="••••••••"
+                  placeholderTextColor={theme.colors.mutedSoft}
+                  secureTextEntry={!showPass}
+                  value={password}
+                  onChangeText={setPassword}
+                  style={[s.input, { flex: 1 }]}
+                  accessibilityLabel="Contraseña"
+                />
+                <Pressable onPress={() => setShowPass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
+                  <Text style={s.eyeText}>{showPass ? '🙈' : '👁'}</Text>
+                </Pressable>
+              </View>
+              <View style={s.strengthRow}>
+                <View style={s.strengthBar}><View style={[s.strengthFill, { width: '66%' }]} /></View>
+                <Text style={s.strengthText}>Nivel de seguridad: <Text style={{ color: theme.colors.success, fontWeight: '700' }}>Medio-Alto</Text></Text>
+                <Text style={s.strengthHint}>Mín. 8 caracteres</Text>
+              </View>
+            </View>
+
+            <Pressable onPress={() => setRemember((v) => !v)} style={s.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: remember }}>
+              <View style={[s.checkBox, remember && s.checkBoxActive]}>{remember ? <Text style={s.checkTick}>✓</Text> : null}</View>
+              <Text style={s.checkLabel}>Recordarme en este equipo</Text>
+            </Pressable>
+
+            <Pressable onPress={onSubmit} disabled={loading} style={({ pressed }) => [s.primaryBtn, pressed && { opacity: 0.92 }, loading && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Ingresar">
+              <Text style={s.primaryText}>{loading ? 'Ingresando…' : 'Ingresar  →'}</Text>
+            </Pressable>
+
+            <View style={s.dividerRow}><View style={s.divider} /><Text style={s.dividerText}>o</Text><View style={s.divider} /></View>
+
+            <Pressable onPress={() => setLocalError('SSO no configurado — usa correo y contraseña')} style={s.secondaryBtn} accessibilityRole="button">
+              <Text style={s.secondaryIcon}>▦</Text><Text style={s.secondaryText}>Ingresar con SSO Empresarial</Text>
+            </Pressable>
+
+            <Text style={s.legal}>Al ingresar, aceptas la política de privacidad y uso de tecnologías.</Text>
+            <View style={s.supportRow}>
+              <Text style={s.supportLabel}>Soporte TI ·</Text><Text style={s.supportLink}> soporte@helpdesk.local</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
+  page: { flex: 1, backgroundColor: theme.colors.bg },
   scroll: { flexGrow: 1, paddingBottom: 24 },
-  hero: { paddingTop: 28, paddingHorizontal: 20, paddingBottom: 18, backgroundColor: theme.colors.bg },
-  heroHairline: { height: 2, backgroundColor: theme.colors.accent, borderRadius: 999, width: 36, marginBottom: 14 },
-  heroImage: { width: '100%', height: 180, borderRadius: theme.radius.lg, marginBottom: 16, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border } as any,
-  brandRow: { flexDirection: 'row', gap: 14, alignItems: 'center' },
-  mark: { width: 44, height: 44, borderRadius: 12, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#1A2540' },
-  markText: { color: theme.colors.accent, fontWeight: '800', fontSize: 13, letterSpacing: 1 },
-  eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase', color: theme.colors.accentStrong },
-  heroTitle: { fontSize: 28, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.6, marginTop: 2 },
-  heroSub: { fontSize: 12, color: theme.colors.muted, marginTop: 2 },
-  body: { paddingHorizontal: 16, gap: 14 },
-  card: { padding: 18, gap: 14, borderRadius: theme.radius.xl },
-  cardHeader: { gap: 4, marginBottom: 2 },
-  title: { fontSize: 20, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.4 },
-  subtitle: { fontSize: 13, color: theme.colors.muted },
-  field: { gap: 6 },
-  label: { fontSize: 11, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: theme.colors.textSoft },
-  input: {
-    borderColor: theme.colors.border,
-    borderWidth: 1.2,
-    borderRadius: theme.radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 14,
-    backgroundColor: '#FFFEFB',
-    color: theme.colors.text,
-  },
-  hint: { fontSize: 11, color: theme.colors.mutedSoft },
+  scrollDesktop: { paddingHorizontal: 0 },
+  topBar: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 16, paddingVertical: 10 },
+  topBarInner: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', maxWidth: 1280, width: '100%', alignSelf: 'center' },
+  brandRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  mark: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  markText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  brandTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3 },
+  badge: { fontSize: 9, fontWeight: '700', color: theme.colors.primary, backgroundColor: theme.colors.primarySoft, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' },
+  brandSub: { fontSize: 10, color: theme.colors.muted, fontWeight: '600', marginTop: 1 },
+  topRightPill: { backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+  topRightText: { fontSize: 10, color: theme.colors.muted, fontWeight: '600' },
+  centerWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingTop: 20 },
+  card: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 24, gap: 14, ...theme.shadow.soft } as any,
+  kickerRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  kicker: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: theme.colors.primary, textTransform: 'uppercase' as const },
+  kickerDot: { color: theme.colors.borderStrong, fontSize: 10 },
+  kickerSoft: { fontSize: 10, color: theme.colors.mutedSoft, fontWeight: '600' },
+  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, marginTop: -6 },
+  sub: { fontSize: 12, color: theme.colors.muted, marginTop: -8 },
   errorBox: { backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 12, padding: 10 },
   errorText: { color: '#7F1D1D', fontSize: 12, fontWeight: '600' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
+  field: { gap: 6 },
+  label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', color: theme.colors.textSoft },
+  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  forgotLink: { fontSize: 10, color: theme.colors.primary, fontWeight: '600' },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surface, paddingHorizontal: 10, height: 44, gap: 8 },
+  inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  input: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
+  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  strengthBar: { flex: 1, height: 4, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden', minWidth: 80 },
+  strengthFill: { height: 4, backgroundColor: theme.colors.success, borderRadius: 999 },
+  strengthText: { fontSize: 10, color: theme.colors.mutedSoft, fontWeight: '600' },
+  strengthHint: { fontSize: 10, color: theme.colors.mutedSoft, marginLeft: 'auto' },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  checkBox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: theme.colors.borderStrong, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' },
+  checkBoxActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  checkTick: { color: '#fff', fontSize: 11, fontWeight: '800', marginTop: -1 },
+  checkLabel: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600' },
+  primaryBtn: { backgroundColor: theme.colors.primary, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  primaryText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   divider: { flex: 1, height: 1, backgroundColor: theme.colors.border },
   dividerText: { fontSize: 11, color: theme.colors.mutedSoft, fontWeight: '600' },
-  linkBtn: { alignItems: 'center', gap: 3, paddingVertical: 6, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: theme.colors.surfaceAlt },
-  link: { color: theme.colors.primary, fontSize: 13, fontWeight: '700' },
-  linkSub: { color: theme.colors.muted, fontSize: 11 },
-  footer: { alignItems: 'center', gap: 4, paddingTop: 8 },
-  footerText: { fontSize: 11, color: theme.colors.muted, textAlign: 'center' },
-  footerTextSoft: { fontSize: 11, color: theme.colors.mutedSoft },
-  footerDot: { color: theme.colors.borderStrong },
+  secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  secondaryIcon: { fontSize: 12, color: theme.colors.primary },
+  secondaryText: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '700' },
+  legal: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'center', lineHeight: 14 },
+  supportRow: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  supportLabel: { fontSize: 10, color: theme.colors.mutedSoft },
+  supportLink: { fontSize: 10, color: theme.colors.primary, fontWeight: '600' },
 });

@@ -7,11 +7,12 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { MisSolicitudesScreen } from '../features/tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
 import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
 import { Card, theme } from '@helpdesk/shared';
-import type { AdminStackParamList, AuthStackParamList, EmpleadoStackParamList, UsuarioStackParamList, JefeStackParamList, TecnicoStackParamList } from './types';
+import { DashboardScreen } from '../features/dashboard/DashboardScreen';
+import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
+import type { AdminStackParamList, AuthStackParamList, EmpleadoStackParamList, JefeStackParamList, TecnicoStackParamList } from './types';
 
 const navTheme = {
   ...DefaultTheme,
@@ -47,8 +48,6 @@ const p = StyleSheet.create({
 });
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const UsuarioStack = createNativeStackNavigator<UsuarioStackParamList>();
-const EmpleadoStack = UsuarioStack;
 const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
 const AdminStack = createNativeStackNavigator<AdminStackParamList>();
@@ -70,15 +69,6 @@ function AuthNavigator() {
     </AuthStack.Navigator>
   );
 }
-function UsuarioNavigator() {
-  return (
-    <UsuarioStack.Navigator screenOptions={screenOpts}>
-      <UsuarioStack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes' }} component={MisSolicitudesScreen} />
-      <UsuarioStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
-      <UsuarioStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
-    </UsuarioStack.Navigator>
-  );
-}
 function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
@@ -94,7 +84,7 @@ function TecnicoNavigator() {
 function JefeNavigator() {
   return (
     <JefeStack.Navigator screenOptions={screenOpts}>
-      <JefeStack.Screen name="Dashboard" options={{ title: 'Dashboard' }}>{() => <Placeholder title="Dashboard" subtitle="RF-16 tiempo real · RF-17 filtros · RF-21 alertas IA" />}</JefeStack.Screen>
+      <JefeStack.Screen name="Dashboard" options={{ title: 'Dashboard', headerShown: false }} component={DashboardScreen} />
       <JefeStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
       <JefeStack.Screen name="Reportes" options={{ title: 'Reportes' }}>{() => <Placeholder title="Reportes" subtitle="RF-18 exportación PDF / CSV" />}</JefeStack.Screen>
       <JefeStack.Screen name="Alertas" options={{ title: 'Alertas IA' }}>{() => <Placeholder title="Alertas IA" subtitle="RF-24 anomalías y picos inusuales" />}</JefeStack.Screen>

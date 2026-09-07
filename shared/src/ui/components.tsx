@@ -1,10 +1,10 @@
-// Primitivos UI compartidos — IUE tech moderno (Stitch: azul #0E87E2 / naranja #FD7C06)
+// Primitivos UI compartidos — tech moderno (Stitch: azul #0E87E2 / naranja #FD7C06)
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle, type TextStyle } from 'react-native';
 import { theme } from './theme.js';
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[] }) {
+  return <View style={[styles.card, style as ViewStyle]}>{children}</View>;
 }
 
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: 'muted' | 'accent' | 'danger' | 'success' | 'warning' | 'info' | 'ink' }) {

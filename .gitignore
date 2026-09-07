@@ -32,3 +32,16 @@ supabase/.branches/
 .opencode/
 skills-lock.json
 .opencode-*
+
+# Datos y modelos ML - PII y artefactos pesados
+data/raw/
+data/processed/
+data/quarantine/
+ml/models/
+ml/.venv/
+models/
+*.parquet
+*.pkl
+*.bin
+*.onnx
+*.pt
