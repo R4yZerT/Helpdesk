@@ -7,8 +7,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
-import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
+import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
+import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import type {
@@ -54,7 +54,7 @@ function TecnicoNavigator() {
     <TecnicoStack.Navigator>
       <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} />
       <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
+      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
     </TecnicoStack.Navigator>
   );
 }

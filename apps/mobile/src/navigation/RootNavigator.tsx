@@ -7,8 +7,8 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { TicketDetailScreen } from '../features/tickets/TicketDetailScreen';
-import { BandejaTecnicoScreen } from '../features/tickets/BandejaTecnicoScreen';
+import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
+import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
 import { Card, theme } from '@helpdesk/shared';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
@@ -77,7 +77,7 @@ function TecnicoNavigator() {
     <TecnicoStack.Navigator screenOptions={screenOpts}>
       <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
       <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
+      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
     </TecnicoStack.Navigator>
   );
 }
