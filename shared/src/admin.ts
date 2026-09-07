@@ -175,7 +175,8 @@ export async function getUserById(supabase: SupabaseClient, id: string): Promise
   };
 }
 
-// Crear usuario (RF-27): intenta admin.createUser (service_role). Si no hay privilegio, lanza error con hint.
+// Crear usuario (RF-27): vía Edge Function admin-create-user (service_role).
+// Fallback: intenta auth.admin.createUser si el cliente tiene service_role (local/dev).
 export async function createUser(
   supabase: SupabaseClient,
   input: CreateUserInput,
@@ -183,37 +184,60 @@ export async function createUser(
   const errs = validateCreateUser(input);
   if (Object.keys(errs).length) throw new Error(`Validación: ${JSON.stringify(errs)}`);
 
-  // Intento 1: API admin (requiere service_role / Edge Function con service key)
-  // supabase-js expone auth.admin.createUser solo si el cliente fue creado con service_role
+  const payload = {
+    fullName: input.fullName.trim(),
+    email: input.email.trim(),
+    password: input.password,
+    rol: input.rol,
+    mesaId: input.mesaId,
+  };
+
+  // Intento 1: Edge Function (producción + local con service_role)
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload });
+    if (!error && data) {
+      const d = data as { id?: string; error?: string; details?: unknown };
+      if (d.id) return { id: d.id };
+      if (d.error) throw new Error(typeof d.details === 'object' ? `${d.error}: ${JSON.stringify(d.details)}` : d.error);
+    }
+    // Si error es 404 (función no desplegada en local), caemos a fallback auth.admin
+    if (error && !/FunctionsHttpError|not found|Failed to send/i.test((error as Error).message ?? '')) {
+      // Errores de validación 400/409 vienen como error con context
+      const msg = (error as { message?: string }).message ?? String(error);
+      // Si es 409 duplicado, propagar claro
+      if (/already|duplicate|409/i.test(msg)) throw new Error('Email ya registrado');
+      // Si es validación 400 con details, ya se manejó arriba; si no, re-throw
+      if (!/Failed to send a request to the Edge Function/i.test(msg)) throw new Error(msg);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/Validación|Email ya registrado|Solo administrador|Token inválido/i.test(msg)) throw e;
+    // network / not-found -> intentar fallback
+  }
+
+  // Intento 2: auth.admin.createUser (solo si supabase client tiene service_role, ej: tests / supa local con key directa)
   const adminAny = (supabase.auth as unknown as { admin?: { createUser: (p: unknown) => Promise<{ data: { user: { id: string } | null }; error: { message: string } | null }> } }).admin;
   if (adminAny?.createUser) {
     const { data, error } = await adminAny.createUser({
-      email: input.email.trim(),
-      password: input.password,
+      email: payload.email,
+      password: payload.password,
       email_confirm: true,
-      user_metadata: { full_name: input.fullName.trim(), rol: mapRolToDb(input.rol) },
+      user_metadata: { full_name: payload.fullName, rol: mapRolToDb(payload.rol as RolUsuario) },
     });
     if (!error && data.user) {
-      // El trigger handle_new_user crea el profile; ahora actualizamos mesa_id si se pasó
-      if (input.mesaId !== null) {
-        const { error: upErr } = await supabase.from('profiles').update({ mesa_id: input.mesaId }).eq('id', data.user.id);
+      if (payload.mesaId !== null) {
+        const { error: upErr } = await supabase.from('profiles').update({ mesa_id: payload.mesaId }).eq('id', data.user.id);
         if (upErr) throw upErr;
       }
       return { id: data.user.id };
     }
-    // Si error es por permisos, caemos al throw con hint
     if (error && /not.*admin|service_role|unauthorized/i.test(error.message)) {
-      throw new Error(
-        `No autorizado para crear usuarios con anon key. Despliega Edge Function con service_role o usa invitación. Detalle: ${error.message}`,
-      );
+      throw new Error(`No autorizado para crear usuarios con anon key. Despliega Edge Function admin-create-user. Detalle: ${error.message}`);
     }
     if (error) throw new Error(error.message);
   }
 
-  // Fallback sin privilegios: no podemos crear auth.users desde anon. Error guiado.
-  throw new Error(
-    'Crear usuario requiere service_role (Edge Function). Implementa POST /functions/v1/admin-create-user con service_role y llama supabase.functions.invoke.',
-  );
+  throw new Error('Crear usuario requiere Edge Function admin-create-user (service_role). Despliega con supabase functions deploy admin-create-user.');
 }
 
 export async function updateUser(
