@@ -120,8 +120,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
   );
 
   const left = (
-    <View style={{ gap: 12, flex: isWide ? 8 : undefined }}>
-      <Card style={{ gap: 12 }}>
+    <View style={{ gap: theme.space[3], flex: isWide ? 8 : undefined }}> // 12
+      <Card style={{ gap: theme.space[3] }}> // 12
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
         <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId?.slice(0,8) ?? '—'}</Text></View>
@@ -135,7 +135,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
             </Pressable>
           ))}
         </View>
-        <View style={{ padding: 14, gap: 10 }}>
+        <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}> // 14/10
           {activeTab==='comentarios' ? (comentarios.length===0? <Text style={s.muted}>Sin comentarios — inicia el hilo con tu diagnóstico.</Text> : comentarios.map((c)=>(
             <View key={c.id} style={[s.comment, c.interno && s.commentInternal]}>
               <View style={s.rowHeader}><Text style={s.rowTitle}>{c.usuarioId.slice(0,8)}…</Text>{c.interno? <Badge label="interno" tone="accent" /> : <Badge label="público" tone="muted" />}<Text style={s.mutedSmall}>{new Date(c.creadoEn).toLocaleDateString('es-ES')}</Text></View>
@@ -162,15 +162,15 @@ export function DetalleTecnicoScreen({ route }: Props) {
   );
 
   const right = (
-    <View style={{ gap: 12, flex: isWide ? 4 : undefined }}>
-      <Card style={{ gap: 10 }}>
+    <View style={{ gap: theme.space[3], flex: isWide ? 4 : undefined }}> // 12
+      <Card style={{ gap: theme.space[3] - 2 }}> // 10
         <Text style={s.section}>Acciones de campo</Text>
         <Pressable onPress={()=>setShowTrans(v=>!v)} style={[s.btn, s.btnAccent]} accessibilityRole="button"><Text style={s.btnAccentText}>{showTrans?'Ocultar transición':'Solucionar incidente'}</Text></Pressable>
         {showTrans && nextEstados.length>0 ? (
           <View style={{ gap: 8 }}>
             <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución (requerida para solucionado)…" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
-            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: 8 }}>
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}> // 8
               {nextEstados.map((e)=>(
                 <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
                   {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
@@ -193,7 +193,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           </View>
         ) : null}
       </Card>
-      <Card style={{ gap: 10 }}>
+      <Card style={{ gap: theme.space[3] - 2 }}> // 10
         <Text style={s.section}>Progreso del ticket</Text>
         <View style={s.progressWrap}>
           {[
@@ -207,7 +207,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           ))}
         </View>
       </Card>
-      <Card style={{ gap: 8 }}>
+      <Card style={{ gap: theme.space[2] }}> // 8
         <Text style={s.section}>Control SLA</Text>
         <Text style={s.slaBig}>{ticket.estado==='cerrado'||ticket.estado==='solucionado'?'Cumplido':'35 min restantes'}</Text>
         <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado==='solucionado'||ticket.estado==='cerrado'? theme.colors.success : ticket.prioridad==='critica'? theme.colors.danger : theme.colors.primary }]} /></View>
@@ -225,7 +225,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
   return (
     <ScrollView contentContainerStyle={s.container} style={{ backgroundColor: theme.colors.bg }}>
       {header}
-      <View style={[isWide ? { flexDirection:'row', gap: 16, alignItems:'flex-start' } : { gap: 12 }]}>
+      <View style={[isWide ? { flexDirection:'row', gap: theme.space[4], alignItems:'flex-start' } : { gap: theme.space[3] }]}> // 16/12
         {left}{right}
       </View>
     </ScrollView>
@@ -240,15 +240,15 @@ const s = StyleSheet.create({
   metaSmall: { fontSize:11, color: theme.colors.textSoft, marginTop:4 },
   error: { color: theme.colors.danger, fontSize:12, fontWeight:'600' },
   errorBox: { backgroundColor:'#FDF1F0', borderWidth:1, borderColor:'#F4C7C3', borderRadius:12, padding:10 },
-  container: { padding:16, gap:16, paddingBottom:28 },
-  header: { gap:10, paddingHorizontal:2 },
-  kickerRow: { flexDirection:'row', alignItems:'center', gap:8 },
+  container: { padding: theme.space[4], gap: theme.space[4], paddingBottom: theme.space[6] + 4 }, // 16/16/28 — tokens
+  header: { gap: theme.space[3] - 2, paddingHorizontal: theme.space[1] - 2 }, // 10/2
+  kickerRow: { flexDirection:'row', alignItems:'center', gap: theme.space[2] }, // 8
   kickerDot: { width:4, height:4, borderRadius:999, backgroundColor: theme.colors.primary },
   kicker: { fontSize:10, fontWeight:'800', letterSpacing:1.2, color: theme.colors.muted, textTransform:'uppercase' },
-  pillsRow: { flexDirection:'row', alignItems:'center', gap:8, flexWrap:'wrap' },
-  codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, paddingHorizontal:8, paddingVertical:4, borderRadius:8 },
+  pillsRow: { flexDirection:'row', alignItems:'center', gap: theme.space[2], flexWrap:'wrap' }, // 8
+  codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, paddingHorizontal: theme.space[2], paddingVertical: theme.space[1], borderRadius: theme.space[2] }, // 8/4/8
   codePillText: { fontSize:11, fontWeight:'800', color: theme.colors.text, fontFamily: theme.font.mono },
-  slaBadge: { flexDirection:'row', alignItems:'center', gap:6, backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', paddingHorizontal:8, paddingVertical:4, borderRadius:999 },
+  slaBadge: { flexDirection:'row', alignItems:'center', gap: theme.space[2] - 2, backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', paddingHorizontal: theme.space[2], paddingVertical: theme.space[1], borderRadius: theme.radius.full },
   slaBadgeText: { fontSize:10, fontWeight:'800', color:'#991B1B', textTransform:'uppercase', letterSpacing:0.6 },
   slaPulse: { width:6, height:6, borderRadius:999, backgroundColor: theme.colors.danger },
   asunto: { fontSize:20, fontWeight:'800', color: theme.colors.text, lineHeight:26, letterSpacing:-0.3 },
@@ -264,36 +264,36 @@ const s = StyleSheet.create({
   commentInternal: { backgroundColor:'#FFF7ED', borderWidth:1, borderColor:'#FED7AA', borderRadius:12, padding:10, borderStyle:'solid' },
   rowHeader: { flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' },
   rowTitle: { fontSize:12, fontWeight:'700', color: theme.colors.text },
-  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding:14, borderWidth:1, borderColor: theme.colors.border, gap:10, ...theme.shadow.soft },
-  input: { borderWidth:1, borderColor: theme.colors.border, borderRadius:12, paddingHorizontal:12, paddingVertical:12, fontSize:13, color: theme.colors.text, minHeight:44, textAlignVertical:'top', backgroundColor: theme.colors.surfaceAlt },
-  timelineRow: { flexDirection:'row', gap:10, paddingVertical:6 },
+  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[3] - 2, ...theme.shadow.soft }, // 14/10
+  input: { borderWidth:1, borderColor: theme.colors.border, borderRadius: theme.radius.md - 2, paddingHorizontal: theme.space[3], paddingVertical: theme.space[3], fontSize:13, color: theme.colors.text, minHeight:44, textAlignVertical:'top', backgroundColor: theme.colors.surfaceAlt }, // 12/12/12
+  timelineRow: { flexDirection:'row', gap: theme.space[3] - 2, paddingVertical: theme.space[2] - 2 }, // 10/6
   dotCol: { alignItems:'center', width:12 },
   dot: { width:8, height:8, borderRadius:999, backgroundColor: theme.colors.primary, marginTop:4 },
   line: { flex:1, width:1, backgroundColor: theme.colors.border, marginTop:6, opacity:0.8 },
   timelineBody: { flex:1, gap:2, paddingBottom:8, borderBottomWidth:1, borderBottomColor: theme.colors.border },
   hint: { fontSize:10, color: theme.colors.mutedSoft, textAlign:'right' },
-  switchRow: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', backgroundColor: theme.colors.bg, borderRadius:12, paddingHorizontal:12, paddingVertical:8, borderWidth:1, borderColor: theme.colors.border },
+  switchRow: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', backgroundColor: theme.colors.bg, borderRadius: theme.radius.md - 2, paddingHorizontal: theme.space[3], paddingVertical: theme.space[2], borderWidth:1, borderColor: theme.colors.border },
   switchLabel: { fontSize:12, color: theme.colors.primary, fontWeight:'600' },
-  sendBtn: { backgroundColor: theme.colors.primary, paddingVertical:13, borderRadius:12, alignItems:'center' },
+  sendBtn: { backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] + 1, borderRadius: theme.radius.md - 2, alignItems:'center' }, // 13/12
   sendText: { color:'#fff', fontWeight:'800', fontSize:13 },
-  btn: { paddingVertical:10, paddingHorizontal:16, borderRadius:10, alignItems:'center', justifyContent:'center' },
+  btn: { paddingVertical: theme.space[3] - 2, paddingHorizontal: theme.space[4], borderRadius: theme.radius.sm, alignItems:'center', justifyContent:'center' }, // 10/16/10
   btnPrimary: { backgroundColor: theme.colors.primary },
   btnPrimaryText: { color:'#fff', fontWeight:'700', fontSize:12 },
   btnAccent: { backgroundColor: theme.colors.accent, borderWidth:1, borderColor:'#FED7AA' },
   btnAccentText: { color:'#fff', fontWeight:'800', fontSize:12 },
   btnGhost: { backgroundColor: theme.colors.surface, borderWidth:1, borderColor: theme.colors.border },
   btnGhostText: { color: theme.colors.textSoft, fontWeight:'700', fontSize:12 },
-  actionRow: { flexDirection:'row', gap:8, flexWrap:'wrap' },
-  retryBtn: { marginTop:10, backgroundColor: theme.colors.primary, paddingVertical:10, paddingHorizontal:16, borderRadius:12, alignSelf:'flex-start' },
+  actionRow: { flexDirection:'row', gap: theme.space[2], flexWrap:'wrap' },
+  retryBtn: { marginTop: theme.space[3] - 2, backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] - 2, paddingHorizontal: theme.space[4], borderRadius: theme.radius.md - 2, alignSelf:'flex-start' },
   retryText: { color:'#fff', fontWeight:'700', fontSize:12 },
-  terminal: { backgroundColor: theme.colors.text, borderRadius:10, padding:12 },
+  terminal: { backgroundColor: theme.colors.text, borderRadius: theme.radius.sm, padding: theme.space[3] }, // 10/12
   terminalText: { color:'#A7F3D0', fontSize:11, fontFamily: theme.font.mono, fontWeight:'600' },
-  solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius:10, padding:10, borderWidth:1, borderColor: theme.colors.border, gap:4 },
+  solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, padding: theme.space[3] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[1] }, // 10/10/4
   solLabel: { fontSize:10, fontWeight:'800', letterSpacing:0.6, textTransform:'uppercase', color: theme.colors.primary },
   solText: { fontSize:12, color: theme.colors.textSoft, lineHeight:16 },
-  ghostStack: { gap:8, marginTop:4 },
+  ghostStack: { gap: theme.space[2], marginTop: theme.space[1] }, // 8/4
   progressWrap: { gap:2, paddingLeft:6 },
-  progressRow: { flexDirection:'row', gap:10, paddingVertical:6 },
+  progressRow: { flexDirection:'row', gap: theme.space[3] - 2, paddingVertical: theme.space[2] - 2 }, // 10/6
   progressDotCol: { alignItems:'center', width:12 },
   progressDot: { width:10, height:10, borderRadius:999, borderWidth:2, marginTop:2 },
   progressDotDone: { backgroundColor: theme.colors.success, borderColor: theme.colors.success },
@@ -301,13 +301,13 @@ const s = StyleSheet.create({
   progressDotPulse: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
   progressLine: { flex:1, width:1, backgroundColor: theme.colors.border, marginTop:4, opacity:0.6 },
   progressLabel: { fontSize:12, fontWeight:'700', color: theme.colors.text },
-  emptyFiles: { alignItems:'center', padding:12 },
+  emptyFiles: { alignItems:'center', padding: theme.space[3] },
   slaBig: { fontSize:18, fontWeight:'800', color: theme.colors.danger, letterSpacing:-0.3 },
   slaBar: { height:8, borderRadius:999, backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, overflow:'hidden' },
   slaFill: { height:'100%', borderRadius:999 },
-  slaAlert: { backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', borderRadius:10, padding:8 },
+  slaAlert: { backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', borderRadius: theme.radius.sm, padding: theme.space[2] },
   slaAlertText: { fontSize:11, color:'#7F1D1D', fontWeight:'600', textAlign:'center' },
-  attrGrid: { flexDirection:'row', flexWrap:'wrap', gap:6, marginTop:4, borderTopWidth:1, borderTopColor: theme.colors.border, paddingTop:8 },
+  attrGrid: { flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] - 2, marginTop: theme.space[1], borderTopWidth:1, borderTopColor: theme.colors.border, paddingTop: theme.space[2] }, // 6/4/8
   attrLabel: { fontSize:10, color: theme.colors.mutedSoft, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.6, width:90 },
   attrValue: { fontSize:11, color: theme.colors.textSoft, fontWeight:'600', flex:1 },
 });

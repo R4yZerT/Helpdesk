@@ -3,8 +3,16 @@ import * as React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle, type TextStyle } from 'react-native';
 import { theme } from './theme.js';
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[] }) {
-  return <View style={[styles.card, style as ViewStyle]}>{children}</View>;
+export function Card({
+  children,
+  style,
+  flush,
+}: {
+  children: React.ReactNode;
+  style?: ViewStyle | ViewStyle[];
+  flush?: boolean;
+}) {
+  return <View style={[styles.card, flush && styles.cardFlush, style as ViewStyle]}>{children}</View>;
 }
 
 export function Badge({ label, tone = 'muted' }: { label: string; tone?: 'muted' | 'accent' | 'danger' | 'success' | 'warning' | 'info' | 'ink' }) {
@@ -74,11 +82,15 @@ export function Divider({ style }: { style?: ViewStyle }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius.lg, // 20px Stitch
-    padding: 20, // space-5
+    borderRadius: theme.radius.lg, // 20px Stitch — token lg
+    padding: theme.space[5], // 20px — token space-5
     borderWidth: 1,
-    borderColor: theme.colors.border, // #E2E8F0
+    borderColor: theme.colors.border, // #E2E8F0 — token border
     ...theme.shadow.soft, // 0 1 3 rgba(15,23,42,0.05)
+  } as ViewStyle,
+  cardFlush: {
+    padding: 0,
+    overflow: 'hidden',
   } as ViewStyle,
   badge: {
     alignSelf: 'flex-start',
@@ -88,13 +100,13 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   badgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' } as TextStyle,
   button: {
-    paddingHorizontal: 16,
-    height: 44, // Stitch touch target mobile
-    borderRadius: 10, // radius-sm
+    paddingHorizontal: theme.space[4], // 16px
+    height: 44, // touch target Stitch — alinea con search 44
+    borderRadius: theme.radius.sm, // 10px
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: theme.space[2], // 8px
   } as ViewStyle,
   buttonPrimary: { backgroundColor: theme.colors.primary } as ViewStyle, // #0E87E2 hover #0A5CB8
   buttonAccent: { backgroundColor: theme.colors.accent } as ViewStyle, // #FD7C06 solo urgencia

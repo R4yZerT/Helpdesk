@@ -216,34 +216,64 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
   muted: { color: theme.colors.muted, fontSize: 12 },
   mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center', lineHeight: 16 },
-  header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 6 },
-  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[3], gap: theme.space[2] - 2 }, // 16/16/12/6 — tokens
+  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] }, // 8
+
   kickerDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.primary },
   kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: theme.colors.muted, textTransform: 'uppercase' },
   h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4 },
   subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
-  filterCard: { marginHorizontal: 12, marginBottom: 12, gap: 12, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 12, paddingHorizontal: 12, height: 44 },
+  filterCard: {
+    marginHorizontal: theme.space[3], // 12
+    marginBottom: theme.space[3],
+    gap: theme.space[3], // 12
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.lg, // 20 — token lg
+    padding: theme.space[4], // 16 — token space-4
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow.soft,
+  },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.borderStrong,
+    borderRadius: theme.radius.sm, // 10 — token sm (antes 12)
+    paddingHorizontal: theme.space[3], // 12
+    height: 44, // alinea con Button 44
+  },
   searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   clearBtn: { padding: 6, marginLeft: 6 },
   clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
   chipsBlock: { gap: 6 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { paddingHorizontal: 14, paddingVertical: 6, height: 32, justifyContent: 'center', borderRadius: 999, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] - 2 }, // 6
+  chip: {
+    paddingHorizontal: theme.space[4] - 2, // 14
+    paddingVertical: theme.space[2] - 2, // 6
+    height: 32,
+    justifyContent: 'center',
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
   chipActive: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary, borderWidth: 1 },
   chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
   chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
-  filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.colors.border },
+  filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.colors.border },
   filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
   linkBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   linkText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
-  listContent: { padding: 12, gap: 10, paddingBottom: 24 },
-  cardPress: { flex: 1, borderRadius: 16 },
-  card: { gap: 8, flex: 1 },
+  listContent: { padding: theme.space[3], gap: theme.space[3] - 2, paddingBottom: theme.space[6] }, // 12/10/24 — tokens
+  cardPress: { flex: 1, borderRadius: theme.radius.lg }, // 20 — token lg (antes 16)
+  card: { gap: theme.space[2], flex: 1 }, // 8
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: theme.space[2], paddingVertical: theme.space[1], borderRadius: theme.space[2] }, // 8/4/8
+
   codeText: { fontSize: 11, fontWeight: '800', color: theme.colors.muted, fontFamily: theme.font.mono },
   badges: { flexDirection: 'row', gap: 6 },
   asunto: { fontSize: 14, fontWeight: '800', color: theme.colors.text, lineHeight: 18 },
@@ -254,9 +284,9 @@ const s = StyleSheet.create({
   slaDot: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   slaPulse: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.danger },
   slaText: { fontSize: 10, fontWeight: '800', color: '#991B1B', textTransform: 'uppercase', letterSpacing: 0.5 },
-  empty: { alignItems: 'center', padding: 32, gap: 10, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: 8 },
+  empty: { alignItems: 'center', padding: theme.space[8], gap: theme.space[3] - 2, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.space[2] },
   emptyTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
-  emptyBtn: { marginTop: 8, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
+  emptyBtn: { marginTop: theme.space[2], backgroundColor: theme.colors.primary, paddingHorizontal: theme.space[4], paddingVertical: theme.space[3] - 2, borderRadius: theme.radius.sm },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   footer: { padding: 16, alignItems: 'center' },
 });

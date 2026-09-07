@@ -69,14 +69,22 @@ const s = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRightWidth: 1,
     borderRightColor: theme.colors.border,
-    padding: 16,
+    padding: theme.space[4], // 16 — token space-4
   },
   mainDesktop: { flex: 1, minWidth: 0 },
-  canvas: { paddingHorizontal: 24, paddingVertical: 16, alignItems: 'center' },
-  inner: { width: '100%', maxWidth: MAX_W, gap: 16 },
-  mobileTopBarWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56 },
-  burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  canvas: { paddingHorizontal: theme.space[6], paddingVertical: theme.space[4], alignItems: 'center' }, // 24/16
+  inner: { width: '100%', maxWidth: MAX_W, gap: theme.space[4] }, // 16
+  mobileTopBarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    paddingHorizontal: theme.space[2], // 8
+    height: 56,
+  },
+  burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm },
   burgerText: { fontSize: 18, color: theme.colors.text },
   overlay: { position: 'absolute', top: 56, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
-  drawer: { width: SIDEBAR_W, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
+  drawer: { width: SIDEBAR_W, backgroundColor: theme.colors.surface, padding: theme.space[4], borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' }, // 16
 });

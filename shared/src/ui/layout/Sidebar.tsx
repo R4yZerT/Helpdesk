@@ -39,17 +39,34 @@ export function Sidebar({ items, footer, user }: { items: SidebarItem[]; footer?
 }
 
 const s = StyleSheet.create({
-  wrap: { flex: 1, gap: 16 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  logoDot: { width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.primary },
+  wrap: { flex: 1, gap: theme.space[4] }, // 16 — token space-4
+  head: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[3], // 12 — token space-3
+    paddingBottom: theme.space[3], // 12 — box model estándar
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  logoDot: { width: 32, height: 32, borderRadius: theme.radius.sm, backgroundColor: theme.colors.primary },
   logoTitle: { fontSize: 13, fontWeight: '800', color: theme.colors.text },
   logoSub: { fontSize: 10, color: theme.colors.muted, fontWeight: '600' },
-  nav: { gap: 4 },
-  item: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12 },
+  nav: { gap: theme.space[1] }, // 4 — token space-1
+  item: { paddingHorizontal: theme.space[3], paddingVertical: theme.space[3] - 2, borderRadius: theme.radius.sm }, // 12/10/10 — tokens
   itemActive: { backgroundColor: theme.colors.primarySoft, borderWidth: 1, borderColor: '#BFDBFE' },
   itemText: { fontSize: 12, fontWeight: '600', color: theme.colors.muted },
   itemTextActive: { color: theme.colors.primaryDark },
-  userCard: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.colors.bg, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: theme.colors.border, marginTop: 'auto' },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[3],
+    backgroundColor: theme.colors.bg,
+    borderRadius: theme.radius.md, // 14 — token md
+    padding: theme.space[3] - 2, // 10 — compensa icono 32
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginTop: 'auto',
+  },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.text, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   userName: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
