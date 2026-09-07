@@ -1,0 +1,26 @@
+# Web HelpDesk — dev con HMR (para no tener que dejar pnpm web corriendo fuera de Docker)
+# Uso: docker compose -f docker-compose.dev.yml up --build
+FROM node:20-alpine
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+WORKDIR /app
+
+# Copia manifests para cache de deps
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.json ./
+COPY shared/package.json ./shared/package.json
+COPY apps/web/package.json ./apps/web/package.json
+
+# Instala deps (incluye expo/metro). Respetar frozen-lockfile para reproducibilidad
+RUN pnpm install --frozen-lockfile
+
+# Copia resto del código (será sobreescrito por volumes en dev, pero sirve para build sin volumes)
+COPY shared ./shared
+COPY apps/web ./apps/web
+
+WORKDIR /app/apps/web
+EXPOSE 19006 19000 19001 19002
+
+# Variables Expo en runtime (no ARG de build) — se inyectan via env_file/.env
+ENV EXPO_DEVTOOLS_LISTEN_ADDRESS=0.0.0.0
+ENV EXPO_PACKAGER_PROXY_URL=http://localhost:19006
+
+CMD ["npx", "expo", "start", "--web", "--port", "19006", "--host", "0.0.0.0"]

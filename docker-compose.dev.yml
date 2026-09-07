@@ -1,0 +1,73 @@
+# HelpDesk — dev con HMR (automatiza pnpm web dentro de Docker)
+# Uso:
+#   docker compose -f docker-compose.dev.yml up --build          # HMR en http://localhost:19006
+#   docker compose -f docker-compose.dev.yml up --build --watch  # + sync con Compose Watch (Docker Desktop 4.24+)
+#   docker compose -f docker-compose.dev.yml down
+#
+# No necesitas dejar `pnpm web` corriendo fuera: este servicio hace `expo start --web --host` con volumes.
+# Para prod sigue usando: docker compose up --build  (nginx en http://localhost:3000)
+services:
+  web-dev:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    ports:
+      - "19006:19006" # Expo web
+      - "19000:19000" # Expo devtools (opcional)
+    env_file:
+      - .env
+    environment:
+      EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY}
+      # Necesario para que Metro detecte cambios dentro del bind mount
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      # Código fuente con HMR (cambias archivo y recarga sin rebuild)
+      - ./apps/web:/app/apps/web
+      - ./shared:/app/shared
+      - ./package.json:/app/package.json:ro
+      - ./pnpm-workspace.yaml:/app/pnpm-workspace.yaml:ro
+      - ./pnpm-lock.yaml:/app/pnpm-lock.yaml:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      # Evita pisar node_modules del contenedor con los del host
+      - web_dev_node_modules:/app/node_modules
+      - web_dev_app_node_modules:/app/apps/web/node_modules
+      - web_dev_shared_node_modules:/app/shared/node_modules
+      # Expo cache
+      - web_dev_expo:/app/apps/web/.expo
+    restart: unless-stopped
+    # Healthcheck simple: espera a que Expo responda
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:19006/ | grep -qi '<html' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+    # Compose Watch: sincroniza cambios sin rebuild manual (requiere `docker compose --watch`)
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web
+          target: /app/apps/web
+          ignore:
+            - node_modules/
+            - dist/
+            - .expo/
+        - action: sync
+          path: ./shared
+          target: /app/shared
+        # si cambias lockfile, rebuild
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./apps/web/Dockerfile.dev
+
+volumes:
+  web_dev_node_modules:
+  web_dev_app_node_modules:
+  web_dev_shared_node_modules:
+  web_dev_expo:
