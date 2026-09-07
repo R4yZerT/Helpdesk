@@ -7,18 +7,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
-import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
+import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
-import type {
-  AdminStackParamList,
-  AuthStackParamList,
-  EmpleadoStackParamList,
-  UsuarioStackParamList,
-  JefeStackParamList,
-  TecnicoStackParamList,
-} from './types';
+import type { AdminStackParamList, AuthStackParamList, JefeStackParamList } from './types';
 
 function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
   const { profile, signOut } = useAuth();
@@ -33,7 +25,6 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
 const AdminStack = createNativeStackNavigator<AdminStackParamList>();
 
@@ -49,15 +40,7 @@ function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
 
-function TecnicoNavigator() {
-  return (
-    <TecnicoStack.Navigator>
-      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} />
-      <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
-    </TecnicoStack.Navigator>
-  );
-}
+
 
 function JefeNavigator() {
   return (

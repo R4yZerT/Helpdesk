@@ -1,7 +1,8 @@
-// AppShell — Stitch layout: aside w-64 fixed + ml-64 + TopBar h-16 + max-w 1280
+// AppShell — Stitch layout: aside w-64 fixed + ml-64 + TopBar h-16 + max-w 1280 + Footer legal
 import * as React from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions, Pressable, Text } from 'react-native';
 import { theme } from '../theme.js';
+import { AppFooter } from './AppFooter.js';
 
 const SIDEBAR_W = 256;
 const MAX_W = 1280;
@@ -30,9 +31,10 @@ export function AppShell({
         <View style={s.mainDesktop}>
           {topBar}
           {filterBar}
-          <ScrollView contentContainerStyle={s.canvas} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.canvas} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
             <View style={s.inner}>{children}</View>
           </ScrollView>
+          <AppFooter />
         </View>
       </View>
     );
@@ -55,9 +57,10 @@ export function AppShell({
           <View style={s.drawer}>{sidebar}</View>
         </Pressable>
       ) : null}
-      <ScrollView contentContainerStyle={[s.canvas, { paddingTop: 8 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[s.canvas, { paddingTop: 8 }]} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={s.inner}>{children}</View>
       </ScrollView>
+      <AppFooter />
     </View>
   );
 }
@@ -71,7 +74,7 @@ const s = StyleSheet.create({
     borderRightColor: theme.colors.border,
     padding: theme.space[4], // 16 — token space-4
   },
-  mainDesktop: { flex: 1, minWidth: 0 },
+  mainDesktop: { flex: 1, minWidth: 0, flexDirection: 'column' },
   canvas: { paddingHorizontal: theme.space[6], paddingVertical: theme.space[4], alignItems: 'center' }, // 24/16
   inner: { width: '100%', maxWidth: MAX_W, gap: theme.space[4] }, // 16
   mobileTopBarWrap: {

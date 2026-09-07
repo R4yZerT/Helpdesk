@@ -5,7 +5,7 @@ import { theme } from '../theme.js';
 
 export type SidebarItem = { id: string; label: string; active?: boolean; onPress?: () => void };
 
-export function Sidebar({ items, footer, user }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string } }) {
+export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string }; onLogout: () => void }) {
   return (
     <View style={s.wrap}>
       <View style={s.head}>
@@ -33,7 +33,27 @@ export function Sidebar({ items, footer, user }: { items: SidebarItem[]; footer?
           </View>
         </View>
       ) : null}
+      {/* Slidebar legal — Stitch: Estación L2 + legal links fijo abajo */}
+      <View style={s.legalBox}>
+        <View style={s.legalRow}>
+          <Text style={s.legalLabel}>Estación L2</Text>
+          <Text style={s.legalValue}>884-TX</Text>
+        </View>
+        <Text style={s.legalSub}>SLA Activo · Nivel Prioridad</Text>
+        <View style={s.legalLinks}>
+          <Text style={s.legalLink}>Privacidad</Text>
+          <Text style={s.legalDot}>·</Text>
+          <Text style={s.legalLink}>Términos</Text>
+          <Text style={s.legalDot}>·</Text>
+          <Text style={s.legalLink}>Soporte</Text>
+        </View>
+        <Text style={s.legalCopy}>© 2026 IUE · HelpDesk</Text>
+      </View>
       {footer}
+      {/* Global: cerrar sesión siempre visible abajo — no opcional (estándar AppShell) */}
+      <Pressable onPress={onLogout} style={s.logoutBtn} accessibilityRole="button" accessibilityLabel="Cerrar sesión">
+        <Text style={s.logoutText}>Cerrar sesión</Text>
+      </Pressable>
     </View>
   );
 }
@@ -71,4 +91,16 @@ const s = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   userName: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
   userRole: { fontSize: 10, color: theme.colors.muted },
+  logoutBtn: { marginTop: 12, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  logoutText: { fontSize: 12, fontWeight: '700', color: theme.colors.muted },
+  legalBox: { gap: 6, backgroundColor: theme.colors.bg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, padding: theme.space[3] },
+  legalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  legalLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
+  legalValue: { fontSize: 11, fontWeight: '800', color: theme.colors.primary, fontFamily: theme.font.mono },
+  legalSub: { fontSize: 10, color: theme.colors.mutedSoft, fontFamily: theme.font.mono },
+  legalLinks: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  legalLink: { fontSize: 10, fontWeight: '600', color: theme.colors.muted },
+  legalDot: { fontSize: 10, color: theme.colors.mutedSoft },
+  legalCopy: { fontSize: 10, color: theme.colors.mutedSoft, marginTop: 2 },
+
 });
