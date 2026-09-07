@@ -4,7 +4,7 @@ import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme } from '@helpdesk/shared';
-import { Sidebar, AppFooter } from '@helpdesk/shared';
+import { Sidebar } from '@helpdesk/shared';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
@@ -91,7 +91,6 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
             <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
             </Stack.Navigator>
           </View>
-          <AppFooter />
         </View>
       </View>
     );
@@ -116,7 +115,6 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
           <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
           </Stack.Navigator>
         </View>
-        <AppFooter />
         {drawerOpen ? (
           <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
             <View style={w.drawer}>{sidebarContent}</View>

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar, AppFooter } from '@helpdesk/shared';
+import { theme, Sidebar } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -66,7 +66,6 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
               <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
             </Stack.Navigator>
           </View>
-          <AppFooter />
         </View>
       </View>
     );
@@ -90,7 +89,6 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
             <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
           </Stack.Navigator>
         </View>
-        <AppFooter />
         {drawerOpen ? (
           <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
             <View style={w.drawer}>{sidebarContent}</View>

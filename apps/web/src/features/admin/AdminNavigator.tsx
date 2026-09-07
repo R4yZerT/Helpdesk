@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar, AppFooter } from '@helpdesk/shared';
+import { theme, Sidebar } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import type { AdminStackParamList } from '../../navigation/types';
@@ -70,7 +70,6 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
               <Stack.Screen name="Import" options={{ title: 'Import' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
             </Stack.Navigator>
           </View>
-          <AppFooter />
         </View>
       </View>
     );
@@ -95,7 +94,6 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
             <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
           </Stack.Navigator>
         </View>
-        <AppFooter />
         {drawerOpen ? (
           <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
             <View style={w.drawer}>{sidebarContent}</View>

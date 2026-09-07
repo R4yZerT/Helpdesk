@@ -2,7 +2,6 @@
 import * as React from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions, Pressable, Text } from 'react-native';
 import { theme } from '../theme.js';
-import { AppFooter } from './AppFooter.js';
 
 const SIDEBAR_W = 256;
 const MAX_W = 1280;
@@ -34,7 +33,6 @@ export function AppShell({
           <ScrollView contentContainerStyle={s.canvas} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
             <View style={s.inner}>{children}</View>
           </ScrollView>
-          <AppFooter />
         </View>
       </View>
     );
@@ -60,7 +58,6 @@ export function AppShell({
       <ScrollView contentContainerStyle={[s.canvas, { paddingTop: 8 }]} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={s.inner}>{children}</View>
       </ScrollView>
-      <AppFooter />
     </View>
   );
 }
