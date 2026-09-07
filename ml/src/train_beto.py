@@ -150,7 +150,7 @@ def main():
         per_device_eval_batch_size=args.eval_batch,
         learning_rate=args.lr,
         weight_decay=0.01,
-        warmup_ratio=0.10,
+        warmup_steps=50,
         logging_steps=50,
         eval_strategy="epoch",
         save_strategy="epoch",
@@ -200,8 +200,9 @@ def main():
     preds = trainer.predict(test_ds)
     y_pred = np.argmax(preds.predictions, axis=1)
     y_true = preds.label_ids
-    target_names = [id2label[i] for i in sorted(id2label)]
-    print(classification_report(y_true, y_pred, target_names=target_names, zero_division=0))
+    labels_present = sorted(set(int(x) for x in y_true) | set(int(x) for x in y_pred))
+    target_names_present = [id2label[i] for i in labels_present]
+    print(classification_report(y_true, y_pred, labels=labels_present, target_names=target_names_present, zero_division=0))
 
     # guardar modelo + tokenizer + métricas
     trainer.save_model(str(out_dir))
