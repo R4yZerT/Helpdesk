@@ -26,3 +26,4 @@ export * from './dashboard.js';
 export * from './export.js';
 export * from './ia.js';
 export * from './admin.js';
+export * from './mesas.js';
