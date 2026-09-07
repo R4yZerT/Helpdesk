@@ -9,16 +9,17 @@ import { useAuth } from '../../context/AuthContext';
 type Props = { route: { params: { id: string } } };
 
 const tonoEstado = (e: string) => {
-  if (e === 'abierto') return 'warning' as const;
-  if (e === 'en_proceso') return 'accent' as const;
-  if (e === 'solucionado' || e === 'cerrado') return 'success' as const;
+  if (e === 'abierto') return 'muted' as const;
+  if (e === 'en_proceso' || e === 'programado') return 'info' as const;
+  if (e === 'solucionado') return 'success' as const;
+  if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
   return 'muted' as const;
 };
 const tonoPrioridad = (p: string) => {
-  if (p === 'critica') return 'danger' as const;
-  if (p === 'alta') return 'warning' as const;
-  if (p === 'media') return 'accent' as const;
+  if (p === 'critica') return 'accent' as const;
+  if (p === 'alta') return 'danger' as const;
+  if (p === 'media') return 'warning' as const;
   return 'muted' as const;
 };
 
@@ -314,7 +315,7 @@ export function TicketDetailScreen({ route }: Props) {
 
 const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, backgroundColor: theme.colors.bg },
-  loadingDot: { width: 36, height: 3, borderRadius: 999, backgroundColor: theme.colors.accent, opacity: 0.9 },
+  loadingDot: { width: 36, height: 3, borderRadius: 999, backgroundColor: theme.colors.primary, opacity: 0.9 },
   muted: { color: theme.colors.muted, fontSize: 12, lineHeight: 16 },
   mutedSmall: { color: theme.colors.mutedSoft, fontSize: 11 },
   metaSmall: { fontSize: 11, color: theme.colors.textSoft, marginTop: 4 },
@@ -323,24 +324,24 @@ const s = StyleSheet.create({
   container: { padding: 16, gap: 14, paddingBottom: 28 },
   hero: { gap: 8, paddingHorizontal: 4, paddingTop: 6 },
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  kickerHairline: { width: 18, height: 2, borderRadius: 999, backgroundColor: theme.colors.accent },
+  kickerHairline: { width: 18, height: 2, borderRadius: 999, backgroundColor: theme.colors.primary },
   kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, color: theme.colors.muted, textTransform: 'uppercase' },
-  asunto: { fontSize: 22, fontWeight: '800', color: theme.colors.primary, lineHeight: 26, letterSpacing: -0.3 },
+  asunto: { fontSize: 22, fontWeight: '800', color: theme.colors.text, lineHeight: 26, letterSpacing: -0.3 },
   desc: { fontSize: 13, color: theme.colors.textSoft, lineHeight: 19 },
   badges: { flexDirection: 'row', gap: 8, marginTop: 4 },
   metaGrid: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   meta: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
   metaDot: { color: theme.colors.borderStrong, fontSize: 11 },
   metaSoft: { fontSize: 11, color: theme.colors.mutedSoft },
-  section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.primary, marginBottom: 10 },
+  section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.text, marginBottom: 10 },
   timelineRow: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
   dotCol: { alignItems: 'center', width: 12 },
-  dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: theme.colors.accent, marginTop: 4 },
+  dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: theme.colors.primary, marginTop: 4 },
   line: { flex: 1, width: 1, backgroundColor: theme.colors.border, marginTop: 6, opacity: 0.8 },
   timelineBody: { flex: 1, gap: 2, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.colors.border, borderStyle: 'dashed' },
   comment: { gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border, borderStyle: 'dashed' },
   rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.primary },
+  rowTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
   composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 10, ...theme.shadow.soft },
   input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 12, fontSize: 13, color: theme.colors.text, minHeight: 44, textAlignVertical: 'top', backgroundColor: theme.colors.surfaceAlt },
   editInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt },

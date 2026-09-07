@@ -199,17 +199,18 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
-function prioridadTone(p: string): 'success' | 'warning' | 'danger' | 'accent' {
-  if (p === 'critica') return 'danger';
-  if (p === 'alta') return 'warning';
-  if (p === 'media') return 'accent';
+function prioridadTone(p: string): 'success' | 'warning' | 'danger' | 'accent' | 'info' {
+  if (p === 'critica') return 'accent'; // Stitch: naranja solo crítico/pico
+  if (p === 'alta') return 'danger';
+  if (p === 'media') return 'warning';
   return 'success';
 }
-function estadoTone(e: string): 'muted' | 'accent' | 'success' | 'ink' {
+function estadoTone(e: string): 'muted' | 'info' | 'success' | 'ink' | 'danger' {
   if (e === 'abierto') return 'muted';
-  if (e === 'en_proceso') return 'accent';
+  if (e === 'en_proceso' || e === 'programado') return 'info'; // azul operativo
   if (e === 'solucionado') return 'success';
   if (e === 'cerrado') return 'ink';
+  if (e === 'devuelto') return 'danger';
   return 'muted';
 }
 function prettyEstado(e: string) { return e.replace('_', ' '); }
@@ -220,7 +221,7 @@ const s = StyleSheet.create({
   muted: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   header: { gap: 10, marginBottom: 6 },
   kicker: { fontSize: 10, letterSpacing: 1.6, color: theme.colors.mutedSoft, fontWeight: '700', textTransform: 'uppercase' },
-  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.4, marginTop: -4 },
+  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, marginTop: -4 },
   subtle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, paddingHorizontal: 12, gap: 8, ...theme.shadow.soft as object },
   searchIcon: { color: theme.colors.mutedSoft, fontSize: 14, transform: [{ translateY: -1 }] },
@@ -234,7 +235,7 @@ const s = StyleSheet.create({
   chipText: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', textTransform: 'capitalize' },
   chipTextActive: { color: '#fff' },
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  totalDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.accent },
+  totalDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary },
   total: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
   resetBtn: { marginLeft: 'auto', paddingHorizontal: 10, paddingVertical: 6, borderRadius: theme.radius.full, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
   resetText: { fontSize: 11, color: theme.colors.muted, fontWeight: '700' },
@@ -247,7 +248,7 @@ const s = StyleSheet.create({
   desc: { fontSize: 12, color: theme.colors.muted, lineHeight: 17 },
   meta: { fontSize: 10, color: theme.colors.mutedSoft, fontWeight: '600', letterSpacing: 0.3 },
   empty: { alignItems: 'center', gap: 8, padding: 18, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft as object },
-  emptyTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.primary },
+  emptyTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   emptySub: { fontSize: 12, color: theme.colors.muted, textAlign: 'center', lineHeight: 17 },
   primaryBtn: { marginTop: 6, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 11, borderRadius: theme.radius.full },
   primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 12, letterSpacing: 0.3 },

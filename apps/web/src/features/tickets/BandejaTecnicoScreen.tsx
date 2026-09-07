@@ -12,16 +12,17 @@ const PAGE_SIZE = 20;
 type Props = { navigation: NativeStackNavigationProp<TecnicoStackParamList, 'Bandeja'> };
 
 const tonoEstado = (e: string) => {
-  if (e === 'abierto') return 'warning' as const;
-  if (e === 'en_proceso') return 'accent' as const;
-  if (e === 'solucionado' || e === 'cerrado') return 'success' as const;
+  if (e === 'abierto') return 'muted' as const;
+  if (e === 'en_proceso' || e === 'programado') return 'info' as const;
+  if (e === 'solucionado') return 'success' as const;
+  if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
   return 'muted' as const;
 };
 const tonoPrioridad = (p: string) => {
-  if (p === 'critica') return 'danger' as const;
-  if (p === 'alta') return 'warning' as const;
-  if (p === 'media') return 'accent' as const;
+  if (p === 'critica') return 'accent' as const; // naranja solo crítico
+  if (p === 'alta') return 'danger' as const;
+  if (p === 'media') return 'warning' as const;
   return 'muted' as const;
 };
 const prettyEstado = (e: string) => e.replace('_', ' ');
@@ -140,7 +141,7 @@ const s = StyleSheet.create({
   muted: { color: theme.colors.muted, fontSize: 12 },
   header: { padding: 16, gap: 8, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: theme.colors.muted, textTransform: 'uppercase' },
-  h1: { fontSize: 18, fontWeight: '800', color: theme.colors.primary },
+  h1: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.bg, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 10, height: 38 },
   searchIcon: { color: theme.colors.mutedSoft, marginRight: 6 },
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
