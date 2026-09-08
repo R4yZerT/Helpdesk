@@ -128,6 +128,10 @@ export function TicketDetailScreen({ route }: Props) {
     ]);
   };
   const onTransition = async (estado: string) => {
+    if ((estado === 'solucionado' || estado === 'cerrado') && solucion.trim().length < 5) {
+      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + estado);
+      return;
+    }
     setTransLoading(estado);
     setTransError(null);
     try {
@@ -214,7 +218,12 @@ export function TicketDetailScreen({ route }: Props) {
         {!editing ? <Text style={s.desc}>{ticket.descripcion}</Text> : null}
         {/* Terminal demo (Stitch) si descripción contiene código/bloque — placeholder */}
         <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad}</Text></View>
-        {ticket.solucionAplicada ? <View style={s.solBox}><Text style={s.solLabel}>Solución aplicada</Text><Text style={s.solText}>{ticket.solucionAplicada}</Text></View> : null}
+        {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
+          <View style={s.solBox}>
+            <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
+            {ticket.solucionAplicada ? <Text style={s.solText}>{ticket.solucionAplicada}</Text> : <Text style={s.solTextMuted}>Sin detalle de solución — registra el procedimiento aplicado.</Text>}
+          </View>
+        ) : null}
         {canEdit && !editing ? (
           <View style={s.actionRow}>
             <Pressable onPress={startEdit} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Editar</Text></Pressable>
@@ -437,6 +446,7 @@ const s = StyleSheet.create({
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.colors.border, gap: 4 },
   solLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: theme.colors.primary },
   solText: { fontSize: 12, color: theme.colors.textSoft, lineHeight: 16 },
+  solTextMuted: { fontSize: 12, color: theme.colors.mutedSoft, lineHeight: 16, fontStyle: 'italic' },
   hint: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'right' },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.bg, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: theme.colors.border },
   switchLabel: { fontSize: 12, color: theme.colors.primary, fontWeight: '600' },

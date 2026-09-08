@@ -79,6 +79,10 @@ export function DetalleTecnicoScreen({ route }: Props) {
     catch (e) { setSendError(e instanceof Error ? e.message : String(e)); } finally { setSending(false); }
   };
   const onTransition = async (estado: string) => {
+    if ((estado === 'solucionado' || estado === 'cerrado') && solucion.trim().length < 5) {
+      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + estado);
+      return;
+    }
     setTransLoading(estado); setTransError(null);
     try { await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined }); setShowTrans(false); setSolucion(''); await load(); }
     catch (e) { setTransError(e instanceof Error ? e.message : String(e)); } finally { setTransLoading(null); }
@@ -125,7 +129,12 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
         <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId?.slice(0,8) ?? '—'}</Text></View>
-        {ticket.solucionAplicada ? <View style={s.solBox}><Text style={s.solLabel}>Solución aplicada</Text><Text style={s.solText}>{ticket.solucionAplicada}</Text></View> : null}
+        {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
+          <View style={s.solBox}>
+            <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
+            {ticket.solucionAplicada ? <Text style={s.solText}>{ticket.solucionAplicada}</Text> : <Text style={s.solTextMuted}>Sin detalle de solución — registra el procedimiento aplicado.</Text>}
+          </View>
+        ) : null}
       </Card>
       <Card style={{ gap: 0, padding: 0, overflow: 'hidden' } as any}>
         <View style={s.tabs}>
@@ -291,6 +300,7 @@ const s = StyleSheet.create({
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, padding: theme.space[3] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[1] }, // 10/10/4
   solLabel: { fontSize:10, fontWeight:'800', letterSpacing:0.6, textTransform:'uppercase', color: theme.colors.primary },
   solText: { fontSize:12, color: theme.colors.textSoft, lineHeight:16 },
+  solTextMuted: { fontSize:12, color: theme.colors.mutedSoft, lineHeight:16, fontStyle:'italic' },
   ghostStack: { gap: theme.space[2], marginTop: theme.space[1] }, // 8/4
   progressWrap: { gap:2, paddingLeft:6 },
   progressRow: { flexDirection:'row', gap: theme.space[3] - 2, paddingVertical: theme.space[2] - 2 }, // 10/6
