@@ -10,7 +10,6 @@ export const ESTADO_LABELS: Record<EstadoTicket, string> = {
   solucionado: 'Solucionado',
   cerrado: 'Cerrado',
   devuelto: 'Devuelto',
-  programado: 'Programado',
 };
 
 export const PRIORIDAD_LABELS: Record<PrioridadTicket, string> = {
@@ -70,7 +69,7 @@ function capitalize(s: string): string {
 
 export const ESTADO_OPTIONS: { value: EstadoTicket | ''; label: string }[] = [
   { value: '', label: 'Todos' },
-  ...(['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto', 'programado'] as EstadoTicket[]).map((e) => ({
+  ...(['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto'] as EstadoTicket[]).map((e) => ({
     value: e,
     label: formatEstado(e),
   })),

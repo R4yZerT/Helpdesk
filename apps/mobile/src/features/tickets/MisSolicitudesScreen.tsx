@@ -218,7 +218,7 @@ function prioridadTone(p: string): 'success' | 'warning' | 'danger' | 'accent' |
 }
 function estadoTone(e: string): 'muted' | 'info' | 'success' | 'ink' | 'danger' {
   if (e === 'abierto') return 'muted';
-  if (e === 'en_proceso' || e === 'programado') return 'info';
+  if (e === 'en_proceso') return 'info';
   if (e === 'solucionado') return 'success';
   if (e === 'cerrado') return 'ink';
   if (e === 'devuelto') return 'danger';

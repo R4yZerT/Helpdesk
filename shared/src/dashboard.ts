@@ -47,7 +47,7 @@ export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}):
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as any[];
   const total = count ?? rows.length;
-  const abiertos = rows.filter((r) => ['abierto', 'en_proceso', 'programado'].includes(r.estado)).length;
+  const abiertos = rows.filter((r) => ['abierto', 'en_proceso'].includes(r.estado)).length;
   const hoy = new Date().toISOString().slice(0, 10);
   const ingresadosHoy = rows.filter((r) => String(r.creado_en).slice(0, 10) === hoy).length;
   const slaRiesgo = rows.filter((r) => r.estado !== 'cerrado' && r.estado !== 'solucionado').length > 100 ? 8 : Math.min(8, Math.floor(abiertos * 0.06));

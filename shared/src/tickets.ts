@@ -12,7 +12,7 @@ function getPrioridadPorCategoriaLocal(categoriaId: number): PrioridadTicket {
 }
 
 export const PRIORIDADES: readonly PrioridadTicket[] = ['baja', 'media', 'alta', 'critica'] as const;
-export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto', 'programado'] as const;
+export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto'] as const;
 
 export function isPrioridadTicket(v: string): v is PrioridadTicket {
   return (PRIORIDADES as readonly string[]).includes(v);
@@ -451,12 +451,11 @@ export async function cancelTicket(client: SupabaseClient, ticketId: string): Pr
 
 // RF-11/13 — Transición de estado con FSM y solución aplicada
 const ESTADOS_TRANSICION: Record<EstadoTicket, readonly EstadoTicket[]> = {
-  abierto: ['en_proceso', 'cerrado', 'programado'],
-  en_proceso: ['solucionado', 'cerrado', 'devuelto', 'programado'],
+  abierto: ['en_proceso', 'cerrado'],
+  en_proceso: ['solucionado', 'cerrado', 'devuelto'],
   solucionado: ['cerrado', 'devuelto'],
   cerrado: [],
   devuelto: ['en_proceso', 'cerrado'],
-  programado: ['en_proceso', 'cerrado'],
 };
 
 export function canTransition(de: EstadoTicket, a: EstadoTicket): boolean {

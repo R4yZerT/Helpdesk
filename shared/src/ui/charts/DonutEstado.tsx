@@ -1,20 +1,28 @@
-// DonutEstado — Stitch r60 circ377 6 estados + legend (sin svg lib, barras como fallback accesible)
+// DonutEstado — Stitch r60 circ377 5 estados + legend (sin svg lib, barras como fallback accesible)
 import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { Card } from '../components.js';
 
+const ESTADOS_ORDEN: readonly string[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto'] as const;
 const COLORS: Record<string, string> = {
-  en_proceso: theme.colors.primary,
-  solucionado: theme.colors.success,
-  abierto: theme.colors.borderStrong,
-  cerrado: theme.colors.text,
-  devuelto: theme.colors.accent,
-  programado: theme.colors.mutedSoft,
+  abierto: theme.colors.primary,        // azul operativo
+  en_proceso: theme.colors.warning,     // ámbar
+  solucionado: theme.colors.success,    // verde
+  cerrado: theme.colors.text,           // navy oscuro
+  devuelto: theme.colors.danger,        // rojo
 };
 
 export function DonutEstado({ data }: { data: { estado: string; count: number }[] }) {
-  const total = data.reduce((a, b) => a + b.count, 0) || 1;
+  // Normaliza para que la dona siempre muestre los 5 estados (0 si no hay datos) y cada color se vea
+  // Legacy: si aún existen tickets 'programado' en BD, se suman a en_proceso para no perder conteo
+  const byEstado = new Map(data.map((d) => [d.estado, d.count]));
+  if (byEstado.has('programado')) {
+    byEstado.set('en_proceso', (byEstado.get('en_proceso') ?? 0) + (byEstado.get('programado') ?? 0));
+    byEstado.delete('programado');
+  }
+  const filled = ESTADOS_ORDEN.map((e) => ({ estado: e, count: byEstado.get(e) ?? 0 }));
+  const total = filled.reduce((a, b) => a + b.count, 0) || 1;
   return (
     <Card style={{ gap: 12 }}>
       <Text style={s.title}>Distribución por Estado</Text>
@@ -24,7 +32,7 @@ export function DonutEstado({ data }: { data: { estado: string; count: number }[
           <Text style={s.centerLabel}>activos</Text>
         </View>
         <View style={{ flex: 1, gap: 8 }}>
-          {data.map((d) => (
+          {filled.map((d) => (
             <View key={d.estado} style={s.legendRow}>
               <View style={[s.dot, { backgroundColor: COLORS[d.estado] ?? theme.colors.muted }]} />
               <Text style={s.legendLabel}>{d.estado.replace('_', ' ')}</Text>
