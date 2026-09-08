@@ -27,11 +27,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (userId: string) => {
     try {
       const p = await fetchProfile(supabase, userId);
+      if (p && !p.activo) {
+        await supabase.auth.signOut();
+        setProfile(null);
+        setSession(null);
+        const msg = 'Usuario desactivado, contacte con el administrador';
+        setError(msg);
+        throw new Error(msg);
+      }
       setProfile(p);
-      if (p && !p.activo) setError('Cuenta desactivada');
+      setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error cargando perfil');
-      setProfile(null);
+      const msg = e instanceof Error ? e.message : 'Error cargando perfil';
+      // si ya es el mensaje de desactivado, no sobreescribir con genérico
+      if (msg.includes('desactivado')) {
+        setError(msg);
+        setProfile(null);
+      } else {
+        setError(msg);
+        setProfile(null);
+      }
+      throw e;
     }
   }, []);
 
@@ -50,8 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       if (newSession?.user) {
         setLoading(true);
-        await loadProfile(newSession.user.id);
-        setLoading(false);
+        try { await loadProfile(newSession.user.id); } catch {}
+        finally { setLoading(false); }
       } else {
         setProfile(null);
       }
@@ -87,10 +103,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       email = d.email.toLowerCase();
     }
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       setError(authError.message);
       throw authError;
+    }
+    // Verificar activo inmediato tras login — si desactivado cerrar sesión y mostrar error claro
+    try {
+      const uid = signInData.user?.id;
+      if (uid) await loadProfile(uid);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Usuario desactivado, contacte con el administrador';
+      setError(msg);
+      throw new Error(msg);
     }
   }, []);
 
