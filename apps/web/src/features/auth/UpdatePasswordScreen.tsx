@@ -9,6 +9,8 @@ export function UpdatePasswordScreen({ navigation }: { navigation?: { navigate: 
   const isDesktop = width >= 768;
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [showNext, setShowNext] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -80,12 +82,20 @@ export function UpdatePasswordScreen({ navigation }: { navigation?: { navigate: 
             ) : null}
             <View style={s.field}>
               <Text style={s.label}>Nueva contraseña *</Text>
-              <TextInput placeholder="Mín. 8 caracteres" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry value={next} onChangeText={setNext} style={s.input} />
+              <View style={s.inputWrap}>
+                <Text style={s.inputIcon}>🔒</Text>
+                <TextInput placeholder="Mín. 8 caracteres" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showNext} value={next} onChangeText={setNext} style={s.inputInner} />
+                <Pressable onPress={() => setShowNext((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showNext ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showNext ? '🙈' : '👁'}</Text></Pressable>
+              </View>
               <PasswordStrength validation={sync} />
             </View>
             <View style={s.field}>
               <Text style={s.label}>Confirmar *</Text>
-              <TextInput placeholder="Repite la contraseña" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry value={confirm} onChangeText={setConfirm} style={[s.input, next && confirm && next !== confirm ? s.inputError : null]} />
+              <View style={[s.inputWrap, next && confirm && next !== confirm ? s.inputWrapError : null]}>
+                <Text style={s.inputIcon}>🔒</Text>
+                <TextInput placeholder="Repite la contraseña" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showConfirm} value={confirm} onChangeText={setConfirm} style={s.inputInner} />
+                <Pressable onPress={() => setShowConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showConfirm ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showConfirm ? '🙈' : '👁'}</Text></Pressable>
+              </View>
               {next && confirm && next !== confirm ? <Text style={s.inlineError}>No coinciden</Text> : null}
             </View>
             {loading ? (
@@ -119,6 +129,12 @@ const s = StyleSheet.create({
   inlineError: { color: '#7F1D1D', fontSize: 11, fontWeight: '600' },
   field: { gap: 6 },
   label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' as const, color: theme.colors.textSoft },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 8, backgroundColor: theme.colors.surface, paddingHorizontal: 10, height: 44, gap: 8 } as unknown as object,
+  inputWrapError: { borderColor: '#FCA5A5' } as unknown as object,
+  inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputInner: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   input: { borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 8, backgroundColor: theme.colors.surface, paddingHorizontal: 12, height: 44, fontSize: 13, color: theme.colors.text } as unknown as object,
   inputError: { borderColor: '#FCA5A5' },
   primaryBtn: { backgroundColor: theme.colors.primary, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
