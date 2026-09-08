@@ -110,18 +110,6 @@ export function MisSolicitudesScreen({ navigation }: Props) {
 
   const filterCard = (
     <View style={s.header}>
-      <View style={s.titleRow}>
-        <View>
-          <Text style={s.kicker}>Bandeja</Text>
-          <Text style={s.h1}>Mis solicitudes</Text>
-          <Text style={s.subtle}>Filtra por estado y prioridad. Pull para actualizar.</Text>
-        </View>
-        <View style={s.counters}>
-          <View style={[s.counter, s.counterActive]}><View style={s.dot} /><Text style={s.counterText}>{activos} activos</Text></View>
-          <Text style={s.counterMuted}>{total} total</Text>
-        </View>
-      </View>
-
       <Card style={s.filterCard}>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
@@ -149,6 +137,10 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         <View style={s.totalRow}>
           <View style={s.totalDot} />
           <Text style={s.total}>{total} resultado{total !== 1 ? 's' : ''} · {qDebounced ? `"${qDebounced}"` : 'sin búsqueda'}</Text>
+          <View style={s.countersInline}>
+            <View style={[s.counter, s.counterActive]}><View style={s.dot} /><Text style={s.counterText}>{activos} activos</Text></View>
+            <Text style={s.counterMuted}>{total} total</Text>
+          </View>
           {(!!estado || !!prioridad || !!qDebounced) && (
             <Pressable onPress={() => { setEstado(''); setPrioridad(''); setQ(''); }} style={s.resetBtn}>
               <Text style={s.resetText}>Limpiar filtros</Text>
@@ -249,12 +241,13 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: theme.colors.bg },
   loadingCard: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 18, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', gap: 10, ...theme.shadow.soft as object },
   muted: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
-  header: { gap: 12, marginBottom: 4 },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  header: { marginBottom: 4 },
+  titleRow: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 12 },
   kicker: { fontSize: 10, letterSpacing: 1.6, color: theme.colors.mutedSoft, fontWeight: '700', textTransform: 'uppercase' },
   h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, marginTop: -4 },
   subtle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
   counters: { alignItems: 'flex-end', gap: 4, marginTop: 2 },
+  countersInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   counter: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   counterActive: { backgroundColor: theme.colors.primarySoft, borderColor: '#BFDBFE' },
   counterText: { fontSize: 11, fontWeight: '700', color: theme.colors.primaryDark },

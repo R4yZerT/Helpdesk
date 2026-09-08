@@ -105,6 +105,20 @@ export function IconUpload({ size = 16, color = '#64748b' }: P) {
   );
 }
 
+// Reloj — círculo + agujas
+export function IconClock({ size = 16, color = '#64748b' }: P) {
+  const r = size * 0.42;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.88, height: size * 0.88, borderRadius: size * 0.44, borderWidth: 1.5, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ position: 'absolute', width: 1.6, height: r * 0.75, backgroundColor: color, borderRadius: 1, top: size * 0.44 - r * 0.75, left: size * 0.44 - 0.8 }} />
+        <View style={{ position: 'absolute', width: r * 0.6, height: 1.6, backgroundColor: color, borderRadius: 1, top: size * 0.44 - 0.8, left: size * 0.44 }} />
+        <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
+
 // Mesa / Dependencia — tablero con 4 patas (ícono de mesa)
 export function IconTable({ size = 16, color = '#64748b' }: P) {
   return (

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar, IconInbox, IconPlus } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus, Clock } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -75,11 +75,12 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Bandeja'}</Text><Clock /></View>
           <View style={{ flex: 1 }}>
-            <Stack.Navigator screenOptions={screenOpts}>
-              <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
-              <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-              <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+            <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
+              <Stack.Screen name="Bandeja" component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
+              <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
+              <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
             </Stack.Navigator>
           </View>
         </View>
@@ -95,7 +96,7 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
           <Text style={w.burgerText}>☰</Text>
         </Pressable>
         <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={w.burgerSpacer} />
+        <View style={w.clockMobile}><Clock size={13} /></View>
       </View>
       <View style={w.mainMobile}>
         <View style={{ flex: 1 }}>
@@ -118,13 +119,16 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
 const w = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: theme.colors.bg },
   rootMobile: { flex: 1, flexDirection: 'column', backgroundColor: theme.colors.bg },
-  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, padding: 16 },
+  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 0 },
   main: { flex: 1, minWidth: 0 as unknown as number, flexDirection: 'column' as const },
   mainMobile: { flex: 1, minWidth: 0 as unknown as number, position: 'relative', flexDirection: 'column' as const },
   mobileTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56 },
   burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   burgerText: { fontSize: 18, color: theme.colors.text },
   burgerSpacer: { width: 44 },
+  clockMobile: { minWidth: 80, alignItems: 'flex-end' },
+  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
   mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
   drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },

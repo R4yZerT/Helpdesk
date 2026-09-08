@@ -17,7 +17,7 @@ import {
   type TicketCategoria,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
-import { Card, Badge, Divider, FeedbackModal } from '@helpdesk/shared';
+import { Card, Badge, Divider, FeedbackModal, FilterDropdown } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () => void; navigate: (s: string) => void } }) {
@@ -237,23 +237,19 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     );
   }
 
-  const byDominio = categorias.reduce<Record<string, TicketCategoria[]>>((acc, c) => {
-    (acc[c.dominio] ??= []).push(c);
-    return acc;
-  }, {});
-
   const prioridadTone = form.prioridad === 'critica' ? 'accent' : form.prioridad === 'alta' ? 'danger' : form.prioridad === 'media' ? 'warning' : 'muted';
   const sugerenciaCat = sugerencia ? categorias.find(c => c.id === sugerencia.categoriaId) : null;
   const isSugerenciaAplicada = sugerencia ? form.categoriaId === sugerencia.categoriaId : false;
+  // opciones para desplegables — mismo componente que en mesas/dependencias; categoría depende de dependencia
+  const mesaOptions = mesas.map(m => ({ value: m.id, label: m.nombre }));
+  const categoriaOptions = (form.mesaId
+    ? categorias.filter(c => getMesaIdPorDominio(c.dominio) === form.mesaId)
+    : []
+  ).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
 
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
       <View style={s.breadcrumb}><Text style={s.breadcrumbText}>Inicio / Mis Solicitudes / Nueva</Text></View>
-      <View style={s.hero}>
-        <Text style={s.kicker}>Nueva incidencia</Text>
-        <Text style={s.h1}>Crear Solicitud de Soporte</Text>
-        <Text style={s.subtitle}>Describe el problema: la IA analizará tu texto y sugerirá la categoría. La prioridad se asigna automáticamente.</Text>
-      </View>
 
       <View style={[s.formWrap, isWide && { maxWidth: 680, alignSelf: 'center', width: '100%' }]}>
         <Card style={s.formCard}>
@@ -322,47 +318,40 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
 
           <Divider />
 
-          {/* Categoría (corregible) */}
-          <Text style={s.sectionTitle}>Categoría *</Text>
-          <Text style={s.sectionHint}>Sugerida por IA — puedes corregirla. Al cambiarla, la prioridad se recalcula sola.</Text>
-          {Object.entries(byDominio).map(([dominio, cats]) => (
-            <View key={dominio} style={s.group}>
-              <Text style={s.groupTitle}>{dominio}</Text>
-              <View style={s.chips}>
-                {cats.map((c) => {
-                  const isSug = sugerencia?.categoriaId === c.id;
-                  return (
-                    <Pressable
-                      key={c.id}
-                      onPress={() => onSelectCategoria(c)}
-                      style={[s.chip, form.categoriaId === c.id && s.chipActive, isSug && form.categoriaId !== c.id && s.chipSuggested]}>
-                      <Text style={[s.chipText, form.categoriaId === c.id && s.chipTextActive]}>{c.subcategoria}</Text>
-                      {isSug ? <Text style={[s.chipSugBadge, form.categoriaId === c.id && { color:'#fff' }]}> IA</Text> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </View>
-          ))}
-          {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
-
-          <Divider />
-
-          {/* Dependencia auto-derivada — grid 3+3 uniforme */}
-          <Text style={s.sectionTitle}>Dependencia (mesa) *</Text>
-          <Text style={s.sectionHint}>Se asigna según dominio de la categoría. Puedes ajustarla si aplica.</Text>
-          <View style={s.mesaGrid}>
-            {mesas.map((m) => {
-              const active = form.mesaId === m.id;
-              return (
-                <Pressable key={m.id} onPress={() => setForm((f) => ({ ...f, mesaId: m.id }))} style={[s.mesaCard, active && s.mesaCardActive]} accessibilityRole="button" accessibilityLabel={`Mesa ${m.nombre}`}>
-                  <View style={[s.mesaDot, active && s.mesaDotActive]}><Text style={[s.mesaDotText, active && { color: '#fff' }]}>◈</Text></View>
-                  <Text style={[s.mesaName, active && s.mesaNameActive]}>{m.nombre}</Text>
-                  {active ? <Text style={s.mesaCheck}>✓</Text> : null}
-                </Pressable>
-              );
-            })}
+          {/* Dependencia y Categoría — mismos desplegables que en mesas/dependencias */}
+          <View style={s.dropdownRow}>
+            <FilterDropdown<number>
+              label="Dependencia *"
+              value={form.mesaId ?? ''}
+              options={mesaOptions}
+              placeholder="Seleccionar dependencia"
+              onSelect={(v) => {
+                const id = v === '' ? null : Number(v);
+                setForm(f => {
+                  // si cambia dependencia, limpia categoría que no pertenece a esa mesa
+                  const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
+                  const keep = keepCat && getMesaIdPorDominio(keepCat.dominio) === id ? f.categoriaId : 0;
+                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep) : f.prioridad };
+                });
+                setTouched(t => ({ ...t, mesaId: true }));
+              }}
+            />
+            <FilterDropdown<number>
+              label="Categoría *"
+              value={form.categoriaId || ''}
+              options={categoriaOptions}
+              placeholder={form.mesaId ? 'Seleccionar categoría' : 'Elige dependencia primero'}
+              onSelect={(v) => {
+                if (v === '') { setForm(f => ({ ...f, categoriaId: 0 })); return; }
+                const cat = categorias.find(c => c.id === Number(v));
+                if (cat) onSelectCategoria(cat);
+                else setForm(f => ({ ...f, categoriaId: Number(v) }));
+                setTouched(t => ({ ...t, categoriaId: true }));
+              }}
+            />
           </View>
+          <Text style={s.sectionHint}>IA preselecciona ambas — puedes cambiar cualquiera. Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
+          {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 
           <Divider />
@@ -472,6 +461,7 @@ const s = StyleSheet.create({
   aiBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   aiApplied: { fontSize:11, color:theme.colors.success, fontWeight:'700' },
   aiHint: { fontSize:11, color:theme.colors.muted, fontWeight:'600' },
+  dropdownRow: { flexDirection:'row', gap: 10, flexWrap:'wrap' as const },
   title: { fontSize: 14, fontWeight: '800', color: theme.colors.primary },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: theme.colors.text },
   sectionHint: { fontSize: 11, color: theme.colors.muted, marginTop: -6 },

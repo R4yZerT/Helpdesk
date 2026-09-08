@@ -104,12 +104,7 @@ export function AdminMesaTicketsScreen() {
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot}/><Text style={s.kicker}>Administrador · Mesa #{mesaId}</Text></View>
-        <Text style={s.h1}>Mesas</Text>
-        <Text style={s.subtitle}>Tickets de tu dependencia (mesa {mesaId}). Solo ves tickets de tu dependencia. Asigna a técnico de la misma dependencia.</Text>
-        {errorMsg? <Text style={s.error}>{errorMsg}</Text>:null}
-      </View>
+      {errorMsg? <View style={s.header}><Text style={s.error}>{errorMsg}</Text></View>:null}
       <View style={s.filterCard}>
         <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />{!!q && <Pressable onPress={()=>setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}</View>
         <View style={s.dropdownRow}>

@@ -151,10 +151,9 @@ export function AdminCategoriasScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.header}>
-        <View style={s.headerRow}><Text style={s.h1}>Categorías</Text>
+        <View style={s.headerRow}>
           <Pressable onPress={() => { if (!isGeneralAdmin && dominioForMesa) setFormDominio(dominioForMesa); setCreateOpen(true); setFormError(null); }} style={s.btnPrimary}><Text style={s.btnPrimaryText}>+ Nueva categoría</Text></Pressable>
         </View>
-        <Text style={s.subtitle}>Administra categorías maestras por dominio (tic, comunicaciones, infraestructura, general). Únicas por dominio.</Text>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
         <View style={s.filters}>
           <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar subcategoría" placeholderTextColor={theme.colors.mutedSoft} style={s.searchInput} /></View>
@@ -231,8 +230,8 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   muted: { color: theme.colors.muted, fontSize: 12 },
   error: { color: theme.colors.danger, fontSize: 11, backgroundColor: '#FEF2F2', borderColor: '#FECACA', borderWidth: 1, borderRadius: 8, padding: 8 },
-  header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, gap: 8 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, gap: 8 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end' },
   h1: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
   subtitle: { fontSize: 11, color: theme.colors.muted, lineHeight: 15 },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 14, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

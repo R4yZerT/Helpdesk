@@ -11,10 +11,10 @@ import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
-import { DashboardScreen } from '../features/dashboard/DashboardScreen';
+import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
-import type { AuthStackParamList, JefeStackParamList } from './types';
+import type { AuthStackParamList } from './types';
 
 function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
   const { profile, signOut } = useAuth();
@@ -29,7 +29,6 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const JefeStack = createNativeStackNavigator<JefeStackParamList>();
 const RootStack = createNativeStackNavigator();
 
 function AuthNavigator() {
@@ -57,20 +56,7 @@ function EmpleadoNavigator() {
 
 
 
-function JefeNavigator() {
-  return (
-    <JefeStack.Navigator screenOptions={{ headerShown: false }}>
-      <JefeStack.Screen name="Dashboard" component={DashboardScreen} />
-      <JefeStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} />
-      <JefeStack.Screen name="Reportes" options={{ title: 'Reportes' }}>
-        {() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}
-      </JefeStack.Screen>
-      <JefeStack.Screen name="Alertas" options={{ title: 'Alertas IA' }}>
-        {() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}
-      </JefeStack.Screen>
-    </JefeStack.Navigator>
-  );
-}
+/* JefeNavigator movido a features/jefe/JefeNavigator.tsx con AppShell sidebar+reloj 56px */
 
 
 
