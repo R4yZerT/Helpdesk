@@ -84,14 +84,14 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
-          <View style={w.topClockBar}><Clock /></View>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Mesas' ? 'Dependencias' : activeName === 'Usuarios' ? 'Usuarios' : activeName === 'Categorias' ? 'Categorías' : activeName === 'Import' ? 'Import' : 'Mesas'}</Text><Clock /></View>
           <View style={{ flex: 1 }}>
-            <Stack.Navigator screenOptions={screenOpts} initialRouteName="MesaTickets">
-              <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} options={{ title: 'MESAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
-              {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} options={{ title: 'DEPENDENCIAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
-              <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'USUARIOS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
-              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} options={{ title: 'CATEGORÍAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-              <Stack.Screen name="Import" options={{ title: 'IMPORT' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
+            <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
+              <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
+              {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
+              <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
+              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
+              <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
             </Stack.Navigator>
           </View>
         </View>
@@ -140,7 +140,8 @@ const w = StyleSheet.create({
   burgerText: { fontSize: 18, color: theme.colors.text },
   burgerSpacer: { width: 44 },
   clockMobile: { minWidth: 80, alignItems: 'flex-end' },
-  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
   mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
   drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },

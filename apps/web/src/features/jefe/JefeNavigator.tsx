@@ -67,13 +67,13 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
-          <View style={w.topClockBar}><Clock /></View>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'Reportes' ? 'Reportes' : activeName === 'Alertas' ? 'Alertas IA' : 'Dashboard'}</Text><Clock /></View>
           <View style={{ flex: 1 }}>
-            <Stack.Navigator screenOptions={screenOpts} initialRouteName="Dashboard">
-              <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: 'Dashboard' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
-              <Stack.Screen name="CrearTicket" component={CreateTicketScreen} options={{ title: 'Nueva solicitud' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-              <Stack.Screen name="Reportes" options={{ title: 'Reportes' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })}>{() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}</Stack.Screen>
-              <Stack.Screen name="Alertas" options={{ title: 'Alertas IA' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })}>{() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}</Stack.Screen>
+            <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="Dashboard">
+              <Stack.Screen name="Dashboard" component={DashboardScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
+              <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
+              <Stack.Screen name="Reportes" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })}>{() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}</Stack.Screen>
+              <Stack.Screen name="Alertas" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })}>{() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}</Stack.Screen>
             </Stack.Navigator>
           </View>
         </View>
@@ -113,7 +113,8 @@ const w = StyleSheet.create({
   burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   burgerText: { fontSize: 18, color: theme.colors.text },
   clockMobile: { minWidth: 80, alignItems: 'flex-end' },
-  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
   mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
   drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
