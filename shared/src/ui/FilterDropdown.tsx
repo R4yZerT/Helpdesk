@@ -127,7 +127,7 @@ export function FilterDropdown<T extends string | number | boolean>({
 
 const s = StyleSheet.create({
   wrap: { gap: 5, minWidth: 132, flex: 1 },
-  label: { fontSize: 10, fontWeight: '700', letterSpacing: 0.7, textTransform: 'uppercase', color: theme.colors.mutedSoft },
+  label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2, color: theme.colors.muted },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',

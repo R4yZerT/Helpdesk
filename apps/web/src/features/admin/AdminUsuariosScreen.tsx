@@ -236,7 +236,7 @@ export function AdminUsuariosScreen() {
       <View style={s.filterCard}>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
+          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
         </View>
         <View style={s.dropdownRow}>

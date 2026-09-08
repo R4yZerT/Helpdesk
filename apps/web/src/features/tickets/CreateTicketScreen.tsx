@@ -256,7 +256,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             value={form.descripcion}
             onChangeText={(v) => setForm((f) => ({ ...f, descripcion: v }))}
             onBlur={() => setTouched((t) => ({ ...t, descripcion: true }))}
-            placeholder="Describe el problema con detalle (mín. 20 caracteres para activar la IA). Ej: El wifi del bloque 3 se cae cada 10 min desde ayer..."
+            placeholder="Describe el problema con detalle (mín. 20 caracteres para activar la IA). Ej: El wifi del bloque 3 se cae cada 10 min desde ayer"
             placeholderTextColor={theme.colors.mutedSoft}
             style={[s.input, s.textarea]}
             multiline

@@ -153,7 +153,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Buscar en asunto…"
+            placeholder="Buscar en asunto"
             placeholderTextColor={theme.colors.mutedSoft}
             style={s.search}
             returnKeyType="search"

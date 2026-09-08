@@ -287,7 +287,7 @@ export function TicketDetailScreen({ route }: Props) {
             <TextInput
               value={mensaje}
               onChangeText={setMensaje}
-              placeholder="Escribe tu avance…"
+              placeholder="Escribe tu avance"
               placeholderTextColor={theme.colors.mutedSoft}
               style={s.input}
               multiline
@@ -326,7 +326,7 @@ export function TicketDetailScreen({ route }: Props) {
         <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnAccent]}><Text style={s.btnAccentText}>{showTrans ? 'Ocultar' : 'Solucionar Incidente'}</Text></Pressable>
         {showTrans && nextEstados.length > 0 ? (
           <View style={{ gap: 8 }}>
-            <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución…" style={s.input} multiline maxLength={5000} />
+            <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {nextEstados.map((e) => (

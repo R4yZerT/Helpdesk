@@ -172,7 +172,7 @@ export function AdminMesasScreen() {
       <View style={s.filterCard}>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="BUSCAR POR NOMBRE…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
+          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
         </View>
         <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
@@ -207,7 +207,7 @@ export function AdminMesasScreen() {
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>NUEVA DEPENDENCIA</Text>
             <Text style={s.modalHint}>NOMBRE ÚNICO, 3–60 CARACTERES. RLS: SOLO ADMINISTRADOR.</Text>
-            <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="NOMBRE (EJ: OFICINA TIC) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
+            <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="Nombre (Ej: oficina TIC)" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
             {formError ? <Text style={s.error}>{formError}</Text> : null}
             <View style={s.modalActions}>
               <Pressable onPress={() => setCreateOpen(false)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>
@@ -221,7 +221,7 @@ export function AdminMesasScreen() {
         <View style={s.modalBackdrop}>
           <View style={s.modalCard}>
             <Text style={s.modalTitle}>EDITAR · #{editMesa?.id}</Text>
-            <TextInput value={nombreEdit} onChangeText={setNombreEdit} placeholder="NOMBRE" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
+            <TextInput value={nombreEdit} onChangeText={setNombreEdit} placeholder="Nombre" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
             {formError ? <Text style={s.error}>{formError}</Text> : null}
             <View style={s.modalActions}>
               <Pressable onPress={() => setEditMesa(null)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>

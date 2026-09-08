@@ -80,7 +80,7 @@ export function AdminMesaTicketsScreen() {
         {errorMsg? <Text style={s.error}>{errorMsg}</Text>:null}
       </View>
       <View style={s.filterCard}>
-        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="BUSCAR POR ASUNTO…" placeholderTextColor={theme.colors.mutedSoft} style={s.search}/>{!!q && <Pressable onPress={()=>setQ('')}><Text style={s.clearText}>×</Text></Pressable>}</View>
+        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por asunto" placeholderTextColor={theme.colors.mutedSoft} style={s.search}/>{!!q && <Pressable onPress={()=>setQ('')}><Text style={s.clearText}>×</Text></Pressable>}</View>
         <Pressable onPress={fetchTickets} style={s.btnPrimary}><Text style={s.btnPrimaryText}>BUSCAR</Text></Pressable>
       </View>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}

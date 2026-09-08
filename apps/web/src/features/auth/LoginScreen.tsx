@@ -69,7 +69,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
               <View style={s.inputWrap}>
                 <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
-                  placeholder="Usuario o Correo"
+                  placeholder="Usuario o correo"
                   placeholderTextColor={theme.colors.mutedSoft}
                   autoCapitalize="none"
                   keyboardType="default"

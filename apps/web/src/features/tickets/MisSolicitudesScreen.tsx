@@ -132,7 +132,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Buscar en asunto…"
+            placeholder="Buscar en asunto"
             placeholderTextColor={theme.colors.mutedSoft}
             style={s.search}
             returnKeyType="search"
@@ -159,8 +159,8 @@ export function MisSolicitudesScreen({ navigation }: Props) {
 
         <Text style={s.filterLabel}>Filtros extra</Text>
         <View style={s.extraRow}>
-          <TextInput value={numeroStr} onChangeText={setNumeroStr} placeholder="# número" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
-          <TextInput value={String(categoriaId)} onChangeText={(v) => setCategoriaId(v ? (parseInt(v,10)||'' as unknown as number) : '')} placeholder="categoría ID" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
+          <TextInput value={numeroStr} onChangeText={setNumeroStr} placeholder="# Número" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
+          <TextInput value={String(categoriaId)} onChangeText={(v) => setCategoriaId(v ? (parseInt(v,10)||'' as unknown as number) : '')} placeholder="Categoría ID" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
         </View>
 
         <View style={s.totalRow}>

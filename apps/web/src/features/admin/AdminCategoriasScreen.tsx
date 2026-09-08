@@ -157,7 +157,7 @@ export function AdminCategoriasScreen() {
         <Text style={s.subtitle}>Administra categorías maestras por dominio (tic, comunicaciones, infraestructura, general). Únicas por dominio.</Text>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
         <View style={s.filters}>
-          <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar subcategoría…" placeholderTextColor={theme.colors.mutedSoft} style={s.searchInput} /></View>
+          <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar subcategoría" placeholderTextColor={theme.colors.mutedSoft} style={s.searchInput} /></View>
           <View style={s.dropdownRow}>
             {isGeneralAdmin ? (
               <FilterDropdown label="Dependencia" value={dominio as never} onSelect={(v) => setDominio(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, ...DOMINIOS.map((d) => ({ value: d as unknown as never, label: formatDominio(d as DominioCategoria) }))]} />
