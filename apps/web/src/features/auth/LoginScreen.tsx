@@ -63,7 +63,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
               <View style={s.inputWrap}>
                 <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
-                  placeholder="1023456789 o tu.correo@empresa.com"
+                  placeholder="Usuario o Correo"
                   placeholderTextColor={theme.colors.mutedSoft}
                   autoCapitalize="none"
                   keyboardType="default"
@@ -109,12 +109,6 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
 
             <Pressable onPress={onSubmit} disabled={loading} style={({ pressed }) => [s.primaryBtn, pressed && { opacity: 0.92 }, loading && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Ingresar">
               <Text style={s.primaryText}>{loading ? 'Ingresando…' : 'Ingresar  →'}</Text>
-            </Pressable>
-
-            <View style={s.dividerRow}><View style={s.divider} /><Text style={s.dividerText}>o</Text><View style={s.divider} /></View>
-
-            <Pressable onPress={() => setLocalError('SSO no configurado — usa correo y contraseña')} style={s.secondaryBtn} accessibilityRole="button">
-              <Text style={s.secondaryIcon}>▦</Text><Text style={s.secondaryText}>Ingresar con SSO Empresarial</Text>
             </Pressable>
 
             <Text style={s.legal}>Al ingresar, aceptas la política de privacidad y uso de tecnologías.</Text>
@@ -174,12 +168,6 @@ const s = StyleSheet.create({
   checkLabel: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600' },
   primaryBtn: { backgroundColor: theme.colors.primary, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  divider: { flex: 1, height: 1, backgroundColor: theme.colors.border },
-  dividerText: { fontSize: 11, color: theme.colors.mutedSoft, fontWeight: '600' },
-  secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  secondaryIcon: { fontSize: 12, color: theme.colors.primary },
-  secondaryText: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '700' },
   legal: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'center', lineHeight: 14 },
   supportRow: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
   supportLabel: { fontSize: 10, color: theme.colors.mutedSoft },
