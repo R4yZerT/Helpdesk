@@ -2,7 +2,7 @@
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa } from '@helpdesk/shared';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
@@ -28,6 +28,9 @@ export function AdminMesasScreen() {
   const [nombreEdit, setNombreEdit] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
+  const [confirmToggle, setConfirmToggle] = useState<Mesa | null>(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -71,13 +74,20 @@ export function AdminMesasScreen() {
   const hasActiveFilters = !!qDeb || activa !== 'todos';
   const clearFilters = () => { setQ(''); setActiva('todos'); };
 
-  const toggleActiva = async (m: Mesa) => {
+  const toggleActiva = (m: Mesa) => setConfirmToggle(m);
+  const doToggleActiva = async () => {
+    if (!confirmToggle) return;
+    setToggleLoading(true);
     try {
-      const upd = await setMesaActiva(supabase, m.id, !m.activa);
-      setMesas((prev) => prev.map((x) => (x.id === m.id ? upd : x)));
+      const upd = await setMesaActiva(supabase, confirmToggle.id, !confirmToggle.activa);
+      setMesas((prev) => prev.map((x) => (x.id === confirmToggle.id ? upd : x)));
+      setFeedback({ visible: true, variant: 'success', title: confirmToggle.activa ? 'Mesa desactivada' : 'Mesa activada', message: upd.nombre });
+      setConfirmToggle(null);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : String(e));
-    }
+      const msg = e instanceof Error ? e.message : String(e);
+      setErrorMsg(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
+    } finally { setToggleLoading(false); }
   };
 
   const submitCreate = async () => {
@@ -88,7 +98,8 @@ export function AdminMesasScreen() {
       const created = await createMesa(supabase, { nombre: nombreNew });
       setCreateOpen(false); setNombreNew('');
       setMesas((prev) => [created, ...prev]); setTotal((n) => n + 1);
-    } catch (e) { setFormError(e instanceof Error ? e.message : String(e)); } finally { setSaving(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Mesa creada', message: created.nombre });
+    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear mesa', message: msg }); } finally { setSaving(false); }
   };
 
   const openEdit = (m: Mesa) => { setEditMesa(m); setNombreEdit(m.nombre); setFormError(null); };
@@ -103,7 +114,8 @@ export function AdminMesasScreen() {
       const upd = await updateMesa(supabase, editMesa.id, { nombre: trimmed });
       setMesas((prev) => prev.map((x) => (x.id === upd.id ? upd : x)));
       setEditMesa(null);
-    } catch (e) { setFormError(e instanceof Error ? e.message : String(e)); } finally { setSaving(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Mesa actualizada', message: upd.nombre });
+    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg }); } finally { setSaving(false); }
   };
 
   const renderItem = ({ item }: { item: Mesa }) => (
@@ -205,6 +217,8 @@ export function AdminMesasScreen() {
           </View>
         </View>
       </Modal>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activa ? 'Desactivar mesa' : 'Activar mesa'} message={confirmToggle ? `¿${confirmToggle.activa ? 'Desactivar' : 'Activar'} "${confirmToggle.nombre}"?` : undefined} confirmText={confirmToggle?.activa ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActiva} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );
 }

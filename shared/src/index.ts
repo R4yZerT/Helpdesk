@@ -18,6 +18,7 @@ export * from './ui/layout/Sidebar.js';
 export * from './ui/layout/AppFooter.js';
 export * from './ui/PasswordStrength.js';
 export * from './ui/icons.js';
+export * from './ui/FeedbackModal.js';
 export * from './ui/charts/KpiCard.js';
 export * from './ui/charts/DonutEstado.js';
 export * from './ui/charts/BarsPrioridad.js';

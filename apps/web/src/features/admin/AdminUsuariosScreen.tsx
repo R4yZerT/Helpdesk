@@ -1,7 +1,7 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
@@ -40,6 +40,9 @@ export function AdminUsuariosScreen() {
   const [showCreatePass, setShowCreatePass] = useState(false);
   const [showEditPass, setShowEditPass] = useState(false);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
+  const [confirmToggle, setConfirmToggle] = useState<AdminUser | null>(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -91,13 +94,20 @@ export function AdminUsuariosScreen() {
   const hasActiveFilters = !!qDebounced || rol !== 'todos' || mesaId !== 'todos' || activo !== 'todos';
   const clearFilters = () => { setQ(''); setRol('todos'); setMesaId('todos'); setActivo('todos'); };
 
-  const toggleActivo = async (u: AdminUser) => {
+  const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
+  const doToggleActivo = async () => {
+    if (!confirmToggle) return;
+    setToggleLoading(true);
     try {
-      await setUserActivo(supabase, u.id, !u.activo);
-      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, activo: !x.activo } : x)));
+      await setUserActivo(supabase, confirmToggle.id, !confirmToggle.activo);
+      setUsers((prev) => prev.map((x) => (x.id === confirmToggle.id ? { ...x, activo: !x.activo } : x)));
+      setFeedback({ visible: true, variant: 'success', title: confirmToggle.activo ? 'Usuario desactivado' : 'Usuario activado', message: `${confirmToggle.fullName} ahora está ${!confirmToggle.activo ? 'activo' : 'inactivo'}` });
+      setConfirmToggle(null);
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : String(e));
-    }
+      const msg = e instanceof Error ? e.message : String(e);
+      setErrorMsg(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
+    } finally { setToggleLoading(false); }
   };
 
   const openEdit = (u: AdminUser) => {
@@ -137,8 +147,11 @@ export function AdminUsuariosScreen() {
       await updateUser(supabase, editUser.id, payload as never);
       setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, fullName: formEdit.fullName.trim(), cedula: formEdit.cedula.trim(), email: formEdit.email.trim().toLowerCase(), rol: formEdit.rol as never, mesaId: formEdit.mesaId, activo: formEdit.activo } : x)));
       setEditUser(null);
+      setFeedback({ visible: true, variant: 'success', title: 'Usuario actualizado', message: 'Los cambios se guardaron correctamente' });
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setFormError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg });
     } finally { setSaving(false); }
   };
 
@@ -153,8 +166,11 @@ export function AdminUsuariosScreen() {
       setCreateOpen(false);
       setForm({ fullName: '', cedula: '', email: '', password: '', rol: 'usuario', mesaId: null });
       fetchPage(0, { reset: true });
+      setFeedback({ visible: true, variant: 'success', title: 'Usuario creado', message: 'El usuario fue creado correctamente' });
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setFormError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al crear usuario', message: msg });
     } finally { setSaving(false); }
   };
 
@@ -355,6 +371,8 @@ export function AdminUsuariosScreen() {
           </ScrollView>
         </View>
       </Modal>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activo ? 'Desactivar usuario' : 'Activar usuario'} message={confirmToggle ? `¿${confirmToggle.activo ? 'Desactivar' : 'Activar'} a ${confirmToggle.fullName}?` : undefined} confirmText={confirmToggle?.activo ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActivo} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );
 }

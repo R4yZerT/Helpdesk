@@ -1,6 +1,6 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere categoría → prioridad bloqueada por categoría
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
   createTicket,
   fetchCategorias,
@@ -17,7 +17,7 @@ import {
   type TicketCategoria,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
-import { Card, Badge, Divider } from '@helpdesk/shared';
+import { Card, Badge, Divider, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () => void; navigate: (s: string) => void } }) {
@@ -44,6 +44,9 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
   const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string; onOk?: () => void }>(
+    { visible: false, variant: 'info', title: '' },
+  );
 
   const load = useCallback(async () => {
     setLoadingCats(true);
@@ -52,7 +55,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       setCategorias(cats);
       setMesas(ms);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cargar catálogos', message: e instanceof Error ? e.message : String(e) });
     } finally {
       setLoadingCats(false);
     }
@@ -95,15 +98,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     if (/usuario_id requerido/i.test(msg)) return 'Sesión expirada — inicia sesión de nuevo';
     if (/mesa_id.*not-null|dependencia/i.test(msg)) return 'Selecciona una dependencia válida';
     return msg;
-  };
-
-  const showAlert = (title: string, msg: string, onOk?: () => void) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(`${title}: ${msg}`);
-      onOk?.();
-    } else {
-      Alert.alert(title, msg, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
-    }
   };
 
   const onPickFiles = (files: FileList | null) => {
@@ -171,19 +165,26 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           }
         }
       }
-      showAlert('Solicitud creada', `Ticket #${res.numero} creado correctamente`, () => {
-        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
-        setAdjuntos([]);
-        setErrors({});
-        setTouched({});
-        setSugerencia(null);
-        navigation?.goBack?.();
+      setFeedback({
+        visible: true,
+        variant: 'success',
+        title: 'Solicitud creada',
+        message: `Ticket #${res.numero} creado correctamente · Prioridad ${form.prioridad} · Mesa ${mesas.find(m => m.id === form.mesaId)?.nombre ?? form.mesaId}`,
+        onOk: () => {
+          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
+          setAdjuntos([]);
+          setErrors({});
+          setTouched({});
+          setSugerencia(null);
+          setFeedback((f) => ({ ...f, visible: false }));
+          navigation?.goBack?.();
+        },
       });
     } catch (e) {
       const msg = humanizeError(e instanceof Error ? e.message : String(e));
       console.error('[CreateTicket] error', e);
       setSubmitError(msg);
-      showAlert('Error al crear', msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al crear solicitud', message: msg });
     } finally {
       setSubmitting(false);
     }
@@ -402,6 +403,14 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </View>
         </Card>
       </View>
+      <FeedbackModal
+        visible={feedback.visible}
+        variant={feedback.variant}
+        title={feedback.title}
+        message={feedback.message}
+        onClose={() => setFeedback((f) => ({ ...f, visible: false }))}
+        onConfirm={() => { const cb = feedback.onOk; if (cb) cb(); else setFeedback((f) => ({ ...f, visible: false })); }}
+      />
     </ScrollView>
   );
 }
