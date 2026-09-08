@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme.js';
+import { Clock } from '../Clock.js';
 
 export function TopBar({
   searchValue,
@@ -37,7 +38,7 @@ export function TopBar({
           </Text>
         ))}
       </View>
-      <View style={s.right}>{right}</View>
+      <View style={s.right}>{right}<Clock /></View>
     </View>
   );
 }

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar, IconInbox, IconPlus } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus, Clock } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -75,6 +75,7 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
+          <View style={w.topClockBar}><Clock /></View>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={screenOpts}>
               <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
@@ -95,7 +96,7 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
           <Text style={w.burgerText}>☰</Text>
         </Pressable>
         <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={w.burgerSpacer} />
+        <View style={w.clockMobile}><Clock size={13} /></View>
       </View>
       <View style={w.mainMobile}>
         <View style={{ flex: 1 }}>
@@ -125,6 +126,8 @@ const w = StyleSheet.create({
   burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   burgerText: { fontSize: 18, color: theme.colors.text },
   burgerSpacer: { width: 44 },
+  clockMobile: { minWidth: 80, alignItems: 'flex-end' },
+  topClockBar: { height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
   drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
