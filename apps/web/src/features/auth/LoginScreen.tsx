@@ -9,7 +9,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
   const { signIn, error, loading } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
@@ -17,8 +17,8 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
 
   const onSubmit = async () => {
     setLocalError(null);
-    if (!email || !password) { setLocalError('Correo y contraseña requeridos'); return; }
-    try { await signIn(email.trim().toLowerCase(), password); } catch (e) { setLocalError(e instanceof Error ? e.message : 'Error de autenticación'); }
+    if (!identifier.trim() || !password) { setLocalError('Cédula/correo y contraseña requeridos'); return; }
+    try { await signIn(identifier.trim(), password); } catch (e) { setLocalError(e instanceof Error ? e.message : 'Error de autenticación'); }
   };
 
   return (
@@ -59,18 +59,18 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
             ) : null}
 
             <View style={s.field}>
-              <Text style={s.label}>Correo corporativo *</Text>
+              <Text style={s.label}>Cédula o correo corporativo *</Text>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>✉</Text>
+                <Text style={s.inputIcon}>🪪</Text>
                 <TextInput
-                  placeholder="tu.correo@empresa.com"
+                  placeholder="1023456789 o tu.correo@empresa.com"
                   placeholderTextColor={theme.colors.mutedSoft}
                   autoCapitalize="none"
-                  keyboardType="email-address"
-                  value={email}
-                  onChangeText={setEmail}
+                  keyboardType="default"
+                  value={identifier}
+                  onChangeText={setIdentifier}
                   style={s.input}
-                  accessibilityLabel="Correo corporativo"
+                  accessibilityLabel="Cédula o correo"
                 />
               </View>
             </View>

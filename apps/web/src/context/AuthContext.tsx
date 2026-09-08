@@ -62,8 +62,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadProfile]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (identifier: string, password: string) => {
     setError(null);
+    let email = identifier.trim().toLowerCase();
+    // Si es cédula (sin @), resolver a email vía Edge Function resolve-login
+    if (!email.includes('@')) {
+      const cedula = email.replace(/\s+/g, '');
+      if (!/^[0-9]{5,15}$/.test(cedula)) {
+        const e = new Error('Cédula debe tener 5 a 15 dígitos');
+        setError(e.message);
+        throw e;
+      }
+      const { data, error } = await supabase.functions.invoke('resolve-login', { body: { cedula } });
+      if (error || !data) {
+        const msg = error?.message ?? 'No se pudo resolver la cédula';
+        setError(msg);
+        throw new Error(msg);
+      }
+      const d = data as { email?: string; error?: string };
+      if (d.error || !d.email) {
+        const msg = d.error ?? 'Cédula no registrada';
+        setError(msg);
+        throw new Error(msg);
+      }
+      email = d.email.toLowerCase();
+    }
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
       setError(authError.message);

@@ -20,7 +20,8 @@ export function mapRolFromDb(dbRol: string): RolUsuario {
 export type AdminUser = {
   id: string;
   fullName: string;
-  email: string; // viene de auth.users o de profiles si se guarda copia; si no existe se deja vacío y se resuelve por separado
+  email: string;
+  cedula: string | null;
   rol: RolUsuario;
   mesaId: number | null;
   mesaNombre?: string | null;
@@ -29,10 +30,11 @@ export type AdminUser = {
   actualizadoEn: string;
 };
 
-// Input creación (RF-27: admin crea usuario con rol+mesa)
+// Input creación (RF-27: admin crea usuario con rol+mesa+cedula obligatorios)
 export type CreateUserInput = {
   fullName: string;
   email: string;
+  cedula: string;
   password: string;
   rol: RolUsuario;
   mesaId: number | null;
@@ -41,6 +43,7 @@ export type CreateUserInput = {
 export type UpdateUserInput = {
   fullName?: string;
   email?: string;
+  cedula?: string;
   password?: string;
   rol?: RolUsuario;
   mesaId?: number | null;
@@ -53,6 +56,9 @@ export type UpdateUserErrors = Partial<Record<keyof UpdateUserInput, string>>;
 function isEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
+function isCedula(v: string): boolean {
+  return /^[0-9]{5,15}$/.test(v);
+}
 
 export function validateCreateUser(input: CreateUserInput): CreateUserErrors {
   const e: CreateUserErrors = {};
@@ -60,6 +66,7 @@ export function validateCreateUser(input: CreateUserInput): CreateUserErrors {
   if (name.length < 3) e.fullName = 'Nombre mínimo 3 caracteres';
   else if (name.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
   if (!isEmail(input.email.trim())) e.email = 'Email inválido';
+  if (!isCedula(input.cedula.trim())) e.cedula = 'Cédula 5-15 dígitos';
   if (!input.password || input.password.length < 8) e.password = 'Mínimo 8 caracteres';
   else if (input.password.length > 72) e.password = 'Máximo 72 caracteres';
   if (!isRolUsuario(input.rol)) e.rol = 'Rol inválido';
@@ -75,6 +82,7 @@ export function validateUpdateUser(input: UpdateUserInput): UpdateUserErrors {
     else if (n.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
   }
   if (input.email !== undefined && !isEmail(input.email.trim())) e.email = 'Email inválido';
+  if (input.cedula !== undefined && !isCedula(input.cedula.trim())) e.cedula = 'Cédula 5-15 dígitos';
   if (input.password !== undefined) {
     const v = validatePasswordSync(input.password, { email: input.email, nombre: input.fullName, rol: input.rol });
     if (!v.ok) e.password = v.reasons[0] ?? 'Contraseña no cumple requisitos';
@@ -115,7 +123,7 @@ export async function listUsers(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  let q = supabase.from('profiles').select('id, full_name, rol, mesa_id, activo, creado_en, actualizado_en, mesas(nombre)', { count: 'exact' });
+  let q = supabase.from('profiles').select('id, full_name, email, cedula, rol, mesa_id, activo, creado_en, actualizado_en, mesas(nombre)', { count: 'exact' });
 
   if (params.search?.trim()) q = q.ilike('full_name', `%${params.search.trim()}%`);
   if (params.rol && params.rol !== 'todos') q = q.eq('rol', mapRolToDb(params.rol));
@@ -129,6 +137,8 @@ export async function listUsers(
   const rows = (data ?? []) as unknown as Array<{
     id: string;
     full_name: string;
+    email: string | null;
+    cedula: string | null;
     rol: string;
     mesa_id: number | null;
     activo: boolean;
@@ -139,7 +149,8 @@ export async function listUsers(
   const mapped: AdminUser[] = rows.map((r) => ({
     id: r.id,
     fullName: r.full_name,
-    email: '', // se resuelve vía auth si se necesita; profiles no guarda email por defecto
+    email: r.email ?? '',
+    cedula: r.cedula ?? null,
     rol: mapRolFromDb(r.rol),
     mesaId: r.mesa_id,
     mesaNombre: r.mesas?.nombre ?? null,
@@ -153,7 +164,7 @@ export async function listUsers(
 export async function getUserById(supabase: SupabaseClient, id: string): Promise<AdminUser | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, rol, mesa_id, activo, creado_en, actualizado_en, mesas(nombre)')
+    .select('id, full_name, email, cedula, rol, mesa_id, activo, creado_en, actualizado_en, mesas(nombre)')
     .eq('id', id)
     .single();
   if (error) {
@@ -163,6 +174,8 @@ export async function getUserById(supabase: SupabaseClient, id: string): Promise
   const r = data as unknown as {
     id: string;
     full_name: string;
+    email: string | null;
+    cedula: string | null;
     rol: string;
     mesa_id: number | null;
     activo: boolean;
@@ -173,7 +186,8 @@ export async function getUserById(supabase: SupabaseClient, id: string): Promise
   return {
     id: r.id,
     fullName: r.full_name,
-    email: '',
+    email: r.email ?? '',
+    cedula: r.cedula ?? null,
     rol: mapRolFromDb(r.rol),
     mesaId: r.mesa_id,
     mesaNombre: r.mesas?.nombre ?? null,
@@ -194,7 +208,8 @@ export async function createUser(
 
   const payload = {
     fullName: input.fullName.trim(),
-    email: input.email.trim(),
+    email: input.email.trim().toLowerCase(),
+    cedula: input.cedula.trim(),
     password: input.password,
     rol: input.rol,
     mesaId: input.mesaId,
@@ -210,10 +225,11 @@ export async function createUser(
     }
     // Si error es 404 (función no desplegada en local), caemos a fallback auth.admin
     if (error && !/FunctionsHttpError|not found|Failed to send/i.test((error as Error).message ?? '')) {
-      // Errores de validación 400/409 vienen como error con context
       const msg = (error as { message?: string }).message ?? String(error);
-      // Si es 409 duplicado, propagar claro
-      if (/already|duplicate|409/i.test(msg)) throw new Error('Email ya registrado');
+      if (/already|duplicate|409/i.test(msg)) {
+        if (/cedula/i.test(msg)) throw new Error('Cédula ya registrada');
+        throw new Error('Email ya registrado');
+      }
       // Si es validación 400 con details, ya se manejó arriba; si no, re-throw
       if (!/Failed to send a request to the Edge Function/i.test(msg)) throw new Error(msg);
     }
@@ -230,13 +246,15 @@ export async function createUser(
       email: payload.email,
       password: payload.password,
       email_confirm: true,
-      user_metadata: { full_name: payload.fullName, rol: mapRolToDb(payload.rol as RolUsuario) },
+      user_metadata: { full_name: payload.fullName, rol: mapRolToDb(payload.rol as RolUsuario), cedula: payload.cedula },
     });
     if (!error && data.user) {
-      if (payload.mesaId !== null) {
-        const { error: upErr } = await supabase.from('profiles').update({ mesa_id: payload.mesaId }).eq('id', data.user.id);
-        if (upErr) throw upErr;
-      }
+      const profPatch: Record<string, unknown> = {};
+      if (payload.mesaId !== null) profPatch.mesa_id = payload.mesaId;
+      profPatch.cedula = payload.cedula;
+      profPatch.email = payload.email;
+      const { error: upErr } = await supabase.from('profiles').update(profPatch).eq('id', data.user.id);
+      if (upErr) throw upErr;
       return { id: data.user.id };
     }
     if (error && /not.*admin|service_role|unauthorized/i.test(error.message)) {
@@ -255,10 +273,11 @@ export async function updateUser(
 ): Promise<void> {
   const errs = validateUpdateUser(patch);
   if (Object.keys(errs).length) throw new Error(`Validación: ${JSON.stringify(errs)}`);
-  // Si cambia email o password, intentar vía Edge Function admin-update-user / auth.admin
-  if (patch.email !== undefined || patch.password !== undefined) {
+  // Si cambia email, cedula o password, intentar vía Edge Function admin-update-user / auth.admin
+  if (patch.email !== undefined || patch.cedula !== undefined || patch.password !== undefined) {
     const authPatch: Record<string, string> = {};
-    if (patch.email !== undefined) authPatch.email = patch.email.trim();
+    if (patch.email !== undefined) authPatch.email = patch.email.trim().toLowerCase();
+    if (patch.cedula !== undefined) authPatch.cedula = patch.cedula.trim();
     if (patch.password !== undefined) authPatch.password = patch.password;
     // Intento Edge Function (service_role)
     try {
@@ -285,6 +304,8 @@ export async function updateUser(
   }
   const payload: Record<string, unknown> = {};
   if (patch.fullName !== undefined) payload.full_name = patch.fullName.trim();
+  if (patch.email !== undefined) payload.email = patch.email.trim().toLowerCase();
+  if (patch.cedula !== undefined) payload.cedula = patch.cedula.trim();
   if (patch.rol !== undefined) payload.rol = mapRolToDb(patch.rol);
   if (patch.mesaId !== undefined) payload.mesa_id = patch.mesaId;
   if (patch.activo !== undefined) payload.activo = patch.activo;

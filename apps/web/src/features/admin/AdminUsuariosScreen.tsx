@@ -33,8 +33,8 @@ export function AdminUsuariosScreen() {
   // Modales
   const [createOpen, setCreateOpen] = useState(false);
   const [editUser, setEditUser] = useState<AdminUser | null>(null);
-  const [form, setForm] = useState<CreateUserInput>({ fullName: '', email: '', password: '', rol: 'usuario', mesaId: null });
-  const [formEdit, setFormEdit] = useState<{ fullName: string; email: string; rol: string; mesaId: number | null; activo: boolean; cambiarPass: boolean; password: string; passwordConfirm: string }>({ fullName: '', email: '', rol: 'usuario', mesaId: null, activo: true, cambiarPass: false, password: '', passwordConfirm: '' });
+  const [form, setForm] = useState<CreateUserInput>({ fullName: '', cedula: '', email: '', password: '', rol: 'usuario', mesaId: null });
+  const [formEdit, setFormEdit] = useState<{ fullName: string; cedula: string; email: string; rol: string; mesaId: number | null; activo: boolean; cambiarPass: boolean; password: string; passwordConfirm: string }>({ fullName: '', cedula: '', email: '', rol: 'usuario', mesaId: null, activo: true, cambiarPass: false, password: '', passwordConfirm: '' });
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,7 +99,7 @@ export function AdminUsuariosScreen() {
 
   const openEdit = (u: AdminUser) => {
     setEditUser(u);
-    setFormEdit({ fullName: u.fullName, email: u.email || '', rol: u.rol, mesaId: u.mesaId, activo: u.activo, cambiarPass: false, password: '', passwordConfirm: '' });
+    setFormEdit({ fullName: u.fullName, cedula: u.cedula ?? '', email: u.email || '', rol: u.rol, mesaId: u.mesaId, activo: u.activo, cambiarPass: false, password: '', passwordConfirm: '' });
     setFormError(null);
   };
 
@@ -108,7 +108,7 @@ export function AdminUsuariosScreen() {
     // Validación base
     const patch: Record<string, unknown> = {};
     const errs: string[] = [];
-    const baseErrs = validateUpdateUser({ fullName: formEdit.fullName, email: formEdit.email || undefined, rol: formEdit.rol as never, mesaId: formEdit.mesaId as never });
+    const baseErrs = validateUpdateUser({ fullName: formEdit.fullName, cedula: formEdit.cedula || undefined, email: formEdit.email || undefined, rol: formEdit.rol as never, mesaId: formEdit.mesaId as never });
     if (Object.keys(baseErrs).length) errs.push(Object.values(baseErrs).join(' · '));
     if (formEdit.cambiarPass) {
       if (!formEdit.password || !formEdit.passwordConfirm) errs.push('Contraseña y confirmación requeridas');
@@ -124,14 +124,15 @@ export function AdminUsuariosScreen() {
     try {
       const payload: Record<string, unknown> = {};
       if (formEdit.fullName.trim() !== editUser.fullName) payload.fullName = formEdit.fullName.trim();
-      if ((formEdit.email || '').trim() !== (editUser.email || '')) payload.email = formEdit.email.trim();
+      if ((formEdit.cedula || '').trim() !== (editUser.cedula ?? '')) payload.cedula = formEdit.cedula.trim();
+      if ((formEdit.email || '').trim().toLowerCase() !== (editUser.email || '').toLowerCase()) payload.email = formEdit.email.trim().toLowerCase();
       if (formEdit.rol !== editUser.rol) payload.rol = formEdit.rol as never;
       if (formEdit.mesaId !== editUser.mesaId) payload.mesaId = formEdit.mesaId;
       if (formEdit.activo !== editUser.activo) payload.activo = formEdit.activo;
       if (formEdit.cambiarPass) payload.password = formEdit.password;
       if (Object.keys(payload).length === 0) { setEditUser(null); setSaving(false); return; }
       await updateUser(supabase, editUser.id, payload as never);
-      setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, fullName: formEdit.fullName.trim(), email: formEdit.email.trim(), rol: formEdit.rol as never, mesaId: formEdit.mesaId, activo: formEdit.activo } : x)));
+      setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, fullName: formEdit.fullName.trim(), cedula: formEdit.cedula.trim(), email: formEdit.email.trim().toLowerCase(), rol: formEdit.rol as never, mesaId: formEdit.mesaId, activo: formEdit.activo } : x)));
       setEditUser(null);
     } catch (e) {
       setFormError(e instanceof Error ? e.message : String(e));
@@ -145,9 +146,9 @@ export function AdminUsuariosScreen() {
     setFormError(null);
     try {
       const { createUser } = await import('@helpdesk/shared');
-      await createUser(supabase, form);
+      await createUser(supabase, { ...form, email: form.email.trim().toLowerCase(), cedula: form.cedula.trim() });
       setCreateOpen(false);
-      setForm({ fullName: '', email: '', password: '', rol: 'usuario', mesaId: null });
+      setForm({ fullName: '', cedula: '', email: '', password: '', rol: 'usuario', mesaId: null });
       fetchPage(0, { reset: true });
     } catch (e) {
       setFormError(e instanceof Error ? e.message : String(e));
@@ -166,6 +167,7 @@ export function AdminUsuariosScreen() {
             <Text style={s.tdSub} numberOfLines={1}>{item.mesaNombre ?? (item.mesaId ? `Mesa #${item.mesaId}` : 'Sin dependencia')}</Text>
           </View>
         </View>
+        <View style={s.tdCedula}><Text style={s.tdText} numberOfLines={1}>{item.cedula ?? '—'}</Text></View>
         <View style={s.tdEmail}><Text style={s.tdText} numberOfLines={1}>{item.email || '—'}</Text></View>
         <View style={s.tdRol}><View style={[s.rolPill, { backgroundColor: pill.bg, borderColor: pill.border }]}><Text style={[s.rolText, { color: pill.fg }]}>{pill.label}</Text></View></View>
         <View style={s.tdMesa}><Text style={s.tdText} numberOfLines={1}>{item.mesaNombre ?? '—'}</Text></View>
@@ -237,6 +239,7 @@ export function AdminUsuariosScreen() {
       <View style={s.tableWrap}>
         <View style={s.thead}>
           <Text style={[s.th, s.thUser]}>Usuario</Text>
+          <Text style={[s.th, s.thCedula]}>Cédula</Text>
           <Text style={[s.th, s.thEmail]}>Correo</Text>
           <Text style={[s.th, s.thRol]}>Rol</Text>
           <Text style={[s.th, s.thMesa]}>Dependencia</Text>
@@ -263,6 +266,7 @@ export function AdminUsuariosScreen() {
             <Text style={s.modalTitle}>Nuevo usuario</Text>
             <Text style={s.modalHint}>Requiere rol administrador. La contraseña debe cumplir política segura (8–64, no común, no datos personales).</Text>
             <TextInput value={form.fullName} onChangeText={(v) => setForm((p) => ({ ...p, fullName: v }))} placeholder="Nombre completo *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
+            <TextInput value={form.cedula} onChangeText={(v) => setForm((p) => ({ ...p, cedula: v.replace(/[^0-9]/g, '') }))} placeholder="Cédula (5-15 dígitos) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} keyboardType="number-pad" maxLength={15} />
             <TextInput value={form.email} onChangeText={(v) => setForm((p) => ({ ...p, email: v }))} placeholder="Correo corporativo *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" />
             <TextInput value={form.password} onChangeText={(v) => setForm((p) => ({ ...p, password: v }))} placeholder="Contraseña *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry />
             <View style={s.rowGap}>
@@ -295,6 +299,9 @@ export function AdminUsuariosScreen() {
 
               <Text style={s.fieldLabel}>Nombre completo *</Text>
               <TextInput value={formEdit.fullName} onChangeText={(v) => setFormEdit((p) => ({ ...p, fullName: v }))} placeholder="Nombre completo" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
+
+              <Text style={s.fieldLabel}>Cédula *</Text>
+              <TextInput value={formEdit.cedula} onChangeText={(v) => setFormEdit((p) => ({ ...p, cedula: v.replace(/[^0-9]/g, '') }))} placeholder="Cédula 5-15 dígitos" style={s.input} placeholderTextColor={theme.colors.mutedSoft} keyboardType="number-pad" maxLength={15} />
 
               <Text style={s.fieldLabel}>Correo electrónico *</Text>
               <TextInput value={formEdit.email} onChangeText={(v) => setFormEdit((p) => ({ ...p, email: v }))} placeholder="correo@empresa.com" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" />
@@ -393,22 +400,24 @@ const s = StyleSheet.create({
   tableWrap: { flex: 1, marginHorizontal: theme.space[3], marginBottom: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, overflow: 'hidden', ...theme.shadow.soft },
   thead: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 12, height: 36, gap: 8 },
   th: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: theme.colors.muted },
-  thUser: { flex: 2.2 },
-  thEmail: { flex: 1.8 },
-  thRol: { width: 92, textAlign: 'center' },
-  thMesa: { flex: 1.2 },
+  thUser: { flex: 1.8 },
+  thCedula: { width: 110, textAlign: 'center' },
+  thEmail: { flex: 1.6 },
+  thRol: { width: 88, textAlign: 'center' },
+  thMesa: { flex: 1 },
   thEstado: { width: 88, textAlign: 'center' },
   thActs: { width: 80, textAlign: 'center' },
   tableContent: { paddingBottom: 8 },
   tr: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border, gap: 8, minHeight: 52 },
-  tdUser: { flex: 2.2, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tdUser: { flex: 1.8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatarSm: { width: 28, height: 28, borderRadius: 14, backgroundColor: theme.colors.text, alignItems: 'center', justifyContent: 'center' },
   avatarSmText: { color: '#fff', fontWeight: '800', fontSize: 10 },
   tdName: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
   tdSub: { fontSize: 10, color: theme.colors.muted },
-  tdEmail: { flex: 1.8 },
-  tdRol: { width: 92, alignItems: 'center' },
-  tdMesa: { flex: 1.2 },
+  tdCedula: { width: 110, alignItems: 'center' },
+  tdEmail: { flex: 1.6 },
+  tdRol: { width: 88, alignItems: 'center' },
+  tdMesa: { flex: 1 },
   tdEstado: { width: 88, alignItems: 'center' },
   tdActs: { width: 80, flexDirection: 'row', gap: 6, justifyContent: 'center' },
   tdText: { fontSize: 11, color: theme.colors.text },
