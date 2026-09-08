@@ -6,19 +6,15 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
+import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
+import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
+import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
-import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
+import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
-import type {
-  AdminStackParamList,
-  AuthStackParamList,
-  EmpleadoStackParamList,
-  UsuarioStackParamList,
-  JefeStackParamList,
-  TecnicoStackParamList,
-} from './types';
+import { AdminNavigator } from '../features/admin/AdminNavigator';
+import type { AuthStackParamList, JefeStackParamList } from './types';
 
 function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
   const { profile, signOut } = useAuth();
@@ -33,31 +29,33 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 }
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
-const AdminStack = createNativeStackNavigator<AdminStackParamList>();
+const RootStack = createNativeStackNavigator();
 
 function AuthNavigator() {
   return (
     <AuthStack.Navigator>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar contraseña', headerShown: false }} />
+      <AuthStack.Screen name="UpdatePassword" component={UpdatePasswordScreen} options={{ title: 'Nueva contraseña', headerShown: false }} />
     </AuthStack.Navigator>
   );
+}
+
+function RoleNavigator() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+  if (profile.rol === 'usuario') return <UsuarioNavigator />;
+  if (profile.rol === 'tecnico') return <TecnicoNavigator />;
+  if (profile.rol === 'jefe') return <JefeNavigator />;
+  return <AdminNavigator />;
 }
 
 function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
 
-function TecnicoNavigator() {
-  return (
-    <TecnicoStack.Navigator>
-      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} />
-      <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
-    </TecnicoStack.Navigator>
-  );
-}
+
 
 function JefeNavigator() {
   return (
@@ -74,24 +72,7 @@ function JefeNavigator() {
   );
 }
 
-function AdminNavigator() {
-  return (
-    <AdminStack.Navigator>
-      <AdminStack.Screen name="Usuarios" options={{ title: 'Usuarios (RF-27)' }}>
-        {() => <Placeholder title="Usuarios" subtitle="RF-27/28 crear, editar, desactivar, asignar rol+mesa" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Mesas" options={{ title: 'Mesas (RF-29)' }}>
-        {() => <Placeholder title="Mesas" subtitle="RF-29/31 mesas y respaldo" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Categorias" options={{ title: 'Categorías (RF-32)' }}>
-        {() => <Placeholder title="Categorías" subtitle="RF-32 catálogo normalizado (19)" />}
-      </AdminStack.Screen>
-      <AdminStack.Screen name="Import" options={{ title: 'Import (RF-26)' }}>
-        {() => <Placeholder title="Import histórico" subtitle="RF-26 latin-1 → UTF-8 NFD" />}
-      </AdminStack.Screen>
-    </AdminStack.Navigator>
-  );
-}
+
 
 export function RootNavigator() {
   const { session, profile, loading } = useAuth();
@@ -107,17 +88,16 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {!session || !profile ? (
-        <AuthNavigator />
-      ) : profile.rol === 'usuario' ? (
-        <UsuarioNavigator />
-      ) : profile.rol === 'tecnico' ? (
-        <TecnicoNavigator />
-      ) : profile.rol === 'jefe' ? (
-        <JefeNavigator />
-      ) : (
-        <AdminNavigator />
-      )}
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {!session || !profile ? (
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
+        ) : (
+          <>
+            <RootStack.Screen name="App" component={RoleNavigator} />
+            <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
+          </>
+        )}
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }

@@ -5,7 +5,7 @@ import { theme } from '../theme.js';
 
 export type SidebarItem = { id: string; label: string; active?: boolean; onPress?: () => void };
 
-export function Sidebar({ items, footer, user }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string } }) {
+export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string }; onLogout: () => void }) {
   return (
     <View style={s.wrap}>
       <View style={s.head}>
@@ -34,6 +34,10 @@ export function Sidebar({ items, footer, user }: { items: SidebarItem[]; footer?
         </View>
       ) : null}
       {footer}
+      {/* Global: cerrar sesión siempre visible abajo — no opcional (estándar AppShell) */}
+      <Pressable onPress={onLogout} style={s.logoutBtn} accessibilityRole="button" accessibilityLabel="Cerrar sesión">
+        <Text style={s.logoutText}>Cerrar sesión</Text>
+      </Pressable>
     </View>
   );
 }
@@ -71,4 +75,7 @@ const s = StyleSheet.create({
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   userName: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
   userRole: { fontSize: 10, color: theme.colors.muted },
+  logoutBtn: { marginTop: 12, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  logoutText: { fontSize: 12, fontWeight: '700', color: theme.colors.muted },
+
 });

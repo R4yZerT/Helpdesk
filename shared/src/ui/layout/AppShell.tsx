@@ -1,4 +1,4 @@
-// AppShell — Stitch layout: aside w-64 fixed + ml-64 + TopBar h-16 + max-w 1280
+// AppShell — Stitch layout: aside w-64 fixed + ml-64 + TopBar h-16 + max-w 1280 + Footer legal
 import * as React from 'react';
 import { ScrollView, StyleSheet, View, useWindowDimensions, Pressable, Text } from 'react-native';
 import { theme } from '../theme.js';
@@ -30,7 +30,7 @@ export function AppShell({
         <View style={s.mainDesktop}>
           {topBar}
           {filterBar}
-          <ScrollView contentContainerStyle={s.canvas} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={s.canvas} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
             <View style={s.inner}>{children}</View>
           </ScrollView>
         </View>
@@ -40,7 +40,7 @@ export function AppShell({
 
   // Mobile/Tablet: drawer overlay
   return (
-    <View style={s.root}>
+    <View style={s.rootMobile}>
       {topBar ? (
         <View style={s.mobileTopBarWrap}>
           <Pressable onPress={() => setDrawerOpen((v) => !v)} style={s.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
@@ -55,7 +55,7 @@ export function AppShell({
           <View style={s.drawer}>{sidebar}</View>
         </Pressable>
       ) : null}
-      <ScrollView contentContainerStyle={[s.canvas, { paddingTop: 8 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[s.canvas, { paddingTop: 8 }]} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         <View style={s.inner}>{children}</View>
       </ScrollView>
     </View>
@@ -64,6 +64,7 @@ export function AppShell({
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.colors.bg, flexDirection: 'row' },
+  rootMobile: { flex: 1, backgroundColor: theme.colors.bg, flexDirection: 'column' },
   sidebarDesktop: {
     width: SIDEBAR_W,
     backgroundColor: theme.colors.surface,
@@ -71,7 +72,7 @@ const s = StyleSheet.create({
     borderRightColor: theme.colors.border,
     padding: theme.space[4], // 16 — token space-4
   },
-  mainDesktop: { flex: 1, minWidth: 0 },
+  mainDesktop: { flex: 1, minWidth: 0, flexDirection: 'column' },
   canvas: { paddingHorizontal: theme.space[6], paddingVertical: theme.space[4], alignItems: 'center' }, // 24/16
   inner: { width: '100%', maxWidth: MAX_W, gap: theme.space[4] }, // 16
   mobileTopBarWrap: {

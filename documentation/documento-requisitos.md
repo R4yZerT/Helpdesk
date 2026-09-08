@@ -184,3 +184,43 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 - **Pico de volumen:** 08:00-13:00 (hora 11 máx. 1057 tickets).
 - **Estacionalidad:** diciembre bajo (385), febrero pico (932).
 - **Campo faltante en histórico:** fecha/hora de resolución (a capturar en el nuevo sistema).
+
+---
+
+## 6. Extensiones de administración — Usuarios (implementado 2026-09)
+
+> Refinamientos de RF-27/RF-28 surgidos de validación de UX con volumen alto de usuarios. Se mantienen 32 RF base; estas extensiones documentan el comportamiento esperado ya implementado.
+
+### RF-27.1 — Listado de usuarios en formato tabla
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-27.1 | La vista **Usuarios** del administrador debe presentarse como **tabla** (no tarjetas) para optimizar densidad y escaneo con grandes volúmenes | M | Implementado |
+| RF-27.2 | Columnas: **Usuario** (avatar iniciales + nombre + dependencia secundaria), **Correo**, **Rol** (pill), **Dependencia** (mesa), **Estado** (Activo/Inactivo), **Acciones** | M | Implementado |
+| RF-27.3 | Paginación servidor (pageSize 20), infinite scroll + pull-to-refresh, filtros combinables (búsqueda nombre, rol, dependencia, estado) y contador de resultados | M | Implementado |
+
+### RF-27.4 — Acciones rápidas por fila
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-27.4 | Cada fila expone **botones de icono pequeño** (28×28) para acciones rápidas sin abrir menú contextual | M | Implementado |
+| RF-27.5 | **Cambiar estado** (activar/desactivar) con icono ●/◯ y confirmación optimista; toggle inverso inmediato en tabla | M | Implementado |
+| RF-27.6 | **Editar** con icono lápiz ✎ que abre la interfaz de edición dedicada | M | Implementado |
+
+### RF-27.7 — Interfaz de edición de usuario
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-27.7 | La interfaz de edición permite modificar: **correo electrónico**, **rol** (usuario/tecnico/jefe/administrador), **estado** (activo/inactivo), **nombre completo**, **Dependencia** (selector de mesas) | M | Implementado |
+| RF-27.8 | Validaciones: nombre 3–80, email RFC, rol ∈ ROLES, mesaId entero >0 o null | M | Implementado |
+| RF-27.9 | Al guardar, solo se envían campos modificados (patch) vía `updateUser` + Edge Function `admin-update-user` (fallback `auth.admin.updateUserById` con service_role) | M | Implementado |
+
+### RF-27.10 — Cambio de contraseña desde edición
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-27.10 | En la parte inferior de la UI de edición existe la opción **"Cambiar contraseña"** deshabilitada por defecto | M | Implementado |
+| RF-27.11 | Al activarla se habilitan dos campos: **Nueva contraseña** y **Repetir contraseña** | M | Implementado |
+| RF-27.12 | Aplica los **requisitos mínimos definidos para la contraseña** (NIST SP 800-63B §5.1.1.2 + OWASP ASVS 2.1): 8–64 chars (NFKC), sin truncar, sin composición forzada, no común (Top 10k), sin secuencias/repeticiones 4+, no contener email/nombre/rol, estimación fuerza ≥ aceptable; feedback en vivo con `validatePasswordSync` | M | Implementado |
+| RF-27.13 | Se exige coincidencia exacta entre ambos campos; error "Las contraseñas no coinciden" si difieren | M | Implementado |
+| RF-27.14 | El cambio se persiste vía `admin-update-user` (service_role) y no expone la contraseña en logs | M | Implementado |

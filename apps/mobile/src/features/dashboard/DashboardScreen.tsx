@@ -80,7 +80,7 @@ export function DashboardScreen() {
         { id: 'alertas', label: `Alertas IA${alertas.length ? ` · ${alertas.length}` : ''}` },
       ]}
       user={profile ? { name: profile.nombre ?? profile.email ?? 'Usuario', role: profile.rol } : undefined}
-      footer={<Text style={s.footerLink} onPress={signOut}>Cerrar sesión</Text>}
+      onLogout={signOut}
     />
   );
 
