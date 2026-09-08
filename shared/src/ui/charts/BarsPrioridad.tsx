@@ -1,11 +1,14 @@
-// BarsPrioridad — Stitch 4 rows h2.5 6/17/55/22%
+// BarsPrioridad — 4 prioridades normalizadas + header con total (distinto a Donut por Estado)
 import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { Card } from '../components.js';
 
 export function BarsPrioridad({ data }: { data: { prioridad: string; count: number }[] }) {
-  const total = data.reduce((a, b) => a + b.count, 0) || 1;
+  const PRIORIDADES_ORDEN = ['critica', 'alta', 'media', 'baja'] as const;
+  const byPri = new Map(data.map((d) => [d.prioridad, d.count]));
+  const filled = PRIORIDADES_ORDEN.map((k) => ({ prioridad: k, count: byPri.get(k) ?? 0 }));
+  const total = filled.reduce((a, b) => a + b.count, 0) || 1;
   const colorMap: Record<string, string> = {
     critica: theme.colors.accent,
     alta: '#FB923C',
@@ -14,8 +17,8 @@ export function BarsPrioridad({ data }: { data: { prioridad: string; count: numb
   };
   return (
     <Card style={{ gap: 12 }}>
-      <Text style={s.title}>Carga por Prioridad</Text>
-      {data.map((d) => {
+      <View style={s.header}><Text style={s.title}>Carga por Prioridad</Text><Text style={s.subtitle}>{total} tickets · urgencia</Text></View>
+      {filled.map((d) => {
         const pct = Math.round((d.count / total) * 100);
         return (
           <View key={d.prioridad} style={s.row}>
@@ -28,13 +31,15 @@ export function BarsPrioridad({ data }: { data: { prioridad: string; count: numb
           </View>
         );
       })}
-      <Text style={s.footer}>SLA Máximo Crítica 60 min</Text>
+      <Text style={s.footer}>SLA Máximo Crítica 60 min · Prioridad = urgencia (no confundir con Estado)</Text>
     </Card>
   );
 }
 
 const s = StyleSheet.create({
+  header: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   title: { fontSize: 13, fontWeight: '800', color: theme.colors.text },
+  subtitle: { fontSize: 10, fontWeight: '600', color: theme.colors.muted },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   label: { fontSize: 11, fontWeight: '700', color: theme.colors.textSoft, textTransform: 'capitalize', width: 52 },
   barBg: { flex: 1, height: 10, backgroundColor: '#F1F5F9', borderRadius: 999, overflow: 'hidden' },
