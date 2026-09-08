@@ -6,6 +6,19 @@ import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
 
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message.trim()) return o.message;
+    if (typeof o.error === 'string' && o.error.trim()) return o.error;
+    if (typeof o.msg === 'string' && o.msg.trim()) return o.msg;
+    try { const j = JSON.stringify(o); if (j !== '{}' && j !== '[]') return j; } catch {}
+  }
+  return String(e ?? 'Error desconocido');
+}
+
 function pillRol(rol: string) {
   if (rol === 'administrador') return { bg: '#EFF6FF', border: '#BFDBFE', fg: '#1D4ED8', label: 'Admin' };
   if (rol === 'jefe') return { bg: '#F0FDF4', border: '#BBF7D0', fg: '#15803D', label: 'Jefe' };
@@ -73,7 +86,7 @@ export function AdminUsuariosScreen() {
       setPage(targetPage);
       setUsers((prev) => (opts.reset || first ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       setErrorMsg(msg);
       console.warn('[AdminUsuarios] listUsers', e);
     } finally {
@@ -104,7 +117,7 @@ export function AdminUsuariosScreen() {
       setFeedback({ visible: true, variant: 'success', title: confirmToggle.activo ? 'Usuario desactivado' : 'Usuario activado', message: `${confirmToggle.fullName} ahora está ${!confirmToggle.activo ? 'activo' : 'inactivo'}` });
       setConfirmToggle(null);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       setErrorMsg(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
     } finally { setToggleLoading(false); }
@@ -149,7 +162,7 @@ export function AdminUsuariosScreen() {
       setEditUser(null);
       setFeedback({ visible: true, variant: 'success', title: 'Usuario actualizado', message: 'Los cambios se guardaron correctamente' });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       setFormError(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg });
     } finally { setSaving(false); }
@@ -168,7 +181,7 @@ export function AdminUsuariosScreen() {
       fetchPage(0, { reset: true });
       setFeedback({ visible: true, variant: 'success', title: 'Usuario creado', message: 'El usuario fue creado correctamente' });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       setFormError(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al crear usuario', message: msg });
     } finally { setSaving(false); }
@@ -226,7 +239,7 @@ export function AdminUsuariosScreen() {
             <Text style={s.chipsLabel}>Rol</Text>
             <View style={s.chipsRow}>
               {(['todos', ...ROLES] as const).map((r) => (
-                <Pressable key={String(r)} onPress={() => setRol(r as never)} style={[s.chip, rol === r && s.chipActive]}><Text style={[s.chipText, rol === r && s.chipTextActive]}>{r === 'todos' ? 'Todos' : r}</Text></Pressable>
+                <Pressable key={String(r)} onPress={() => setRol(r as never)} style={[s.chip, rol === r && s.chipActive]}><Text style={[s.chipText, rol === r && s.chipTextActive]}>{(r === 'todos' ? 'Todos' : String(r)).toUpperCase()}</Text></Pressable>
               ))}
             </View>
           </View>
@@ -413,7 +426,7 @@ const s = StyleSheet.create({
     borderRadius: theme.radius.full, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border,
   },
   chipActive: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary },
-  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
+  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
   filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.colors.border },
   filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },

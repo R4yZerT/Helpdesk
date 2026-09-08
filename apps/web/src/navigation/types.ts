@@ -34,7 +34,8 @@ export type JefeStackParamList = {
 
 export type AdminStackParamList = {
   Usuarios: undefined;
-  Mesas: undefined;
+  Mesas: undefined; // DEPENDENCIAS (RF-29/30)
+  MesaTickets: undefined; // RF replanteo: tickets por dependencia del admin
   Categorias: undefined;
   Import: undefined;
 };

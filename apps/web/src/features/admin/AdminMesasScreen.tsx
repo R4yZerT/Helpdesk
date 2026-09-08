@@ -1,4 +1,5 @@
-// RF-29 / RF-30 — Admin: crear y gestionar mesas (dependencias)
+// RF-29 / RF-30 — Admin: crear y gestionar DEPENDENCIAS (antes mesas)
+// Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
@@ -6,6 +7,18 @@ import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, set
 import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
+
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message.trim()) return o.message;
+    if (typeof o.error === 'string' && o.error.trim()) return o.error;
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+  }
+  return String(e ?? 'Error desconocido');
+}
 
 export function AdminMesasScreen() {
   const { width } = useWindowDimensions();
@@ -55,7 +68,7 @@ export function AdminMesasScreen() {
       setPage(targetPage);
       setMesas((prev) => (opts.reset || first ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setErrorMsg(getErrorMessage(e));
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -84,7 +97,7 @@ export function AdminMesasScreen() {
       setFeedback({ visible: true, variant: 'success', title: confirmToggle.activa ? 'Mesa desactivada' : 'Mesa activada', message: upd.nombre });
       setConfirmToggle(null);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = getErrorMessage(e);
       setErrorMsg(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
     } finally { setToggleLoading(false); }
@@ -99,7 +112,7 @@ export function AdminMesasScreen() {
       setCreateOpen(false); setNombreNew('');
       setMesas((prev) => [created, ...prev]); setTotal((n) => n + 1);
       setFeedback({ visible: true, variant: 'success', title: 'Mesa creada', message: created.nombre });
-    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear mesa', message: msg }); } finally { setSaving(false); }
+    } catch (e) { const msg = getErrorMessage(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear mesa', message: msg }); } finally { setSaving(false); }
   };
 
   const openEdit = (m: Mesa) => { setEditMesa(m); setNombreEdit(m.nombre); setFormError(null); };
@@ -115,7 +128,7 @@ export function AdminMesasScreen() {
       setMesas((prev) => prev.map((x) => (x.id === upd.id ? upd : x)));
       setEditMesa(null);
       setFeedback({ visible: true, variant: 'success', title: 'Mesa actualizada', message: upd.nombre });
-    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg }); } finally { setSaving(false); }
+    } catch (e) { const msg = getErrorMessage(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg }); } finally { setSaving(false); }
   };
 
   const renderItem = ({ item }: { item: Mesa }) => (
@@ -128,38 +141,38 @@ export function AdminMesasScreen() {
       </View>
       <Text style={s.name} numberOfLines={2}>{item.nombre}</Text>
       <View style={s.actions}>
-        <Pressable onPress={() => openEdit(item)} style={s.btnGhost} accessibilityRole="button"><Text style={s.btnGhostText}>Editar</Text></Pressable>
+        <Pressable onPress={() => openEdit(item)} style={s.btnGhost} accessibilityRole="button"><Text style={s.btnGhostText}>EDITAR</Text></Pressable>
         <Pressable onPress={() => toggleActiva(item)} style={[s.btnGhost, !item.activa && s.btnGhostAccent]} accessibilityRole="button">
-          <Text style={[s.btnGhostText, !item.activa && { color: theme.colors.primary }]}>{item.activa ? 'Desactivar' : 'Activar'}</Text>
+          <Text style={[s.btnGhostText, !item.activa && { color: theme.colors.primary }]}>{item.activa ? 'DESACTIVAR' : 'ACTIVAR'}</Text>
         </Pressable>
       </View>
     </Card>
   );
 
   if (loading && mesas.length === 0) {
-    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando mesas…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>CARGANDO DEPENDENCIAS…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
   }
 
   return (
     <View style={s.wrap}>
       <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Administrador · RF-29 / RF-30</Text></View>
+        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR · RF-29 / RF-30</Text></View>
         <View style={s.headerRow}>
-          <Text style={s.h1}>Mesas · {total}</Text>
-          <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ Nueva mesa</Text></Pressable>
+        <Text style={s.h1}>DEPENDENCIAS · {total}</Text>
+        <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>
         </View>
-        <Text style={s.subtitle}>Crear y gestionar mesas (dependencias). Ver todas las mesas y su configuración (RF-30). Requiere rol administrador (RLS mesa:write).</Text>
+        <Text style={s.subtitle}>CREAR Y GESTIONAR DEPENDENCIAS. VER TODAS LAS DEPENDENCIAS Y SU CONFIGURACIÓN (RF-30). REQUIERE ROL ADMINISTRADOR (RLS mesa:write).</Text>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
       </View>
 
       <View style={s.filterCard}>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
+          <TextInput value={q} onChangeText={setQ} placeholder="BUSCAR POR NOMBRE…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
         </View>
         <View style={s.chipsBlock}>
-          <Text style={s.chipsLabel}>Estado</Text>
+          <Text style={s.chipsLabel}>ESTADO</Text>
           <View style={s.chipsRow}>
             {(['todos', true, false] as const).map((v) => (
               <Pressable key={String(v)} onPress={() => setActiva(v as never)} style={[s.chip, activa === v && s.chipActive]} accessibilityState={{ selected: activa === v }}>
@@ -184,7 +197,7 @@ export function AdminMesasScreen() {
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin mesas</Text><Text style={s.mutedCenter}>Ajusta filtros o crea la primera mesa.</Text></View>}
+        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>SIN DEPENDENCIAS</Text><Text style={s.mutedCenter}>AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA.</Text></View>}
         ListFooterComponent={loadingMore ? <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
         contentContainerStyle={s.listContent}
       />
@@ -192,13 +205,13 @@ export function AdminMesasScreen() {
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={s.modalBackdrop}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Nueva mesa · RF-29</Text>
-            <Text style={s.modalHint}>Nombre único, 3–60 caracteres. RLS: solo administrador.</Text>
-            <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="Nombre (ej: Oficina TIC) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
+            <Text style={s.modalTitle}>NUEVA DEPENDENCIA · RF-29</Text>
+            <Text style={s.modalHint}>NOMBRE ÚNICO, 3–60 CARACTERES. RLS: SOLO ADMINISTRADOR.</Text>
+            <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="NOMBRE (EJ: OFICINA TIC) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
             {formError ? <Text style={s.error}>{formError}</Text> : null}
             <View style={s.modalActions}>
-              <Pressable onPress={() => setCreateOpen(false)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-              <Pressable onPress={submitCreate} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Crear'}</Text></Pressable>
+              <Pressable onPress={() => setCreateOpen(false)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>
+              <Pressable onPress={submitCreate} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'GUARDANDO…' : 'CREAR'}</Text></Pressable>
             </View>
           </View>
         </View>
@@ -207,12 +220,12 @@ export function AdminMesasScreen() {
       <Modal visible={!!editMesa} transparent animationType="fade" onRequestClose={() => setEditMesa(null)}>
         <View style={s.modalBackdrop}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Editar · #{editMesa?.id}</Text>
-            <TextInput value={nombreEdit} onChangeText={setNombreEdit} placeholder="Nombre" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
+            <Text style={s.modalTitle}>EDITAR · #{editMesa?.id}</Text>
+            <TextInput value={nombreEdit} onChangeText={setNombreEdit} placeholder="NOMBRE" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
             {formError ? <Text style={s.error}>{formError}</Text> : null}
             <View style={s.modalActions}>
-              <Pressable onPress={() => setEditMesa(null)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-              <Pressable onPress={submitEdit} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar'}</Text></Pressable>
+              <Pressable onPress={() => setEditMesa(null)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>
+              <Pressable onPress={submitEdit} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'GUARDANDO…' : 'GUARDAR'}</Text></Pressable>
             </View>
           </View>
         </View>
@@ -249,7 +262,7 @@ const s = StyleSheet.create({
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { paddingHorizontal: 14, paddingVertical: 6, height: 32, justifyContent: 'center', borderRadius: theme.radius.full, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
   chipActive: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary },
-  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
+  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
   filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.colors.border },
   filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
@@ -262,7 +275,7 @@ const s = StyleSheet.create({
   activaPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   activaOn: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   activaOff: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
-  activaText: { fontSize: 10, fontWeight: '700' },
+  activaText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   activaTextOn: { color: '#15803D' },
   activaTextOff: { color: '#991B1B' },
   name: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
