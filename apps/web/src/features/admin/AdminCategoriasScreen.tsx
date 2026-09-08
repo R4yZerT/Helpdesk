@@ -241,7 +241,7 @@ const s = StyleSheet.create({
   dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   lockedPill: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 12, height: 36, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   lockedText: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, borderRadius: 10, paddingHorizontal: 10, height: 38, gap: 6 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40, gap: 6 },
   searchIcon: { color: theme.colors.mutedSoft, fontSize: 13 },
   searchInput: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },

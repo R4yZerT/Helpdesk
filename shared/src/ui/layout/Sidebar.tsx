@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
+import { formatRol } from '../../filters.js';
 
 export type SidebarItem = { id: string; label: string; active?: boolean; onPress?: () => void; icon?: React.ReactNode };
 
@@ -32,7 +33,7 @@ export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[
           </View>
           <View>
             <Text style={s.userName}>{user.name}</Text>
-            <Text style={s.userRole}>{user.role}</Text>
+            <Text style={s.userRole}>{formatRol(user.role as never)}</Text>
           </View>
         </View>
       ) : null}

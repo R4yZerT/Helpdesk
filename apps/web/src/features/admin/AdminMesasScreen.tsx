@@ -252,7 +252,7 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filterCard: { marginHorizontal: theme.space[3], marginBottom: theme.space[3], gap: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 44 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40 },
   searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   clearBtn: { padding: 6, marginLeft: 6 },
