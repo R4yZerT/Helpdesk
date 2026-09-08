@@ -1,8 +1,9 @@
 // RF-32 — Admin: categorías maestras ticket_categories
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal } from '@helpdesk/shared';
+import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
 
@@ -15,6 +16,17 @@ function pillDominio(d: string) {
 
 export function AdminCategoriasScreen() {
   const { width } = useWindowDimensions();
+  const { profile } = useAuth();
+  const adminMesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
+  const isGeneralAdmin = adminMesaId == null;
+  const dominioForMesa: DominioCategoria | null = (() => {
+    if (isGeneralAdmin) return null;
+    if (adminMesaId === 1) return 'tic';
+    if (adminMesaId === 2) return 'comunicaciones';
+    if (adminMesaId === 3) return 'infraestructura';
+    if (adminMesaId === 4) return 'general';
+    return null;
+  })();
   const [q, setQ] = useState('');
   const [qDeb, setQDeb] = useState('');
   const [dominio, setDominio] = useState<DominioCategoria | 'todos'>('todos');
@@ -46,6 +58,7 @@ export function AdminCategoriasScreen() {
     return () => { if (debRef.current) clearTimeout(debRef.current); };
   }, [q]);
 
+  const effectiveDominio = (isGeneralAdmin ? dominio : (dominioForMesa ?? 'tic')) as DominioCategoria | 'todos';
   const fetchPage = useCallback(async (targetPage: number, opts: { reset?: boolean } = {}) => {
     const first = targetPage === 0;
     if (first) setLoading(true); else setLoadingMore(true);
@@ -53,7 +66,7 @@ export function AdminCategoriasScreen() {
     try {
       const res = await listCategoriasPaginated(supabase, {
         search: qDeb || undefined,
-        dominio: dominio as never,
+        dominio: effectiveDominio as never,
         activa: activa as never,
         page: targetPage + 1,
         pageSize: PAGE_SIZE,
@@ -64,13 +77,13 @@ export function AdminCategoriasScreen() {
       setRows((prev) => (opts.reset || first ? res.data : [...prev, ...res.data]));
     } catch (e) { setErrorMsg(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); setLoadingMore(false); setRefreshing(false); }
-  }, [qDeb, dominio, activa]);
+  }, [qDeb, effectiveDominio, activa]);
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
   const onRefresh = useCallback(() => { setRefreshing(true); fetchPage(0, { reset: true }); }, [fetchPage]);
   const onEndReached = useCallback(() => { if (loadingMore || loading || !hasMore) return; fetchPage(page + 1); }, [loadingMore, loading, hasMore, page, fetchPage]);
-  const hasFilters = !!qDeb || dominio !== 'todos' || activa !== 'todos';
-  const clearFilters = () => { setQ(''); setDominio('todos'); setActiva('todos'); };
+  const hasFilters = !!qDeb || effectiveDominio !== 'todos' || activa !== 'todos';
+  const clearFilters = () => { setQ(''); if (isGeneralAdmin) setDominio('todos'); setActiva('todos'); };
 
   const toggleActiva = (r: TicketCategoria) => setConfirmToggle(r);
   const doToggleActiva = async () => {
@@ -94,7 +107,7 @@ export function AdminCategoriasScreen() {
     } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear categoría', message: msg }); } finally { setSaving(false); }
   };
 
-  const openEdit = (r: TicketCategoria) => { setEditRow(r); setFormDominio(r.dominio as DominioCategoria); setFormSub(r.subcategoria); setFormOrden(String(r.orden)); setFormError(null); };
+  const openEdit = (r: TicketCategoria) => { setEditRow(r); setFormDominio(isGeneralAdmin ? (r.dominio as DominioCategoria) : (dominioForMesa ?? 'tic')); setFormSub(r.subcategoria); setFormOrden(String(r.orden)); setFormError(null); };
   const submitEdit = async () => {
     if (!editRow) return;
     const orden = formOrden.trim() ? Number(formOrden) : 0;
@@ -139,22 +152,19 @@ export function AdminCategoriasScreen() {
     <View style={s.wrap}>
       <View style={s.header}>
         <View style={s.headerRow}><Text style={s.h1}>Categorías</Text>
-          <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary}><Text style={s.btnPrimaryText}>+ Nueva categoría</Text></Pressable>
+          <Pressable onPress={() => { if (!isGeneralAdmin && dominioForMesa) setFormDominio(dominioForMesa); setCreateOpen(true); setFormError(null); }} style={s.btnPrimary}><Text style={s.btnPrimaryText}>+ Nueva categoría</Text></Pressable>
         </View>
         <Text style={s.subtitle}>Administra categorías maestras por dominio (tic, comunicaciones, infraestructura, general). Únicas por dominio.</Text>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
         <View style={s.filters}>
           <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar subcategoría…" placeholderTextColor={theme.colors.mutedSoft} style={s.searchInput} /></View>
-          <View style={s.chipsRow}>
-            {(['todos', ...DOMINIOS] as const).map((d) => (
-              <Pressable key={d} onPress={() => setDominio(d as never)} style={[s.chip, dominio === d && s.chipActive]}><Text style={[s.chipText, dominio === d && s.chipTextActive]}>{d}</Text></Pressable>
-            ))}
-            <View style={{ width: 12 }} />
-            {(['todos', true, false] as const).map((v) => (
-              <Pressable key={String(v)} onPress={() => setActiva(v as never)} style={[s.chip, activa === v && s.chipActive]}><Text style={[s.chipText, activa === v && s.chipTextActive]}>{v === 'todos' ? 'Todas' : v ? 'Activas' : 'Inactivas'}</Text></Pressable>
-            ))}
-            {hasFilters ? <Pressable onPress={clearFilters} style={s.clearBtn}><Text style={s.clearText}>Limpiar</Text></Pressable> : null}
+          <View style={s.dropdownRow}>
+            {isGeneralAdmin ? (
+              <FilterDropdown label="Dependencia" value={dominio as never} onSelect={(v) => setDominio(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, ...DOMINIOS.map((d) => ({ value: d as unknown as never, label: formatDominio(d as DominioCategoria) }))]} />
+            ) : null}
+            <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
           </View>
+          {hasFilters ? <Pressable onPress={clearFilters} style={[s.clearBtn, { alignSelf: 'flex-start', marginTop: 2 }]}><Text style={s.clearText}>Limpiar filtros</Text></Pressable> : null}
         </View>
       </View>
 
@@ -176,7 +186,11 @@ export function AdminCategoriasScreen() {
         <Pressable style={s.backdrop} onPress={() => setCreateOpen(false)} />
         <View style={s.modalCard}>
           <Text style={s.modalTitle}>Nueva categoría</Text>
-          <View style={s.chipsRow}>{DOMINIOS.map((d) => <Pressable key={d} onPress={() => setFormDominio(d)} style={[s.chip, formDominio === d && s.chipActive]}><Text style={[s.chipText, formDominio === d && s.chipTextActive]}>{d}</Text></Pressable>)}</View>
+          {isGeneralAdmin ? (
+            <FilterDropdown label="Dependencia" value={formDominio as never} onSelect={(v) => setFormDominio(v as never)} options={DOMINIOS.map((d) => ({ value: d as unknown as never, label: formatDominio(d as DominioCategoria) }))} />
+          ) : (
+            <View style={s.lockedPill}><Text style={s.lockedText}>{formatDominio(dominioForMesa ?? 'tic')}</Text></View>
+          )}
           <Text style={s.label}>Subcategoría *</Text><TextInput value={formSub} onChangeText={setFormSub} placeholder="Ej. Redes y conectividad" placeholderTextColor={theme.colors.mutedSoft} style={s.input} />
           <Text style={s.label}>Orden</Text><TextInput value={formOrden} onChangeText={(t) => setFormOrden(t.replace(/[^0-9-]/g, ''))} placeholder="0" keyboardType="number-pad" style={s.input} />
           {formError ? <Text style={s.error}>{formError}</Text> : null}
@@ -192,7 +206,11 @@ export function AdminCategoriasScreen() {
         <Pressable style={s.backdrop} onPress={() => setEditRow(null)} />
         <View style={s.modalCard}>
           <Text style={s.modalTitle}>Editar categoría #{editRow?.id}</Text>
-          <View style={s.chipsRow}>{DOMINIOS.map((d) => <Pressable key={d} onPress={() => setFormDominio(d)} style={[s.chip, formDominio === d && s.chipActive]}><Text style={[s.chipText, formDominio === d && s.chipTextActive]}>{d}</Text></Pressable>)}</View>
+          {isGeneralAdmin ? (
+            <FilterDropdown label="Dependencia" value={formDominio as never} onSelect={(v) => setFormDominio(v as never)} options={DOMINIOS.map((d) => ({ value: d as unknown as never, label: formatDominio(d as DominioCategoria) }))} />
+          ) : (
+            <View style={s.lockedPill}><Text style={s.lockedText}>{formatDominio(dominioForMesa ?? 'tic')}</Text></View>
+          )}
           <Text style={s.label}>Subcategoría *</Text><TextInput value={formSub} onChangeText={setFormSub} style={s.input} />
           <Text style={s.label}>Orden</Text><TextInput value={formOrden} onChangeText={(t) => setFormOrden(t.replace(/[^0-9-]/g, ''))} keyboardType="number-pad" style={s.input} />
           {formError ? <Text style={s.error}>{formError}</Text> : null}
@@ -220,6 +238,9 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 14, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filters: { gap: 8, marginTop: 4 },
+  dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  lockedPill: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 12, height: 36, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
+  lockedText: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
   searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, borderRadius: 10, paddingHorizontal: 10, height: 38, gap: 6 },
   searchIcon: { color: theme.colors.mutedSoft, fontSize: 13 },
   searchInput: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
