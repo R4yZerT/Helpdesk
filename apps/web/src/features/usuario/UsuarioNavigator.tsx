@@ -3,8 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme } from '@helpdesk/shared';
-import { Sidebar } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus } from '@helpdesk/shared';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
@@ -52,15 +51,31 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
     if (id === 'crear') return activeName === 'CrearTicket';
     return false;
   };
+  // Fix pantalla blanca: evita navegar si ya está en la ruta; si vuelve a raíz (MisSolicitudes) hace popToTop
   const navigateAndClose = (name: string) => {
+    if (activeName === name) { setDrawerOpen(false); return; }
+    try {
+      const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[]; index: number }; popToTop?: () => void };
+      const st = anyNav?.getState?.();
+      const hasTarget = st?.routes?.some((r) => r.name === name);
+      const isRoot = name === 'MisSolicitudes';
+      if (hasTarget && isRoot && typeof anyNav?.popToTop === 'function') {
+        anyNav.popToTop();
+        const st2 = anyNav.getState?.();
+        if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
+        setDrawerOpen(false);
+        return;
+      }
+    } catch {}
     nav?.navigate(name as never);
     setDrawerOpen(false);
   };
+  const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
   const sidebarContent = (
     <Sidebar
       items={[
-        { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigateAndClose('MisSolicitudes') },
-        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket') },
+        { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigateAndClose('MisSolicitudes'), icon: <IconInbox size={14} color={iconColor(isActive('mis'))} /> },
+        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol } : undefined}
       onLogout={signOut}

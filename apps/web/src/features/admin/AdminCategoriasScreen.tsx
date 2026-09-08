@@ -1,7 +1,7 @@
 // RF-32 — Admin: categorías maestras ticket_categories
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria } from '@helpdesk/shared';
+import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
@@ -35,6 +35,9 @@ export function AdminCategoriasScreen() {
   const [formOrden, setFormOrden] = useState('0');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
+  const [confirmToggle, setConfirmToggle] = useState<TicketCategoria | null>(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -69,9 +72,13 @@ export function AdminCategoriasScreen() {
   const hasFilters = !!qDeb || dominio !== 'todos' || activa !== 'todos';
   const clearFilters = () => { setQ(''); setDominio('todos'); setActiva('todos'); };
 
-  const toggleActiva = async (r: TicketCategoria) => {
-    try { const upd = await setCategoriaActiva(supabase, r.id, !r.activa); setRows((prev) => prev.map((x) => x.id === r.id ? upd : x)); }
-    catch (e) { setErrorMsg(e instanceof Error ? e.message : String(e)); }
+  const toggleActiva = (r: TicketCategoria) => setConfirmToggle(r);
+  const doToggleActiva = async () => {
+    if (!confirmToggle) return;
+    setToggleLoading(true);
+    try { const upd = await setCategoriaActiva(supabase, confirmToggle.id, !confirmToggle.activa); setRows((prev) => prev.map((x) => x.id === confirmToggle.id ? upd : x)); setFeedback({ visible: true, variant: 'success', title: confirmToggle.activa ? 'Categoría desactivada' : 'Categoría activada', message: upd.subcategoria }); setConfirmToggle(null); }
+    catch (e) { const msg = e instanceof Error ? e.message : String(e); setErrorMsg(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg }); }
+    finally { setToggleLoading(false); }
   };
 
   const submitCreate = async () => {
@@ -83,7 +90,8 @@ export function AdminCategoriasScreen() {
       const created = await createCategoria(supabase, { dominio: formDominio, subcategoria: formSub, orden });
       setCreateOpen(false); setFormSub(''); setFormOrden('0');
       setRows((prev) => [created, ...prev]); setTotal((n) => n + 1);
-    } catch (e) { setFormError(e instanceof Error ? e.message : String(e)); } finally { setSaving(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Categoría creada', message: created.subcategoria });
+    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear categoría', message: msg }); } finally { setSaving(false); }
   };
 
   const openEdit = (r: TicketCategoria) => { setEditRow(r); setFormDominio(r.dominio as DominioCategoria); setFormSub(r.subcategoria); setFormOrden(String(r.orden)); setFormError(null); };
@@ -102,7 +110,8 @@ export function AdminCategoriasScreen() {
       const upd = await updateCategoria(supabase, editRow.id, patch as never);
       setRows((prev) => prev.map((x) => x.id === upd.id ? upd : x));
       setEditRow(null);
-    } catch (e) { setFormError(e instanceof Error ? e.message : String(e)); } finally { setSaving(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Categoría actualizada', message: upd.subcategoria });
+    } catch (e) { const msg = e instanceof Error ? e.message : String(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg }); } finally { setSaving(false); }
   };
 
   const renderItem = ({ item }: { item: TicketCategoria }) => {
@@ -193,6 +202,8 @@ export function AdminCategoriasScreen() {
           </View>
         </View>
       </Modal>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activa ? 'Desactivar categoría' : 'Activar categoría'} message={confirmToggle ? `¿${confirmToggle.activa ? 'Desactivar' : 'Activar'} "${confirmToggle.subcategoria}"?` : undefined} confirmText={confirmToggle?.activa ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActiva} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );
 }

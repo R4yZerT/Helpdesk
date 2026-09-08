@@ -1,7 +1,7 @@
 // RF-03 — Recuperación web (Stitch: #0E87E2 / #FD7C06 / #F6F8FB)
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, Card, Button } from '@helpdesk/shared';
+import { theme, Card, Button, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: (r: string) => void; goBack: () => void } }) {
@@ -11,6 +11,7 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error'; title: string; message?: string } | null>(null);
 
   const onSubmit = async () => {
     setError(null);
@@ -24,8 +25,11 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), redirectTo ? { redirectTo } : undefined);
       if (error) throw error;
       setSent(true);
+      setFeedback({ visible: true, variant: 'success', title: 'Correo enviado', message: 'Revisa tu bandeja (y spam/Inbucket en local). Enlace válido 1 hora.' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al enviar enlace', message: msg });
     } finally {
       setLoading(false);
     }
@@ -98,6 +102,7 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
           </View>
         </View>
       </ScrollView>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
     </View>
   );
 }

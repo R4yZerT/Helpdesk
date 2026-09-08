@@ -1,8 +1,8 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, FeedbackModal } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -53,6 +53,9 @@ export function TicketDetailScreen({ route }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'warning' | 'info' | 'confirm'; title: string; message?: string } | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -93,8 +96,11 @@ export function TicketDetailScreen({ route }: Props) {
       setMensaje('');
       setInterno(false);
       await load();
+      setFeedback({ visible: true, variant: 'success', title: 'Comentario enviado', message: 'Tu avance se publicó correctamente' });
     } catch (e) {
-      setSendError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setSendError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al comentar', message: msg });
     } finally {
       setSending(false);
     }
@@ -116,15 +122,25 @@ export function TicketDetailScreen({ route }: Props) {
       await updateTicket(supabase, id, { asunto: editAsunto, descripcion: editDesc });
       setEditing(false);
       await load();
-    } catch (e) { setEditError(e instanceof Error ? e.message : String(e)); } finally { setEditSaving(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Ticket actualizado', message: 'Los cambios se guardaron correctamente' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setEditError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al guardar', message: msg });
+    } finally { setEditSaving(false); }
   };
-  const onCancelTicket = () => {
-    Alert.alert('Cancelar solicitud', '¿Seguro que quieres cerrar esta solicitud?', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Sí, cerrar', style: 'destructive', onPress: async () => {
-        try { await cancelTicket(supabase, id); await load(); } catch (e) { Alert.alert('Error', e instanceof Error ? e.message : String(e)); }
-      }},
-    ]);
+  const onCancelTicket = () => setConfirmCancel(true);
+  const doCancelTicket = async () => {
+    setCancelLoading(true);
+    try {
+      await cancelTicket(supabase, id);
+      setConfirmCancel(false);
+      await load();
+      setFeedback({ visible: true, variant: 'success', title: 'Solicitud cancelada', message: 'El ticket fue cerrado correctamente' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cancelar', message: msg });
+    } finally { setCancelLoading(false); }
   };
   const onTransition = async (estado: string) => {
     setTransLoading(estado);
@@ -134,7 +150,12 @@ export function TicketDetailScreen({ route }: Props) {
       setShowTrans(false);
       setSolucion('');
       await load();
-    } catch (e) { setTransError(e instanceof Error ? e.message : String(e)); } finally { setTransLoading(null); }
+      setFeedback({ visible: true, variant: 'success', title: 'Estado actualizado', message: `Ticket pasó a ${estado}` });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTransError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
+    } finally { setTransLoading(null); }
   };
   const onReassign = async () => {
     setReassignLoading(true);
@@ -149,7 +170,12 @@ export function TicketDetailScreen({ route }: Props) {
       setReassignTecnico('');
       setReassignMesa('');
       await load();
-    } catch (e) { setReassignError(e instanceof Error ? e.message : String(e)); } finally { setReassignLoading(false); }
+      setFeedback({ visible: true, variant: 'success', title: 'Ticket reasignado', message: 'La reasignación se aplicó correctamente' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setReassignError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al reasignar', message: msg });
+    } finally { setReassignLoading(false); }
   };
 
   if (loading && !detail) {
@@ -312,7 +338,7 @@ export function TicketDetailScreen({ route }: Props) {
           </View>
         ) : null}
         <View style={s.ghostStack}>
-          <Pressable onPress={() => Alert.alert('Escalar', 'Próximamente N3')} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Escalar a Infra N3</Text></Pressable>
+          <Pressable onPress={() => setFeedback({ visible: true, variant: 'info', title: 'Próximamente', message: 'Escalado N3 estará disponible pronto' })} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Escalar a Infra N3</Text></Pressable>
           <Pressable onPress={() => setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir Información</Text></Pressable>
           {(canReassign) ? <Pressable onPress={() => setShowReassign((v) => !v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
         </View>
@@ -369,6 +395,8 @@ export function TicketDetailScreen({ route }: Props) {
         {left}
         {right}
       </View>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={confirmCancel} variant="confirm" title="Cancelar solicitud" message="¿Seguro que quieres cerrar esta solicitud? Esta acción no se puede deshacer." confirmText="Sí, cerrar" cancelText="No" loading={cancelLoading} onConfirm={doCancelTicket} onClose={() => setConfirmCancel(false)} onCancel={() => setConfirmCancel(false)} />
     </ScrollView>
   );
 }

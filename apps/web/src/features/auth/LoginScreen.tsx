@@ -1,8 +1,8 @@
 // RF-01 / RF-04 — Login Corporativo Stitch (HelpDesk - Login Corporativo 0500513c)
 // Screenshot 0500513c Desktop & Mobile — fidelity #0E87E2 / #FD7C06 / #F6F8FB / Inter+JetBrains
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
+import { theme, IconEye, IconEyeOff, IconLock, validatePasswordSync, strengthLabel } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
 
 export function LoginScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
@@ -14,6 +14,12 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  const pwValidation = useMemo(() => (password ? validatePasswordSync(password) : null), [password]);
+  const pct = pwValidation ? ([0, 25, 50, 75, 100] as const)[pwValidation.score] : 0;
+  const strengthColors: Record<string, string> = { muy_debil: theme.colors.danger, debil: '#f59e0b', aceptable: '#3b82f6', fuerte: '#10b981' };
+  const barColor = pwValidation ? strengthColors[pwValidation.strength] : theme.colors.border;
+  const label = pwValidation ? strengthLabel(pwValidation.strength) : '—';
 
   const onSubmit = async () => {
     setLocalError(null);
@@ -96,9 +102,9 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
                 </Pressable>
               </View>
               <View style={s.strengthRow}>
-                <View style={s.strengthBar}><View style={[s.strengthFill, { width: '66%' }]} /></View>
-                <Text style={s.strengthText}>Nivel de seguridad: <Text style={{ color: theme.colors.success, fontWeight: '700' }}>Medio-Alto</Text></Text>
-                <Text style={s.strengthHint}>Mín. 8 caracteres</Text>
+                <View style={s.strengthBar}><View style={[s.strengthFill, { width: `${pct}%` as unknown as number, backgroundColor: barColor }]} /></View>
+                <Text style={s.strengthText}>Nivel de seguridad: <Text style={{ color: barColor, fontWeight: '700' }}>{label}{pwValidation ? ` · ${pwValidation.score}/4` : ''}</Text></Text>
+                <Text style={s.strengthHint}>{pwValidation?.reasons[0] ?? 'Mín. 8 caracteres'}</Text>
               </View>
             </View>
 

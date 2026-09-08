@@ -37,6 +37,74 @@ export function IconLock({ size = 16, color = '#64748b' }: P) {
   );
 }
 
+// Sidebar — View puros (sin react-native-svg) acorde a cada funcionalidad
+
+export function IconInbox({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.9, height: size * 0.65, borderWidth: 1.5, borderColor: color, borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: size * 0.55, height: 1.5, backgroundColor: color, borderRadius: 1, marginBottom: 2 }} />
+        <View style={{ width: size * 0.4, height: 1.2, backgroundColor: color, opacity: 0.6, borderRadius: 1 }} />
+      </View>
+      <View style={{ position: 'absolute', top: -1, width: size * 0.5, height: size * 0.22, borderWidth: 1.2, borderColor: color, borderBottomWidth: 0, borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: '#fff' }} />
+    </View>
+  );
+}
+
+export function IconPlus({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', width: size * 0.7, height: 1.6, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ position: 'absolute', width: 1.6, height: size * 0.7, backgroundColor: color, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+export function IconUsers({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 1 }}>
+      <View style={{ alignItems: 'center' }}>
+        <View style={{ width: size * 0.38, height: size * 0.38, borderRadius: size * 0.19, borderWidth: 1.4, borderColor: color, backgroundColor: '#fff' }} />
+        <View style={{ width: size * 0.5, height: size * 0.28, borderWidth: 1.4, borderColor: color, borderTopLeftRadius: 3, borderTopRightRadius: 3, marginTop: 1, backgroundColor: '#fff' }} />
+      </View>
+      <View style={{ alignItems: 'center', marginLeft: -2, opacity: 0.9 }}>
+        <View style={{ width: size * 0.3, height: size * 0.3, borderRadius: size * 0.15, borderWidth: 1.2, borderColor: color, backgroundColor: '#fff' }} />
+        <View style={{ width: size * 0.42, height: size * 0.24, borderWidth: 1.2, borderColor: color, borderTopLeftRadius: 3, borderTopRightRadius: 3, marginTop: 1, backgroundColor: '#fff' }} />
+      </View>
+    </View>
+  );
+}
+
+export function IconLayers({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.8, height: size * 0.28, borderWidth: 1.4, borderColor: color, backgroundColor: '#fff', transform: [{ rotateX: '0deg' }], borderRadius: 1 }} />
+      <View style={{ width: size * 0.8, height: size * 0.28, borderWidth: 1.4, borderColor: color, backgroundColor: '#fff', marginTop: -2, borderRadius: 1 }} />
+      <View style={{ width: size * 0.8, height: size * 0.28, borderWidth: 1.4, borderColor: color, backgroundColor: '#fff', marginTop: -2, borderRadius: 1 }} />
+    </View>
+  );
+}
+
+export function IconTag({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.62, height: size * 0.62, borderWidth: 1.4, borderColor: color, borderRadius: 2, transform: [{ rotate: '45deg' }], alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' }}>
+        <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: color, transform: [{ rotate: '-45deg' }] }} />
+      </View>
+    </View>
+  );
+}
+
+export function IconUpload({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: size * 0.75, height: size * 0.28, borderWidth: 1.4, borderColor: color, borderTopWidth: 0, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, marginTop: size * 0.35 }} />
+      <View style={{ position: 'absolute', top: size * 0.12, width: 1.6, height: size * 0.42, backgroundColor: color, borderRadius: 1 }} />
+      <View style={{ position: 'absolute', top: size * 0.12, width: size * 0.32, height: size * 0.32, borderTopWidth: 1.6, borderLeftWidth: 1.6, borderColor: color, transform: [{ rotate: '45deg' }], backgroundColor: 'transparent' }} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   eyeOuter: { borderWidth: 1.8, alignItems: 'center', justifyContent: 'center' },
   eyeInner: { borderWidth: 1.8 },

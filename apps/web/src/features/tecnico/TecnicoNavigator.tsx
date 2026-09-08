@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -36,15 +36,31 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
     if (id === 'crear') return activeName === 'CrearTicket';
     return false;
   };
+  // Fix pantalla blanca: si ya está en la ruta no navegar; si el target ya está en el stack (ej volver a Bandeja desde Crear) hacer popToTop antes de navegar
   const navigateAndClose = (name: string) => {
+    if (activeName === name) { setDrawerOpen(false); return; }
+    try {
+      const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[]; index: number }; popToTop?: () => void };
+      const st = anyNav?.getState?.();
+      const hasTarget = st?.routes?.some((r) => r.name === name);
+      const isRoot = name === 'Bandeja';
+      if (hasTarget && isRoot && typeof anyNav?.popToTop === 'function') {
+        anyNav.popToTop();
+        const st2 = anyNav.getState?.();
+        if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
+        setDrawerOpen(false);
+        return;
+      }
+    } catch {}
     nav?.navigate(name as never);
     setDrawerOpen(false);
   };
+  const iconColor = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
   const sidebarContent = (
     <Sidebar
       items={[
-        { id: 'bandeja', label: 'Bandeja Asignada', active: isActive('bandeja'), onPress: () => navigateAndClose('Bandeja') },
-        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket') },
+        { id: 'bandeja', label: 'Bandeja Asignada', active: isActive('bandeja'), onPress: () => navigateAndClose('Bandeja'), icon: <IconInbox size={14} color={iconColor(isActive('bandeja'))} /> },
+        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Técnico') as string, role: profile.rol } : undefined}
       onLogout={signOut}

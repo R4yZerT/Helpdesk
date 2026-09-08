@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar } from '@helpdesk/shared';
+import { theme, Sidebar, IconUsers, IconLayers, IconTag, IconUpload } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminCategoriasScreen } from './AdminCategoriasScreen';
@@ -38,17 +38,32 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
     if (id === 'import') return activeName === 'Import';
     return false;
   };
+  // Fix pantalla blanca: evita navegar duplicado; si el destino ya está en el stack hace pop/navigate limpio
   const navigateAndClose = (name: string) => {
+    if (activeName === name) { setDrawerOpen(false); return; }
+    // Para Admin todas las pantallas son hermanas en el mismo Stack: navigate normal basta, pero evitamos doble push si ya existe
+    try {
+      const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[] }; popToTop?: () => void };
+      const st = anyNav?.getState?.();
+      const hasTarget = st?.routes?.some((r) => r.name === name);
+      if (hasTarget) {
+        // Si ya existe, navigate hará pop al existente sin dejar pantalla blanca
+        nav?.navigate(name as never);
+        setDrawerOpen(false);
+        return;
+      }
+    } catch {}
     nav?.navigate(name as never);
     setDrawerOpen(false);
   };
+  const ic = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
   const sidebarContent = (
     <Sidebar
       items={[
-        { id: 'usuarios', label: 'Usuarios', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios') },
-        { id: 'mesas', label: 'Mesas', active: isActive('mesas'), onPress: () => navigateAndClose('Mesas') },
-        { id: 'categorias', label: 'Categorías', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias') },
-        { id: 'import', label: 'Import', active: isActive('import'), onPress: () => navigateAndClose('Import') },
+        { id: 'usuarios', label: 'Usuarios', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
+        { id: 'mesas', label: 'Mesas', active: isActive('mesas'), onPress: () => navigateAndClose('Mesas'), icon: <IconLayers size={14} color={ic(isActive('mesas'))} /> },
+        { id: 'categorias', label: 'Categorías', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
+        { id: 'import', label: 'Import', active: isActive('import'), onPress: () => navigateAndClose('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Administrador') as string, role: profile.rol } : undefined}
       onLogout={signOut}
