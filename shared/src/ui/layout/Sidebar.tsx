@@ -52,7 +52,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: theme.space[3], // 12 — token space-3
-    paddingBottom: theme.space[3], // 12 — box model estándar
+    height: 56, // alineado con topClockBar/mobileTopBar 56
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },

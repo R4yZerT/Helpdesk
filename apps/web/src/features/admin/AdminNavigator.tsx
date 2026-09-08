@@ -132,7 +132,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
 const w = StyleSheet.create({
   root: { flex: 1, flexDirection: 'row', backgroundColor: theme.colors.bg },
   rootMobile: { flex: 1, flexDirection: 'column', backgroundColor: theme.colors.bg },
-  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, padding: 16 },
+  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 0 },
   main: { flex: 1, minWidth: 0 as unknown as number, flexDirection: 'column' as const },
   mainMobile: { flex: 1, minWidth: 0 as unknown as number, position: 'relative', flexDirection: 'column' as const },
   mobileTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56 },
@@ -140,7 +140,7 @@ const w = StyleSheet.create({
   burgerText: { fontSize: 18, color: theme.colors.text },
   burgerSpacer: { width: 44 },
   clockMobile: { minWidth: 80, alignItems: 'flex-end' },
-  topClockBar: { height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
+  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
   drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
