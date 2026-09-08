@@ -47,7 +47,7 @@ export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}):
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as any[];
   const total = count ?? rows.length;
-  const abiertos = rows.filter((r) => ['abierto', 'en_proceso', 'programado'].includes(r.estado)).length;
+  const abiertos = rows.filter((r) => ['abierto', 'en_proceso'].includes(r.estado)).length;
   const hoy = new Date().toISOString().slice(0, 10);
   const ingresadosHoy = rows.filter((r) => String(r.creado_en).slice(0, 10) === hoy).length;
   const slaRiesgo = rows.filter((r) => r.estado !== 'cerrado' && r.estado !== 'solucionado').length > 100 ? 8 : Math.min(8, Math.floor(abiertos * 0.06));
@@ -137,6 +137,19 @@ export async function getCargaHoraria(client: SupabaseClient, f: DashboardFilter
   const out: CargaCelda[] = [];
   for (let dow = 0; dow < 5; dow++) for (let h = 7; h <= 21; h++) { const c = bucket.get(`${dow}-${h}`) ?? 0; out.push({ dow, hour: h, count: c, nivel: nivel(c) }); }
   return out;
+}
+
+
+export async function generarAlertasIA(client: any): Promise<number> {
+  const { data, error } = await client.rpc('generar_alertas_ia');
+  if (error) throw new Error(error.message);
+  if (Array.isArray(data)) return Number(data[0]?.insertados ?? 0);
+  return Number((data as any)?.insertados ?? 0);
+}
+
+export async function marcarAlertaIA(client: any, id: number, estado: 'vista' | 'resuelta'): Promise<void> {
+  const { error } = await client.from('alertas_ia').update({ estado }).eq('id', id);
+  if (error) throw new Error(error.message);
 }
 
 export async function listAlertasIA(client: SupabaseClient, opts: { estado?: string } = {}): Promise<AlertaIA[]> {

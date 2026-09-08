@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, canTransition, fetchMesas, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -10,7 +10,7 @@ type Props = { route: { params: { id: string } }; navigation?: any };
 
 const tonoEstado = (e: string) => {
   if (e === 'abierto') return 'muted' as const;
-  if (e === 'en_proceso' || e === 'programado') return 'info' as const;
+  if (e === 'en_proceso') return 'info' as const;
   if (e === 'solucionado') return 'success' as const;
   if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
@@ -132,8 +132,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
   );
 
   const left = (
-    <View style={{ gap: theme.space[3], flex: isWide ? 8 : undefined }}> // 12
-      <Card style={{ gap: theme.space[3] }}> // 12
+    <View style={{ gap: theme.space[3], flex: isWide ? 8 : undefined }}>>
+      <Card style={{ gap: theme.space[3] }}>>
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
         <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId?.slice(0,8) ?? '—'}</Text></View>
@@ -152,13 +152,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
             </Pressable>
           ))}
         </View>
-        <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}> // 14/10
-          {activeTab==='comentarios' ? (comentarios.length===0? <Text style={s.muted}>Sin comentarios — inicia el hilo con tu diagnóstico.</Text> : comentarios.map((c)=>(
-            <View key={c.id} style={[s.comment, c.interno && s.commentInternal]}>
-              <View style={s.rowHeader}><Text style={s.rowTitle}>{c.usuarioId.slice(0,8)}…</Text>{c.interno? <Badge label="interno" tone="accent" /> : <Badge label="público" tone="muted" />}<Text style={s.mutedSmall}>{new Date(c.creadoEn).toLocaleDateString('es-ES')}</Text></View>
-              <Text style={s.desc}>{c.comentario}</Text>
-            </View>
-          ))) : activeTab==='historial' ? (estados.length===0? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e)=>(
+        <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}>>
+          {activeTab==='comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab==='historial' ? (estados.length===0? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e)=>(
             <View key={e.id} style={s.timelineRow}><View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View><View style={s.timelineBody}><Text style={s.rowTitle}>{e.tipoEvento==='estado'?`${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}`:`Asignación ${e.tecnicoDe?.slice(0,6) ?? '—'} → ${e.tecnicoPara?.slice(0,6) ?? '—'}`}</Text><Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>{e.comentario? <Text style={s.metaSmall}>{e.comentario}</Text> : null}</View></View>
           ))) : adjuntos.length === 0 ? (
             <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
@@ -179,30 +174,21 @@ export function DetalleTecnicoScreen({ route }: Props) {
         </View>
       </Card>
       <View style={s.composer}>
-        <Text style={s.section}>Agregar avance técnico</Text>
-        {!canComment ? <Text style={s.muted}>No tienes permiso para comentar</Text> : (
-          <>
-            <TextInput value={mensaje} onChangeText={setMensaje} placeholder="Describe diagnóstico, pasos o solución" placeholderTextColor={theme.colors.mutedSoft} style={s.input} multiline maxLength={2000} accessibilityLabel="Mensaje técnico" />
-            <Text style={s.hint}>{mensaje.length}/2000</Text>
-            {canInternal ? <View style={s.switchRow}><Text style={s.switchLabel}>Interno — solo equipo técnico</Text><Switch value={interno} onValueChange={setInterno} trackColor={{ true: theme.colors.accent }} thumbColor="#fff" /></View> : null}
-            {sendError ? <View style={s.errorBox}><Text style={s.error}>{sendError}</Text></View> : null}
-            <Pressable onPress={onSend} disabled={sending || !mensaje.trim()} style={[s.sendBtn, (sending||!mensaje.trim()) && {opacity:0.45}]} accessibilityRole="button"><Text style={s.sendText}>{sending?'Enviando…':'Enviar avance'}</Text></Pressable>
-          </>
-        )}
+        <TicketCommentComposer mensaje={mensaje} onChange={setMensaje} interno={interno} onInternoChange={setInterno} canInternal={canInternal} sending={sending} error={sendError} onSend={onSend} canComment={canComment} label="Agregar avance técnico" />
       </View>
     </View>
   );
 
   const right = (
-    <View style={{ gap: theme.space[3], flex: isWide ? 4 : undefined }}> // 12
-      <Card style={{ gap: theme.space[3] - 2 }}> // 10
+    <View style={{ gap: theme.space[3], flex: isWide ? 4 : undefined }}>>
+      <Card style={{ gap: theme.space[3] - 2 }}>>
         <Text style={s.section}>Acciones de campo</Text>
         <Pressable onPress={()=>setShowTrans(v=>!v)} style={[s.btn, s.btnAccent]} accessibilityRole="button"><Text style={s.btnAccentText}>{showTrans?'Ocultar transición':'Solucionar incidente'}</Text></Pressable>
         {showTrans && nextEstados.length>0 ? (
           <View style={{ gap: 8 }}>
             <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución (requerida para solucionado)" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
-            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}> // 8
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}>>
               {nextEstados.map((e)=>(
                 <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
                   {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
@@ -225,7 +211,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           </View>
         ) : null}
       </Card>
-      <Card style={{ gap: theme.space[3] - 2 }}> // 10
+      <Card style={{ gap: theme.space[3] - 2 }}>>
         <Text style={s.section}>Progreso del ticket</Text>
         <View style={s.progressWrap}>
           {[
@@ -239,7 +225,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           ))}
         </View>
       </Card>
-      <Card style={{ gap: theme.space[2] }}> // 8
+      <Card style={{ gap: theme.space[2] }}>>
         <Text style={s.section}>Control SLA</Text>
         <Text style={s.slaBig}>{ticket.estado==='cerrado'||ticket.estado==='solucionado'?'Cumplido':'35 min restantes'}</Text>
         <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado==='solucionado'||ticket.estado==='cerrado'? theme.colors.success : ticket.prioridad==='critica'? theme.colors.danger : theme.colors.primary }]} /></View>
@@ -257,7 +243,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
   return (
     <ScrollView contentContainerStyle={s.container} style={{ backgroundColor: theme.colors.bg }}>
       {header}
-      <View style={[isWide ? { flexDirection:'row', gap: theme.space[4], alignItems:'flex-start' } : { gap: theme.space[3] }]}> // 16/12
+      <View style={[isWide ? { flexDirection:'row', gap: theme.space[4], alignItems:'flex-start' } : { gap: theme.space[3] }]}>
         {left}{right}
       </View>
     </ScrollView>
@@ -296,8 +282,8 @@ const s = StyleSheet.create({
   commentInternal: { backgroundColor:'#FFF7ED', borderWidth:1, borderColor:'#FED7AA', borderRadius:12, padding:10, borderStyle:'solid' },
   rowHeader: { flexDirection:'row', alignItems:'center', gap:6, flexWrap:'wrap' },
   rowTitle: { fontSize:12, fontWeight:'700', color: theme.colors.text },
-  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[3] - 2, ...theme.shadow.soft }, // 14/10
-  input: { borderWidth:1, borderColor: theme.colors.border, borderRadius: theme.radius.md - 2, paddingHorizontal: theme.space[3], paddingVertical: theme.space[3], fontSize:13, color: theme.colors.text, minHeight:44, textAlignVertical:'top', backgroundColor: theme.colors.surfaceAlt }, // 12/12/12
+  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[3] - 2, ...theme.shadow.soft },
+  input: { borderWidth:1, borderColor: theme.colors.border, borderRadius: theme.radius.md - 2, paddingHorizontal: theme.space[3], paddingVertical: theme.space[3], fontSize:13, color: theme.colors.text, minHeight:44, textAlignVertical:'top', backgroundColor: theme.colors.surfaceAlt },
   timelineRow: { flexDirection:'row', gap: theme.space[3] - 2, paddingVertical: theme.space[2] - 2 }, // 10/6
   dotCol: { alignItems:'center', width:12 },
   dot: { width:8, height:8, borderRadius:999, backgroundColor: theme.colors.primary, marginTop:4 },
@@ -306,7 +292,7 @@ const s = StyleSheet.create({
   hint: { fontSize:10, color: theme.colors.mutedSoft, textAlign:'right' },
   switchRow: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', backgroundColor: theme.colors.bg, borderRadius: theme.radius.md - 2, paddingHorizontal: theme.space[3], paddingVertical: theme.space[2], borderWidth:1, borderColor: theme.colors.border },
   switchLabel: { fontSize:12, color: theme.colors.primary, fontWeight:'600' },
-  sendBtn: { backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] + 1, borderRadius: theme.radius.md - 2, alignItems:'center' }, // 13/12
+  sendBtn: { backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] + 1, borderRadius: theme.radius.md - 2, alignItems:'center' },
   sendText: { color:'#fff', fontWeight:'800', fontSize:13 },
   btn: { paddingVertical: theme.space[3] - 2, paddingHorizontal: theme.space[4], borderRadius: theme.radius.sm, alignItems:'center', justifyContent:'center' }, // 10/16/10
   btnPrimary: { backgroundColor: theme.colors.primary },
@@ -318,7 +304,7 @@ const s = StyleSheet.create({
   actionRow: { flexDirection:'row', gap: theme.space[2], flexWrap:'wrap' },
   retryBtn: { marginTop: theme.space[3] - 2, backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] - 2, paddingHorizontal: theme.space[4], borderRadius: theme.radius.md - 2, alignSelf:'flex-start' },
   retryText: { color:'#fff', fontWeight:'700', fontSize:12 },
-  terminal: { backgroundColor: theme.colors.text, borderRadius: theme.radius.sm, padding: theme.space[3] }, // 10/12
+  terminal: { backgroundColor: theme.colors.text, borderRadius: theme.radius.sm, padding: theme.space[3] },
   terminalText: { color:'#A7F3D0', fontSize:11, fontFamily: theme.font.mono, fontWeight:'600' },
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, padding: theme.space[3] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[1] }, // 10/10/4
   solLabel: { fontSize:10, fontWeight:'800', letterSpacing:0.6, textTransform:'uppercase', color: theme.colors.primary },

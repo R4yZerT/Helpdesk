@@ -1,12 +1,10 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { AppShell, FilterBar, Sidebar, TopBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, fetchMesas, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
 
 export function DashboardScreen() {
-  const { profile, signOut } = useAuth();
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
 
@@ -29,6 +27,7 @@ export function DashboardScreen() {
   const [evolucion, setEvolucion] = React.useState<any[]>([]);
   const [carga, setCarga] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
+  const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
 
   const filters: DashboardFilters = React.useMemo(() => {
     const f: DashboardFilters = {};
@@ -92,19 +91,11 @@ export function DashboardScreen() {
       downloadCsv(`dashboard-${new Date().toISOString().slice(0,10)}.csv`, csv);
     } catch (e) { console.warn('[Dashboard] export', e); }
   }, [filters, mesas]);
-
-  const sidebar = (
-    <Sidebar
-      items={[
-        { id: 'dash', label: 'Dashboard', active: true },
-        { id: 'bandeja', label: 'Bandeja' },
-        { id: 'reportes', label: 'Reportes' },
-        { id: 'alertas', label: `Alertas IA${alertas.length ? ` · ${alertas.length}` : ''}` },
-      ]}
-      user={profile ? { name: profile.nombre ?? profile.email ?? 'Usuario', role: profile.rol } : undefined}
-      onLogout={signOut}
-    />
-  );
+  const onGenerarAlertas = React.useCallback(async () => {
+    setGenerandoAlertas(true);
+    try { await generarAlertasIA(supabase as any); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e){ console.warn('[Dashboard] generar alertas', e); } finally { setGenerandoAlertas(false); }
+  }, []);
+  const onMarcarAlerta = React.useCallback(async (id:number, estado:'vista'|'resuelta')=>{ try{ await marcarAlertaIA(supabase as any, id, estado); setAlertas(prev=>prev.filter(a=>a.id!==id)); }catch(e){ console.warn('[Dashboard] marcar alerta', e);} },[]);
 
   if (loading) {
     return (
@@ -134,32 +125,27 @@ export function DashboardScreen() {
       <AreaEvolucion data={evolucion} mesas={mesas} />
       <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
         <View style={{ flex: 7 }}><HeatmapCarga data={carga} /></View>
-        <View style={{ flex: 5 }}><TimelineAlertas alertas={alertas} /></View>
+        <View style={{ flex: 5 }}><Pressable onPress={onGenerarAlertas} disabled={generandoAlertas} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 8, alignItems: 'center', marginBottom: 8, opacity: generandoAlertas?0.6:1 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{generandoAlertas ? 'Generando…' : 'Generar alertas (IA)'}</Text></Pressable><TimelineAlertas alertas={alertas} onVista={(id)=>onMarcarAlerta(id,'vista')} onResuelta={(id)=>onMarcarAlerta(id,'resuelta')} /></View>
       </View>
     </View>
   );
 
   return (
-    <AppShell
-      sidebar={sidebar}
-      topBar={<TopBar />}
-      filterBar={
-        <FilterBar
-          range={range} onRangeChange={setRange}
-          mesaIds={mesaIds} onToggleMesa={onToggleMesa} mesas={mesas}
-          estado={estado} onEstadoChange={setEstado}
-          prioridad={prioridad} onPrioridadChange={setPrioridad}
-          categoriaId={categoriaId} onCategoriaChange={setCategoriaId} categorias={categorias}
-          tecnicoId={tecnicoId} onTecnicoChange={setTecnicoId} tecnicos={tecnicos}
-          customDesde={customDesde} customHasta={customHasta} onCustomDesdeChange={setCustomDesde} onCustomHastaChange={setCustomHasta}
-          onExport={onExport}
-        />
-      }
-    >
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
+      <FilterBar
+        range={range} onRangeChange={setRange}
+        mesaIds={mesaIds} onToggleMesa={onToggleMesa} mesas={mesas}
+        estado={estado} onEstadoChange={setEstado}
+        prioridad={prioridad} onPrioridadChange={setPrioridad}
+        categoriaId={categoriaId} onCategoriaChange={setCategoriaId} categorias={categorias}
+        tecnicoId={tecnicoId} onTecnicoChange={setTecnicoId} tecnicos={tecnicos}
+        customDesde={customDesde} customHasta={customHasta} onCustomDesdeChange={setCustomDesde} onCustomHastaChange={setCustomHasta}
+        onExport={onExport}
+      />
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />} contentContainerStyle={{ padding: 16 }} style={{ flex: 1 }}>
         {content}
       </ScrollView>
-    </AppShell>
+    </View>
   );
 }
 

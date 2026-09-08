@@ -13,7 +13,7 @@ type Props = { navigation: NativeStackNavigationProp<TecnicoStackParamList, 'Ban
 
 const tonoEstado = (e: string) => {
   if (e === 'abierto') return 'muted' as const;
-  if (e === 'en_proceso' || e === 'programado') return 'info' as const;
+  if (e === 'en_proceso') return 'info' as const;
   if (e === 'solucionado') return 'success' as const;
   if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
