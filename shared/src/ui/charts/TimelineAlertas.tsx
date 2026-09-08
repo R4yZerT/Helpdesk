@@ -6,7 +6,7 @@ import { Card, Badge } from '../components.js';
 
 type Alerta = { id: number; tipo: string; mensaje: string; severidad: string; estado: string; creadoEn: string; mesaId?: number | null };
 
-export function TimelineAlertas({ alertas }: { alertas: Alerta[] }) {
+export function TimelineAlertas({ alertas, onVista, onResuelta }: { alertas: Alerta[]; onVista?: (id:number)=>void; onResuelta?: (id:number)=>void }) {
   if (!alertas.length) {
     return (
       <Card style={{ gap: 8 }}>
@@ -29,6 +29,7 @@ export function TimelineAlertas({ alertas }: { alertas: Alerta[] }) {
           </View>
           <Text style={s.mensaje}>{a.mensaje}</Text>
           <Text style={s.meta}>{new Date(a.creadoEn).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · Modelo v2</Text>
+          {(onVista || onResuelta) ? <View style={s.actions}><Text onPress={()=>onVista?.(a.id)} style={s.actionLink}>Marcar vista</Text><Text onPress={()=>onResuelta?.(a.id)} style={s.actionLinkRes}>Resolver</Text></View> : null}
         </View>
       ))}
     </Card>
@@ -45,4 +46,7 @@ const s = StyleSheet.create({
   tipo: { fontSize: 10, fontWeight: '700', color: theme.colors.mutedSoft, textTransform: 'uppercase', letterSpacing: 0.6 },
   mensaje: { fontSize: 12, fontWeight: '600', color: theme.colors.text, lineHeight: 16 },
   meta: { fontSize: 10, color: theme.colors.mutedSoft },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  actionLink: { fontSize: 11, color: theme.colors.primary, fontWeight: '700' },
+  actionLinkRes: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
 });

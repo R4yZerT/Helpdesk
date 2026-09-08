@@ -139,6 +139,19 @@ export async function getCargaHoraria(client: SupabaseClient, f: DashboardFilter
   return out;
 }
 
+
+export async function generarAlertasIA(client: any): Promise<number> {
+  const { data, error } = await client.rpc('generar_alertas_ia');
+  if (error) throw new Error(error.message);
+  if (Array.isArray(data)) return Number(data[0]?.insertados ?? 0);
+  return Number((data as any)?.insertados ?? 0);
+}
+
+export async function marcarAlertaIA(client: any, id: number, estado: 'vista' | 'resuelta'): Promise<void> {
+  const { error } = await client.from('alertas_ia').update({ estado }).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 export async function listAlertasIA(client: SupabaseClient, opts: { estado?: string } = {}): Promise<AlertaIA[]> {
   let q = client.from('alertas_ia').select('id,tipo,mensaje,severidad,estado,creado_en,mesa_id').order('creado_en', { ascending: false }).limit(20);
   if (opts.estado) q = q.eq('estado', opts.estado);

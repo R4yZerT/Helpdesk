@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, fetchMesas, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function DashboardScreen() {
@@ -27,6 +27,7 @@ export function DashboardScreen() {
   const [evolucion, setEvolucion] = React.useState<any[]>([]);
   const [carga, setCarga] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
+  const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
 
   const filters: DashboardFilters = React.useMemo(() => {
     const f: DashboardFilters = {};
@@ -90,6 +91,11 @@ export function DashboardScreen() {
       downloadCsv(`dashboard-${new Date().toISOString().slice(0,10)}.csv`, csv);
     } catch (e) { console.warn('[Dashboard] export', e); }
   }, [filters, mesas]);
+  const onGenerarAlertas = React.useCallback(async () => {
+    setGenerandoAlertas(true);
+    try { await generarAlertasIA(supabase as any); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e){ console.warn('[Dashboard] generar alertas', e); } finally { setGenerandoAlertas(false); }
+  }, []);
+  const onMarcarAlerta = React.useCallback(async (id:number, estado:'vista'|'resuelta')=>{ try{ await marcarAlertaIA(supabase as any, id, estado); setAlertas(prev=>prev.filter(a=>a.id!==id)); }catch(e){ console.warn('[Dashboard] marcar alerta', e);} },[]);
 
   if (loading) {
     return (
@@ -119,7 +125,7 @@ export function DashboardScreen() {
       <AreaEvolucion data={evolucion} mesas={mesas} />
       <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
         <View style={{ flex: 7 }}><HeatmapCarga data={carga} /></View>
-        <View style={{ flex: 5 }}><TimelineAlertas alertas={alertas} /></View>
+        <View style={{ flex: 5 }}><Pressable onPress={onGenerarAlertas} disabled={generandoAlertas} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 8, alignItems: 'center', marginBottom: 8, opacity: generandoAlertas?0.6:1 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{generandoAlertas ? 'Generando…' : 'Generar alertas (IA)'}</Text></Pressable><TimelineAlertas alertas={alertas} onVista={(id)=>onMarcarAlerta(id,'vista')} onResuelta={(id)=>onMarcarAlerta(id,'resuelta')} /></View>
       </View>
     </View>
   );
