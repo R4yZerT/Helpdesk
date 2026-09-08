@@ -67,8 +67,12 @@ export function validateCreateUser(input: CreateUserInput): CreateUserErrors {
   else if (name.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
   if (!isEmail(input.email.trim())) e.email = 'Email inválido';
   if (!isCedula(input.cedula.trim())) e.cedula = 'Cédula 5-15 dígitos';
-  if (!input.password || input.password.length < 8) e.password = 'Mínimo 8 caracteres';
-  else if (input.password.length > 72) e.password = 'Máximo 72 caracteres';
+  if (!input.password) e.password = 'Contraseña requerida';
+  else {
+    const v = validatePasswordSync(input.password, { email: input.email, nombre: input.fullName, rol: input.rol });
+    if (!v.ok) e.password = v.reasons.join(' · ');
+    else if (input.password.length > 64) e.password = 'Máximo 64 caracteres';
+  }
   if (!isRolUsuario(input.rol)) e.rol = 'Rol inválido';
   if (input.mesaId !== null && (!Number.isInteger(input.mesaId) || input.mesaId <= 0)) e.mesaId = 'Mesa inválida';
   return e;
@@ -204,7 +208,10 @@ export async function createUser(
   input: CreateUserInput,
 ): Promise<{ id: string }> {
   const errs = validateCreateUser(input);
-  if (Object.keys(errs).length) throw new Error(`Validación: ${JSON.stringify(errs)}`);
+  if (Object.keys(errs).length) {
+    const msg = Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join(' · ');
+    throw new Error(msg);
+  }
 
   const payload = {
     fullName: input.fullName.trim(),
@@ -218,25 +225,47 @@ export async function createUser(
   // Intento 1: Edge Function (producción + local con service_role)
   try {
     const { data, error } = await supabase.functions.invoke('admin-create-user', { body: payload });
-    if (!error && data) {
-      const d = data as { id?: string; error?: string; details?: unknown };
-      if (d.id) return { id: d.id };
-      if (d.error) throw new Error(typeof d.details === 'object' ? `${d.error}: ${JSON.stringify(d.details)}` : d.error);
+    // Respuesta exitosa con id incluso si error es null
+    const d = (data ?? null) as { id?: string; error?: string; details?: unknown } | null;
+    if (d?.id) return { id: d.id };
+    if (d?.error) {
+      const detailsStr = d.details ? `: ${typeof d.details === 'object' ? Object.entries(d.details as Record<string,string>).map(([k,v])=> `${k}: ${v}`).join(' · ') : String(d.details)}` : '';
+      const full = `${d.error}${detailsStr}`;
+      if (/cedula/i.test(full)) throw new Error('Cédula ya registrada');
+      if (/email/i.test(full) && /registrado|duplicate|already/i.test(full)) throw new Error('Correo ya registrado');
+      throw new Error(full);
     }
-    // Si error es 404 (función no desplegada en local), caemos a fallback auth.admin
-    if (error && !/FunctionsHttpError|not found|Failed to send/i.test((error as Error).message ?? '')) {
-      const msg = (error as { message?: string }).message ?? String(error);
-      if (/already|duplicate|409/i.test(msg)) {
-        if (/cedula/i.test(msg)) throw new Error('Cédula ya registrada');
-        throw new Error('Email ya registrado');
+    if (error) {
+      const raw = (error as unknown as { message?: string; context?: unknown }).message ?? String(error);
+      // Intentar extraer body del contexto (FunctionsHttpError)
+      const ctx = (error as unknown as { context?: { json?: () => Promise<unknown> } }).context;
+      // Mensaje ya contiene posible detalle de red; solo propagar si es error de validación/duplicado
+      if (/FunctionsHttpError/i.test(raw)) {
+        // Edge devolvió 4xx: el body ya se intentó leer vía data; si llegamos aquí, falló parseo -> intentar lanzar raw
+        // Si es 404/not found, caer a fallback
+        if (/not found|Failed to send/i.test(raw)) {
+          // caer a fallback
+        } else {
+          // extraer si el error contiene cedula/email en el mensaje envoltorio
+          if (/cedula/i.test(raw)) throw new Error('Cédula ya registrada');
+          if (/email.*registrado|already.*exists/i.test(raw)) throw new Error('Correo ya registrado');
+          throw new Error(raw);
+        }
+      } else {
+        if (/cedula/i.test(raw)) throw new Error('Cédula ya registrada');
+        if (/email/i.test(raw) && /registrado|duplicate|already/i.test(raw)) throw new Error('Correo ya registrado');
+        if (!/Failed to send a request to the Edge Function/i.test(raw)) throw new Error(raw);
       }
-      // Si es validación 400 con details, ya se manejó arriba; si no, re-throw
-      if (!/Failed to send a request to the Edge Function/i.test(msg)) throw new Error(msg);
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (/Validación|Email ya registrado|Solo administrador|Token inválido/i.test(msg)) throw e;
+    if (/Cédula ya registrada|Correo ya registrado|Validación|Solo administrador|Token inválido|Mínimo|Máximo|Contraseña|Email inválido|Cédula 5-15/i.test(msg)) throw e;
     // network / not-found -> intentar fallback
+    if (/Failed to send|not found|FunctionsHttpError/i.test(msg)) {
+      // caer a fallback silencioso
+    } else {
+      throw e;
+    }
   }
 
   // Intento 2: auth.admin.createUser (solo si supabase client tiene service_role, ej: tests / supa local con key directa)
@@ -272,7 +301,10 @@ export async function updateUser(
   patch: UpdateUserInput,
 ): Promise<void> {
   const errs = validateUpdateUser(patch);
-  if (Object.keys(errs).length) throw new Error(`Validación: ${JSON.stringify(errs)}`);
+  if (Object.keys(errs).length) {
+    const msg = Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join(' · ');
+    throw new Error(msg);
+  }
   // Si cambia email, cedula o password, intentar vía Edge Function admin-update-user / auth.admin
   if (patch.email !== undefined || patch.cedula !== undefined || patch.password !== undefined) {
     const authPatch: Record<string, string> = {};
@@ -282,24 +314,51 @@ export async function updateUser(
     // Intento Edge Function (service_role)
     try {
       const { data, error } = await supabase.functions.invoke('admin-update-user', { body: { id, ...authPatch } });
-      if (!error && data) {
-        const d = data as { error?: string };
-        if (d.error) throw new Error(d.error);
-      } else if (error && !/FunctionsHttpError|not found|Failed to send/i.test((error as Error).message ?? '')) {
-        throw error;
-      } else {
-        // Fallback directo auth.admin si está disponible (tests / local service_role)
+      const d = (data ?? null) as { error?: string; details?: unknown } | null;
+      if (d?.error) {
+        const detailsStr = (d as unknown as { details?: unknown }).details ? `: ${typeof (d as unknown as { details?: unknown }).details === 'object' ? JSON.stringify((d as unknown as { details: unknown }).details) : String((d as unknown as { details: unknown }).details)}` : '';
+        const full = `${d.error}${detailsStr}`;
+        if (/cedula/i.test(full)) throw new Error('Cédula ya registrada');
+        if (/email/i.test(full) && /registrado|duplicate|already/i.test(full)) throw new Error('Correo ya registrado');
+        throw new Error(full);
+      }
+      if (error) {
+        const raw = (error as unknown as { message?: string }).message ?? String(error);
+        if (/FunctionsHttpError/i.test(raw)) {
+          if (/not found|Failed to send/i.test(raw)) {
+            // fallback a auth.admin
+            const adminAny = (supabase.auth as unknown as { admin?: { updateUserById: (uid: string, p: unknown) => Promise<{ error: { message: string } | null }> } }).admin;
+            if (adminAny?.updateUserById) {
+              const { error: admErr } = await adminAny.updateUserById(id, authPatch);
+              if (admErr) {
+                if (/cedula/i.test(admErr.message)) throw new Error('Cédula ya registrada');
+                if (/duplicate|already/i.test(admErr.message) && /email/i.test(admErr.message)) throw new Error('Correo ya registrado');
+                throw new Error(admErr.message);
+              }
+            }
+          } else {
+            if (/cedula/i.test(raw)) throw new Error('Cédula ya registrada');
+            if (/email.*registrado|already.*exists/i.test(raw)) throw new Error('Correo ya registrado');
+            throw new Error(raw);
+          }
+        } else {
+          throw new Error(raw);
+        }
+      } else if (!d) {
+        // error null pero data null -> intentar fallback si existe admin
         const adminAny = (supabase.auth as unknown as { admin?: { updateUserById: (uid: string, p: unknown) => Promise<{ error: { message: string } | null }> } }).admin;
-        if (adminAny?.updateUserById) {
+        if (adminAny?.updateUserById && /Failed to send|not found/i.test(String(error ?? ''))) {
           const { error: admErr } = await adminAny.updateUserById(id, authPatch);
           if (admErr) throw new Error(admErr.message);
         }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/Validación/i.test(msg)) throw e;
-      // Si falla Edge/auth pero solo era email/password, propagar; si hay además cambios de profile, continuar con profile update
+      if (/Cédula ya registrada|Correo ya registrado|Contraseña|Email inválido|Cédula 5-15|Mínimo|Máximo/i.test(msg)) throw e;
+      // Si falla Edge/auth pero solo era email/password/cedula, propagar; si hay además cambios de profile, continuar con profile update
       if (patch.fullName === undefined && patch.rol === undefined && patch.mesaId === undefined && patch.activo === undefined) throw e;
+      // caso mixto: log pero continuar para actualizar otros campos de profile
+      console.warn('[updateUser] edge/auth fallback falló, continuando con profile update:', msg);
     }
   }
   const payload: Record<string, unknown> = {};
@@ -313,7 +372,12 @@ export async function updateUser(
   if (Object.keys(payload).length === 0) return;
   payload.actualizado_en = new Date().toISOString();
   const { error } = await supabase.from('profiles').update(payload).eq('id', id);
-  if (error) throw error;
+  if (error) {
+    const m = error.message ?? String(error);
+    if (/duplicate|unique/i.test(m) && /cedula/i.test(m)) throw new Error('Cédula ya registrada');
+    if (/duplicate|unique/i.test(m) && /email/i.test(m)) throw new Error('Correo ya registrado');
+    throw error;
+  }
 }
 
 export async function setUserActivo(supabase: SupabaseClient, id: string, activo: boolean): Promise<void> {
