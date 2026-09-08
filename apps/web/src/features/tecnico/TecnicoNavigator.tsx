@@ -77,8 +77,8 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
         <View style={w.main}>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={screenOpts}>
-              <Stack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
-              <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
+              <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
+              <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
               <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
             </Stack.Navigator>
           </View>
@@ -135,8 +135,8 @@ export function TecnicoNavigator() {
   // native: stack simple (tabs previstos)
   return (
     <Stack.Navigator screenOptions={screenOpts}>
-      <Stack.Screen name="Bandeja" options={{ title: 'Bandeja (RF-12)' }} component={BandejaTecnicoScreen} />
-      <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
+      <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
+      <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} />
       <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
     </Stack.Navigator>
   );

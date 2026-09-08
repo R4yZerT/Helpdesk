@@ -3,8 +3,9 @@
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal } from '@helpdesk/shared';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
 
@@ -23,6 +24,8 @@ function getErrorMessage(e: unknown): string {
 export function AdminMesasScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
+  const { profile } = useAuth();
+  const secretariaId = (profile as unknown as { mesa_id?: number | null; mesaId?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
   const [q, setQ] = useState('');
   const [qDeb, setQDeb] = useState('');
   const [activa, setActiva] = useState<boolean | 'todos'>('todos');
@@ -62,6 +65,7 @@ export function AdminMesasScreen() {
         activa: activa as never,
         page: targetPage + 1,
         pageSize: PAGE_SIZE,
+        secretariaId: secretariaId ?? undefined,
       });
       setTotal(res.count);
       setHasMore(res.data.length === PAGE_SIZE);
@@ -74,7 +78,7 @@ export function AdminMesasScreen() {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [qDeb, activa]);
+  }, [qDeb, activa, secretariaId]);
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
 
@@ -156,12 +160,12 @@ export function AdminMesasScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR · RF-29 / RF-30</Text></View>
+        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR</Text></View>
         <View style={s.headerRow}>
-        <Text style={s.h1}>DEPENDENCIAS · {total}</Text>
+        <Text style={s.h1}>Dependencias</Text>
         <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>
         </View>
-        <Text style={s.subtitle}>CREAR Y GESTIONAR DEPENDENCIAS. VER TODAS LAS DEPENDENCIAS Y SU CONFIGURACIÓN (RF-30). REQUIERE ROL ADMINISTRADOR (RLS mesa:write).</Text>
+        <Text style={s.subtitle}>Crea y gestiona dependencias.{secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}</Text>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
       </View>
 
@@ -171,19 +175,15 @@ export function AdminMesasScreen() {
           <TextInput value={q} onChangeText={setQ} placeholder="BUSCAR POR NOMBRE…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
         </View>
-        <View style={s.chipsBlock}>
-          <Text style={s.chipsLabel}>ESTADO</Text>
-          <View style={s.chipsRow}>
-            {(['todos', true, false] as const).map((v) => (
-              <Pressable key={String(v)} onPress={() => setActiva(v as never)} style={[s.chip, activa === v && s.chipActive]} accessibilityState={{ selected: activa === v }}>
-                <Text style={[s.chipText, activa === v && s.chipTextActive]}>{v === 'todos' ? 'Todas' : v ? 'Activas' : 'Inactivas'}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
+        <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
         <View style={s.filterFooter}>
-          <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
+          <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''} · Pág. {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters} style={s.linkBtn}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
+        </View>
+        <View style={s.paginationRow}>
+          <Pressable disabled={page === 0} onPress={() => fetchPage(page - 1, { reset: true })} style={[s.pageBtn, page === 0 && s.pageBtnDisabled]}><Text style={s.pageBtnText}>← Anterior</Text></Pressable>
+          <Text style={s.pageInfo}>Página {page + 1} de {Math.max(1, Math.ceil(total / PAGE_SIZE))} · {total} total</Text>
+          <Pressable disabled={!hasMore} onPress={() => fetchPage(page + 1)} style={[s.pageBtn, !hasMore && s.pageBtnDisabled]}><Text style={s.pageBtnText}>Siguiente →</Text></Pressable>
         </View>
       </View>
 
@@ -205,7 +205,7 @@ export function AdminMesasScreen() {
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={s.modalBackdrop}>
           <View style={s.modalCard}>
-            <Text style={s.modalTitle}>NUEVA DEPENDENCIA · RF-29</Text>
+            <Text style={s.modalTitle}>NUEVA DEPENDENCIA</Text>
             <Text style={s.modalHint}>NOMBRE ÚNICO, 3–60 CARACTERES. RLS: SOLO ADMINISTRADOR.</Text>
             <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="NOMBRE (EJ: OFICINA TIC) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
             {formError ? <Text style={s.error}>{formError}</Text> : null}
@@ -265,6 +265,11 @@ const s = StyleSheet.create({
   chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
   chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
   filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.colors.border },
+  paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.colors.border, marginTop: 4 },
+  pageBtn: { paddingHorizontal: 12, height: 32, borderRadius: 999, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  pageBtnDisabled: { opacity: 0.45 },
+  pageBtnText: { fontSize: 11, fontWeight: '700', color: theme.colors.textSoft },
+  pageInfo: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
   filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
   linkBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   linkText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },

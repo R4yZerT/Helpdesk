@@ -138,7 +138,7 @@ export function AdminCategoriasScreen() {
   return (
     <View style={s.wrap}>
       <View style={s.header}>
-        <View style={s.headerRow}><Text style={s.h1}>Categorías · {total}</Text>
+        <View style={s.headerRow}><Text style={s.h1}>Categorías</Text>
           <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary}><Text style={s.btnPrimaryText}>+ Nueva categoría</Text></Pressable>
         </View>
         <Text style={s.subtitle}>Administra categorías maestras por dominio (tic, comunicaciones, infraestructura, general). Únicas por dominio.</Text>

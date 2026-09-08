@@ -61,12 +61,12 @@ function JefeNavigator() {
   return (
     <JefeStack.Navigator screenOptions={{ headerShown: false }}>
       <JefeStack.Screen name="Dashboard" component={DashboardScreen} />
-      <JefeStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud (RF-06)' }} component={CreateTicketScreen} />
-      <JefeStack.Screen name="Reportes" options={{ title: 'Reportes (RF-18)' }}>
-        {() => <Placeholder title="Reportes" subtitle="RF-18 exportación PDF/CSV" />}
+      <JefeStack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} />
+      <JefeStack.Screen name="Reportes" options={{ title: 'Reportes' }}>
+        {() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}
       </JefeStack.Screen>
-      <JefeStack.Screen name="Alertas" options={{ title: 'Alertas IA (RF-24)' }}>
-        {() => <Placeholder title="Alertas IA" subtitle="RF-24 anomalías y picos" />}
+      <JefeStack.Screen name="Alertas" options={{ title: 'Alertas IA' }}>
+        {() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}
       </JefeStack.Screen>
     </JefeStack.Navigator>
   );

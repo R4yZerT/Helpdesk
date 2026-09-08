@@ -109,7 +109,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
     <View style={s.wrap}>
       <View style={s.header}>
         <Text style={s.kicker}>Técnico · Orden prioridad → antigüedad</Text>
-        <Text style={s.h1}>Bandeja asignada · {total}</Text>
+        <Text style={s.h1}>Bandeja asignada</Text>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
           <TextInput value={q} onChangeText={setQ} placeholder="Buscar en asunto…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar bandeja" />

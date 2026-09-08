@@ -157,7 +157,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
           {PRIORIDADES.map((p) => <Chip key={p} label={p} active={prioridad === p} onPress={() => setPrioridad(p as PrioridadTicket)} />)}
         </View>
 
-        <Text style={s.filterLabel}>Filtros extra (RF-08)</Text>
+        <Text style={s.filterLabel}>Filtros extra</Text>
         <View style={s.extraRow}>
           <TextInput value={numeroStr} onChangeText={setNumeroStr} placeholder="# número" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
           <TextInput value={String(categoriaId)} onChangeText={(v) => setCategoriaId(v ? (parseInt(v,10)||'' as unknown as number) : '')} placeholder="categoría ID" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />

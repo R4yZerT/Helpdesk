@@ -1,8 +1,8 @@
-// Edge Function: admin-create-user — RF-27 cierre + cédula
+// Edge Function: admin-create-user — cierre + cédula
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 
-const ALLOWED_ROLES_DB = new Set(['empleado', 'tecnico', 'jefe', 'administrador']);
-const MAP_ROL: Record<string, string> = { usuario: 'empleado', empleado: 'empleado', tecnico: 'tecnico', jefe: 'jefe', administrador: 'administrador' };
+const ALLOWED_ROLES_DB = new Set(['usuario', 'tecnico', 'jefe', 'administrador']);
+const MAP_ROL: Record<string, string> = { usuario: 'usuario', empleado: 'usuario', tecnico: 'tecnico', jefe: 'jefe', administrador: 'administrador' };
 
 function corsHeaders(origin?: string): Record<string, string> {
   return {

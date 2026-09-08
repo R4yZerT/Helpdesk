@@ -11,6 +11,8 @@ export type { TicketCategoria, Mesa, Ticket, TicketEstado, TicketComentario, Tic
 export { PRIORIDADES, ESTADOS, isPrioridadTicket, isEstadoTicket, validateCreateTicket, isCreateTicketValid, validateComentario, validateAdjunto, validateAdjuntos, ADJUNTO_MAX_BYTES, ADJUNTO_MAX_COUNT, ADJUNTO_ALLOWED_MIMES, fetchCategorias, fetchMesas, createTicket, listMyTickets, getTicketDetail, fetchAdjuntos, addComentario, updateTicket, cancelTicket, transitionTicket, canTransition, reassignTicket, listAssignedTickets, PRIORIDAD_PESO, validateUpdateTicket } from './tickets.js';
 export * from './ui/theme.js';
 export * from './ui/components.js';
+export * from './ui/FilterDropdown.js';
+export * from './filters.js';
 export * from './ui/layout/AppShell.js';
 export * from './ui/layout/TopBar.js';
 export * from './ui/layout/FilterBar.js';

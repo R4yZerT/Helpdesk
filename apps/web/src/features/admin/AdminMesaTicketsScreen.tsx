@@ -75,7 +75,7 @@ export function AdminMesaTicketsScreen() {
     <View style={s.wrap}>
       <View style={s.header}>
         <View style={s.kickerRow}><View style={s.kickerDot}/><Text style={s.kicker}>ADMINISTRADOR · MESA #{mesaId}</Text></View>
-        <Text style={s.h1}>MESAS · {total}</Text>
+        <Text style={s.h1}>Mesas</Text>
         <Text style={s.subtitle}>TICKETS DE TU DEPENDENCIA (MESA {mesaId}). SOLO VES TICKETS DE TU DEPENDENCIA. ASIGNA A TÉCNICO DE LA MISMA DEPENDENCIA.</Text>
         {errorMsg? <Text style={s.error}>{errorMsg}</Text>:null}
       </View>

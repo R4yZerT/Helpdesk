@@ -40,6 +40,7 @@ export type ListMesasParams = {
   activa?: boolean | 'todos';
   page?: number; // 1-indexed
   pageSize?: number; // default 20
+  secretariaId?: number; // si admin tiene dependencia asignada, solo esa mesa
 };
 
 export async function listMesasPaginated(
@@ -53,6 +54,7 @@ export async function listMesasPaginated(
   let q = supabase.from('mesas').select('id, nombre, activa', { count: 'exact' });
   if (params.search?.trim()) q = q.ilike('nombre', `%${params.search.trim()}%`);
   if (typeof params.activa === 'boolean') q = q.eq('activa', params.activa);
+  if (params.secretariaId != null) q = q.eq('id', params.secretariaId);
   q = q.order('nombre', { ascending: true }).range(from, to);
   const { data, error, count } = await q;
   if (error) throw error;
