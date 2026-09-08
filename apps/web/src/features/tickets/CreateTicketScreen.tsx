@@ -1,11 +1,13 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere categoría → prioridad bloqueada por categoría
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
   createTicket,
   fetchCategorias,
   fetchMesas,
   validateCreateTicket,
+  validateAdjunto,
+  ADJUNTO_MAX_COUNT,
   getPrioridadPorCategoria,
   getMesaIdPorDominio,
   classifyLocal,
@@ -38,6 +40,10 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const [sugerencia, setSugerencia] = useState<Clasificacion | null>(null);
   const [iaLoading, setIaLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
+  const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoadingCats(true);
@@ -91,6 +97,32 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     return msg;
   };
 
+  const showAlert = (title: string, msg: string, onOk?: () => void) => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(`${title}: ${msg}`);
+      onOk?.();
+    } else {
+      Alert.alert(title, msg, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
+    }
+  };
+
+  const onPickFiles = (files: FileList | null) => {
+    if (!files) return;
+    setAdjuntoError(null);
+    const arr = Array.from(files);
+    if (adjuntos.length + arr.length > ADJUNTO_MAX_COUNT) {
+      setAdjuntoError(`Máximo ${ADJUNTO_MAX_COUNT} archivos`);
+      return;
+    }
+    const next: typeof adjuntos = [...adjuntos];
+    for (const f of arr) {
+      const err = validateAdjunto({ name: f.name, size: f.size, type: f.type });
+      if (err) { setAdjuntoError(`${f.name}: ${err}`); return; }
+      next.push({ name: f.name, size: f.size, type: f.type || 'image/jpeg', file: f });
+    }
+    setAdjuntos(next);
+  };
+
   const onSelectCategoria = (c: TicketCategoria) => {
     setForm(f => ({
       ...f,
@@ -113,27 +145,45 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   };
 
   const onSubmit = async () => {
+    setSubmitError(null);
     const errs = validateCreateTicket(form);
     setErrors(errs);
     setTouched({ categoriaId: true, asunto: true, descripcion: true, prioridad: true, mesaId: true });
-    if (Object.keys(errs).length > 0) return;
+    if (Object.keys(errs).length > 0) {
+      setSubmitError(Object.values(errs)[0] ?? 'Revisa los campos marcados');
+      return;
+    }
     setSubmitting(true);
     try {
+      console.log('[CreateTicket] submit', form);
       const res = await createTicket(supabase, form);
-      Alert.alert('Solicitud creada', `Ticket #${res.numero} creado correctamente`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
-            setErrors({});
-            setTouched({});
-            setSugerencia(null);
-            navigation?.goBack?.();
-          },
-        },
-      ]);
+      // Subir adjuntos si hay (RF-07) — no bloquea éxito del ticket si falla
+      if (adjuntos.length) {
+        for (const a of adjuntos) {
+          try {
+            const path = `${res.id}/${Date.now()}-${a.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+            const { error: upErr } = await supabase.storage.from('ticket-adjuntos').upload(path, a.file, { contentType: a.type, upsert: false });
+            if (upErr) throw upErr;
+            const { error: insErr } = await supabase.from('ticket_adjuntos').insert({ ticket_id: res.id, storage_path: path, nombre_original: a.name, mime: a.type, tamano_bytes: a.size, subido_por: (await supabase.auth.getUser()).data.user?.id });
+            if (insErr) throw insErr;
+          } catch (upE) {
+            console.warn('[CreateTicket] adjunto fail', a.name, upE);
+          }
+        }
+      }
+      showAlert('Solicitud creada', `Ticket #${res.numero} creado correctamente`, () => {
+        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
+        setAdjuntos([]);
+        setErrors({});
+        setTouched({});
+        setSugerencia(null);
+        navigation?.goBack?.();
+      });
     } catch (e) {
-      Alert.alert('Error al crear', humanizeError(e instanceof Error ? e.message : String(e)));
+      const msg = humanizeError(e instanceof Error ? e.message : String(e));
+      console.error('[CreateTicket] error', e);
+      setSubmitError(msg);
+      showAlert('Error al crear', msg);
     } finally {
       setSubmitting(false);
     }
@@ -277,14 +327,14 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
 
           <Divider />
 
-          {/* Dependencia auto-derivada */}
+          {/* Dependencia auto-derivada — grid 3+3 uniforme */}
           <Text style={s.sectionTitle}>Dependencia (mesa) *</Text>
           <Text style={s.sectionHint}>Se asigna según dominio de la categoría. Puedes ajustarla si aplica.</Text>
           <View style={s.mesaGrid}>
-            {mesas.slice(0, 4).map((m) => {
+            {mesas.map((m) => {
               const active = form.mesaId === m.id;
               return (
-                <Pressable key={m.id} onPress={() => setForm((f) => ({ ...f, mesaId: m.id }))} style={[s.mesaCard, active && s.mesaCardActive]}>
+                <Pressable key={m.id} onPress={() => setForm((f) => ({ ...f, mesaId: m.id }))} style={[s.mesaCard, active && s.mesaCardActive]} accessibilityRole="button" accessibilityLabel={`Mesa ${m.nombre}`}>
                   <View style={[s.mesaDot, active && s.mesaDotActive]}><Text style={[s.mesaDotText, active && { color: '#fff' }]}>◈</Text></View>
                   <Text style={[s.mesaName, active && s.mesaNameActive]}>{m.nombre}</Text>
                   {active ? <Text style={s.mesaCheck}>✓</Text> : null}
@@ -292,15 +342,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               );
             })}
           </View>
-          {mesas.length > 4 ? (
-            <View style={s.chips}>
-              {mesas.slice(4).map((m) => (
-                <Pressable key={m.id} onPress={() => setForm((f) => ({ ...f, mesaId: m.id }))} style={[s.chip, form.mesaId === m.id && s.chipActive]}>
-                  <Text style={[s.chipText, form.mesaId === m.id && s.chipTextActive]}>{m.nombre}</Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 
           <Divider />
@@ -316,13 +357,36 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </View>
           {touched.prioridad && errors.prioridad ? <Text style={s.error}>{errors.prioridad}</Text> : null}
 
-          {/* Adjuntos RF-07 solo imágenes */}
-          <View style={s.dropZone}>
+          {/* Adjuntos RF-07 solo imágenes — clic abre picker */}
+          <Pressable onPress={() => (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.()} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar imágenes adjuntas">
             <Text style={s.dropIcon}>⤒</Text>
-            <Text style={s.dropTitle}>Adjuntos (opcional)</Text>
-            <Text style={s.dropSub}>Solo imágenes JPG/PNG/WebP/GIF · 10 MB máx · 5 máx</Text>
+            <Text style={s.dropTitle}>Adjuntos (opcional) — tocar para cargar</Text>
+            <Text style={s.dropSub}>Solo imágenes JPG/PNG/WebP/GIF · 10 MB máx · 5 máx {adjuntos.length ? `· ${adjuntos.length} seleccionado(s)` : ''}</Text>
+          </Pressable>
+          {/* input web nativo oculto */}
+          <View style={{ display: 'none' } as unknown as object}>
+            {/* @ts-ignore web only */}
+            <input
+              ref={fileInputRef as unknown as never}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
+              onChange={(e: { target: { files: FileList | null; value: string } }) => { onPickFiles(e.target.files); e.target.value = ''; }}
+            />
           </View>
+          {adjuntoError ? <Text style={s.error}>{adjuntoError}</Text> : null}
+          {adjuntos.length ? (
+            <View style={s.adjList}>
+              {adjuntos.map((a, i) => (
+                <View key={`${a.name}-${i}`} style={s.adjRow}>
+                  <Text style={s.adjName} numberOfLines={1}>{a.name} · {(a.size/1024).toFixed(0)} KB</Text>
+                  <Pressable onPress={() => setAdjuntos(prev => prev.filter((_, idx) => idx !== i))} style={s.adjRemove}><Text style={s.adjRemoveText}>Quitar</Text></Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
+          {submitError ? <View style={s.alertErr}><Text style={s.alertErrText}>{submitError}</Text></View> : null}
           {/* Acciones */}
           <View style={s.actions}>
             <Pressable onPress={() => navigation?.goBack?.()} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar y volver</Text></Pressable>
@@ -393,7 +457,7 @@ const s = StyleSheet.create({
   chipTextActive: { color: '#fff' },
   chipSugBadge: { fontSize:9, fontWeight:'800', color: theme.colors.primary, marginLeft:4 },
   mesaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  mesaCard: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, minWidth: 140, flex: 1 },
+  mesaCard: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, width: '31%' as unknown as number, minWidth: 140, flexGrow: 0, flexShrink: 0 },
   mesaCardActive: { backgroundColor: '#EFF6FF', borderColor: theme.colors.primary, borderWidth: 2 },
   mesaDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border },
   mesaDotActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
@@ -405,6 +469,13 @@ const s = StyleSheet.create({
   prioLockedBox: { backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor:theme.colors.border, borderRadius:12, padding:12, gap:2 },
   prioLockedText: { fontSize:12, fontWeight:'700', color:theme.colors.textSoft },
   prioLockedSub: { fontSize:11, color:theme.colors.muted, lineHeight:16 },
+  alertErr: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, padding: 10 },
+  alertErrText: { color: '#991B1B', fontSize: 12, fontWeight: '700' },
+  adjList: { gap: 6 },
+  adjRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  adjName: { fontSize: 11, color: theme.colors.textSoft, flex: 1, fontWeight: '600' },
+  adjRemove: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
+  adjRemoveText: { fontSize: 10, color: theme.colors.danger, fontWeight: '700' },
   dropZone: { borderWidth: 2, borderColor: theme.colors.borderStrong, borderStyle: 'dashed', borderRadius: 12, backgroundColor: '#F8FAFC', padding: 18, alignItems: 'center', gap: 4 },
   dropIcon: { fontSize: 18, color: theme.colors.mutedSoft },
   dropTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.textSoft },
