@@ -4,6 +4,7 @@ import type { RolUsuario } from './types.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Mesa } from './tickets.js';
 import { ROLES, isRolUsuario } from './roles.js';
+import { validatePasswordSync } from './password.js';
 
 // La DB usa 'empleado' pero la app usa 'usuario' (compatibilidad histórica)
 // Reusa ROLES de roles.ts; aquí solo mapeo DB<->app
@@ -39,6 +40,8 @@ export type CreateUserInput = {
 
 export type UpdateUserInput = {
   fullName?: string;
+  email?: string;
+  password?: string;
   rol?: RolUsuario;
   mesaId?: number | null;
   activo?: boolean;
@@ -70,6 +73,11 @@ export function validateUpdateUser(input: UpdateUserInput): UpdateUserErrors {
     const n = input.fullName.trim();
     if (n.length < 3) e.fullName = 'Nombre mínimo 3 caracteres';
     else if (n.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
+  }
+  if (input.email !== undefined && !isEmail(input.email.trim())) e.email = 'Email inválido';
+  if (input.password !== undefined) {
+    const v = validatePasswordSync(input.password, { email: input.email, nombre: input.fullName, rol: input.rol });
+    if (!v.ok) e.password = v.reasons[0] ?? 'Contraseña no cumple requisitos';
   }
   if (input.rol !== undefined && !isRolUsuario(input.rol)) e.rol = 'Rol inválido';
   if (input.mesaId !== undefined && input.mesaId !== null && (!Number.isInteger(input.mesaId) || input.mesaId <= 0))
@@ -247,11 +255,41 @@ export async function updateUser(
 ): Promise<void> {
   const errs = validateUpdateUser(patch);
   if (Object.keys(errs).length) throw new Error(`Validación: ${JSON.stringify(errs)}`);
+  // Si cambia email o password, intentar vía Edge Function admin-update-user / auth.admin
+  if (patch.email !== undefined || patch.password !== undefined) {
+    const authPatch: Record<string, string> = {};
+    if (patch.email !== undefined) authPatch.email = patch.email.trim();
+    if (patch.password !== undefined) authPatch.password = patch.password;
+    // Intento Edge Function (service_role)
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-update-user', { body: { id, ...authPatch } });
+      if (!error && data) {
+        const d = data as { error?: string };
+        if (d.error) throw new Error(d.error);
+      } else if (error && !/FunctionsHttpError|not found|Failed to send/i.test((error as Error).message ?? '')) {
+        throw error;
+      } else {
+        // Fallback directo auth.admin si está disponible (tests / local service_role)
+        const adminAny = (supabase.auth as unknown as { admin?: { updateUserById: (uid: string, p: unknown) => Promise<{ error: { message: string } | null }> } }).admin;
+        if (adminAny?.updateUserById) {
+          const { error: admErr } = await adminAny.updateUserById(id, authPatch);
+          if (admErr) throw new Error(admErr.message);
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/Validación/i.test(msg)) throw e;
+      // Si falla Edge/auth pero solo era email/password, propagar; si hay además cambios de profile, continuar con profile update
+      if (patch.fullName === undefined && patch.rol === undefined && patch.mesaId === undefined && patch.activo === undefined) throw e;
+    }
+  }
   const payload: Record<string, unknown> = {};
   if (patch.fullName !== undefined) payload.full_name = patch.fullName.trim();
   if (patch.rol !== undefined) payload.rol = mapRolToDb(patch.rol);
   if (patch.mesaId !== undefined) payload.mesa_id = patch.mesaId;
   if (patch.activo !== undefined) payload.activo = patch.activo;
+  // Si solo era cambio de auth (email/password) sin campos de profile, no hacer update vacío
+  if (Object.keys(payload).length === 0) return;
   payload.actualizado_en = new Date().toISOString();
   const { error } = await supabase.from('profiles').update(payload).eq('id', id);
   if (error) throw error;
