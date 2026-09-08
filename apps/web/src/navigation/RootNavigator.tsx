@@ -6,6 +6,9 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
+import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
+import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
+import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
@@ -27,13 +30,25 @@ function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) 
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const JefeStack = createNativeStackNavigator<JefeStackParamList>();
+const RootStack = createNativeStackNavigator();
 
 function AuthNavigator() {
   return (
     <AuthStack.Navigator>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar contraseña', headerShown: false }} />
+      <AuthStack.Screen name="UpdatePassword" component={UpdatePasswordScreen} options={{ title: 'Nueva contraseña', headerShown: false }} />
     </AuthStack.Navigator>
   );
+}
+
+function RoleNavigator() {
+  const { profile } = useAuth();
+  if (!profile) return null;
+  if (profile.rol === 'usuario') return <UsuarioNavigator />;
+  if (profile.rol === 'tecnico') return <TecnicoNavigator />;
+  if (profile.rol === 'jefe') return <JefeNavigator />;
+  return <AdminNavigator />;
 }
 
 function EmpleadoNavigator() {
@@ -73,17 +88,16 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {!session || !profile ? (
-        <AuthNavigator />
-      ) : profile.rol === 'usuario' ? (
-        <UsuarioNavigator />
-      ) : profile.rol === 'tecnico' ? (
-        <TecnicoNavigator />
-      ) : profile.rol === 'jefe' ? (
-        <JefeNavigator />
-      ) : (
-        <AdminNavigator />
-      )}
+      <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        {!session || !profile ? (
+          <RootStack.Screen name="Auth" component={AuthNavigator} />
+        ) : (
+          <>
+            <RootStack.Screen name="App" component={RoleNavigator} />
+            <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
+          </>
+        )}
+      </RootStack.Navigator>
     </NavigationContainer>
   );
 }

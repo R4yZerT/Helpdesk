@@ -2,6 +2,14 @@
 
 export type AuthStackParamList = {
   Login: undefined;
+  ForgotPassword: undefined;
+  UpdatePassword: undefined;
+};
+
+export type RootStackParamList = {
+  Auth: undefined;
+  App: undefined;
+  ChangePassword: undefined;
 };
 
 export type UsuarioStackParamList = {
