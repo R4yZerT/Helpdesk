@@ -471,8 +471,13 @@ export async function transitionTicket(
 ): Promise<Ticket> {
   if (!ticketId) throw new Error('ticketId requerido');
   if (!isEstadoTicket(nuevoEstado)) throw new Error('Estado inválido');
-  // Validar solución requerida para solucionado/cerrado si se aporta comentario
-  if ((nuevoEstado === 'solucionado' || nuevoEstado === 'cerrado') && opts?.solucionAplicada !== undefined) {
+  // RF-11 — solución aplicada requerida para solucionado/cerrado (dato clave IA)
+  if (nuevoEstado === 'solucionado' || nuevoEstado === 'cerrado') {
+    const s = (opts?.solucionAplicada ?? '').trim();
+    if (!s) throw new Error('Solución aplicada requerida para ' + nuevoEstado + ' (mín. 5 caracteres)');
+    if (s.length < 5) throw new Error('Solución mínimo 5 caracteres');
+    if (s.length > 5000) throw new Error('Solución máximo 5000 caracteres');
+  } else if (opts?.solucionAplicada !== undefined) {
     const s = opts.solucionAplicada.trim();
     if (s.length > 0 && s.length < 5) throw new Error('Solución mínimo 5 caracteres');
     if (s.length > 5000) throw new Error('Solución máximo 5000 caracteres');

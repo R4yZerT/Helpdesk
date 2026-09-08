@@ -11,8 +11,16 @@ export function DashboardScreen() {
   const isWide = width >= 1024;
 
   const [range, setRange] = React.useState<FilterRange>('30d');
+  const [customDesde, setCustomDesde] = React.useState('');
+  const [customHasta, setCustomHasta] = React.useState('');
   const [mesaIds, setMesaIds] = React.useState<number[]>([]);
   const [mesas, setMesas] = React.useState<{ id: number; nombre: string }[]>([]);
+  const [categorias, setCategorias] = React.useState<{ id: number; nombre: string }[]>([]);
+  const [tecnicos, setTecnicos] = React.useState<{ id: string; nombre: string }[]>([]);
+  const [estado, setEstado] = React.useState('');
+  const [prioridad, setPrioridad] = React.useState('');
+  const [categoriaId, setCategoriaId] = React.useState<number | ''>('');
+  const [tecnicoId, setTecnicoId] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
   const [kpis, setKpis] = React.useState<any>(null);
@@ -25,12 +33,20 @@ export function DashboardScreen() {
   const filters: DashboardFilters = React.useMemo(() => {
     const f: DashboardFilters = {};
     if (mesaIds.length) f.mesaIds = mesaIds;
+    if (categoriaId !== '') f.categoriaId = categoriaId as number;
+    if (estado) f.estado = estado as any;
+    if (prioridad) f.prioridad = prioridad as any;
+    if (tecnicoId) f.tecnicoId = tecnicoId;
     const now = new Date();
     if (range === 'hoy') f.desde = new Date(now.setHours(0, 0, 0, 0)).toISOString();
     else if (range === '7d') { const d = new Date(); d.setDate(d.getDate() - 7); f.desde = d.toISOString(); }
     else if (range === '30d') { const d = new Date(); d.setDate(d.getDate() - 30); f.desde = d.toISOString(); }
+    else if (range === 'custom') {
+      if (customDesde) f.desde = new Date(customDesde).toISOString();
+      if (customHasta) { const h = new Date(customHasta); h.setHours(23, 59, 59, 999); f.hasta = h.toISOString(); }
+    }
     return f;
-  }, [range, mesaIds]);
+  }, [range, mesaIds, categoriaId, estado, prioridad, tecnicoId, customDesde, customHasta]);
 
   const load = React.useCallback(async () => {
     try {
@@ -51,8 +67,14 @@ export function DashboardScreen() {
   }, [filters, mesas.length]);
 
   React.useEffect(() => { setLoading(true); load(); }, [load]);
-  React.useEffect(() => { // initial mesas
+  React.useEffect(() => { // initial mesas + categorías + técnicos
     fetchMesas(supabase).then(setMesas).catch(() => {});
+    (supabase.from('ticket_categories').select('id,nombre').eq('activa', true).order('nombre') as any).then(({ data }: any) => {
+      if (data) setCategorias(data.map((c: any) => ({ id: c.id, nombre: c.nombre })));
+    }).catch(() => {});
+    (supabase.from('usuarios').select('id,nombre,rol').in('rol', ['tecnico', 'jefe']).order('nombre') as any).then(({ data }: any) => {
+      if (data) setTecnicos(data.map((u: any) => ({ id: u.id, nombre: u.nombre })));
+    }).catch(() => {});
   }, []);
 
   const onToggleMesa = (id: number) => setMesaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -121,7 +143,18 @@ export function DashboardScreen() {
     <AppShell
       sidebar={sidebar}
       topBar={<TopBar />}
-      filterBar={<FilterBar range={range} onRangeChange={setRange} mesaIds={mesaIds} onToggleMesa={onToggleMesa} mesas={mesas} onExport={onExport} />}
+      filterBar={
+        <FilterBar
+          range={range} onRangeChange={setRange}
+          mesaIds={mesaIds} onToggleMesa={onToggleMesa} mesas={mesas}
+          estado={estado} onEstadoChange={setEstado}
+          prioridad={prioridad} onPrioridadChange={setPrioridad}
+          categoriaId={categoriaId} onCategoriaChange={setCategoriaId} categorias={categorias}
+          tecnicoId={tecnicoId} onTecnicoChange={setTecnicoId} tecnicos={tecnicos}
+          customDesde={customDesde} customHasta={customHasta} onCustomDesdeChange={setCustomDesde} onCustomHastaChange={setCustomHasta}
+          onExport={onExport}
+        />
+      }
     >
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />}>
         {content}

@@ -28,6 +28,7 @@ export * from './ui/charts/BarsPrioridad.js';
 export * from './ui/charts/AreaEvolucion.js';
 export * from './ui/charts/HeatmapCarga.js';
 export * from './ui/charts/TimelineAlertas.js';
+export * from './ui/ticket/TicketComments.js';
 export * from './dashboard.js';
 export * from './export.js';
 export * from './ia.js';
