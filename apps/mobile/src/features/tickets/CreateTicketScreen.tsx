@@ -231,7 +231,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const sugerenciaCat = sugerencia ? categorias.find(c => c.id === sugerencia.categoriaId) : null;
   const isSugerenciaAplicada = sugerencia ? form.categoriaId === sugerencia.categoriaId : false;
   const mesaOptions = mesas.map(m => ({ value: m.id, label: m.nombre }));
-  const categoriaOptions = categorias.map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
+  const categoriaOptions = (form.mesaId ? categorias.filter(c => getMesaIdPorDominio(c.dominio) === form.mesaId) : []).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
 
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
@@ -318,7 +318,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               placeholder="Seleccionar dependencia"
               onSelect={(v) => {
                 const id = v === '' ? null : Number(v);
-                setForm(f => ({ ...f, mesaId: id }));
+                setForm(f => {
+                  const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
+                  const keep = keepCat && getMesaIdPorDominio(keepCat.dominio) === id ? f.categoriaId : 0;
+                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep) : f.prioridad };
+                });
                 setTouched(t => ({ ...t, mesaId: true }));
               }}
             />
@@ -326,7 +330,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               label="Categoría *"
               value={form.categoriaId || ''}
               options={categoriaOptions}
-              placeholder="Seleccionar categoría"
+              placeholder={form.mesaId ? 'Seleccionar categoría' : 'Elige dependencia primero'}
               onSelect={(v) => {
                 if (v === '') { setForm(f => ({ ...f, categoriaId: 0 })); return; }
                 const cat = categorias.find(c => c.id === Number(v));
