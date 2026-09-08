@@ -2,7 +2,7 @@
 // Screenshot 0500513c Desktop & Mobile — fidelity #0E87E2 / #FD7C06 / #F6F8FB / Inter+JetBrains
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme } from '@helpdesk/shared';
+import { theme, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
 
 export function LoginScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
@@ -61,9 +61,9 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
             <View style={s.field}>
               <Text style={s.label}>Cédula o correo corporativo *</Text>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>🪪</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
-                  placeholder="1023456789 o tu.correo@empresa.com"
+                  placeholder="Usuario o Correo"
                   placeholderTextColor={theme.colors.mutedSoft}
                   autoCapitalize="none"
                   keyboardType="default"
@@ -81,7 +81,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
                 <Pressable onPress={() => navigation?.navigate('ForgotPassword' as never)}><Text style={s.forgotLink}>¿Olvidaste tu contraseña?</Text></Pressable>
               </View>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>🔒</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
                   placeholder="••••••••"
                   placeholderTextColor={theme.colors.mutedSoft}
@@ -92,7 +92,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
                   accessibilityLabel="Contraseña"
                 />
                 <Pressable onPress={() => setShowPass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
-                  <Text style={s.eyeText}>{showPass ? '🙈' : '👁'}</Text>
+                  {showPass ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}
                 </Pressable>
               </View>
               <View style={s.strengthRow}>
@@ -109,12 +109,6 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
 
             <Pressable onPress={onSubmit} disabled={loading} style={({ pressed }) => [s.primaryBtn, pressed && { opacity: 0.92 }, loading && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Ingresar">
               <Text style={s.primaryText}>{loading ? 'Ingresando…' : 'Ingresar  →'}</Text>
-            </Pressable>
-
-            <View style={s.dividerRow}><View style={s.divider} /><Text style={s.dividerText}>o</Text><View style={s.divider} /></View>
-
-            <Pressable onPress={() => setLocalError('SSO no configurado — usa correo y contraseña')} style={s.secondaryBtn} accessibilityRole="button">
-              <Text style={s.secondaryIcon}>▦</Text><Text style={s.secondaryText}>Ingresar con SSO Empresarial</Text>
             </Pressable>
 
             <Text style={s.legal}>Al ingresar, aceptas la política de privacidad y uso de tecnologías.</Text>
@@ -158,8 +152,9 @@ const s = StyleSheet.create({
   forgotLink: { fontSize: 10, color: theme.colors.primary, fontWeight: '600' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surface, paddingHorizontal: 10, height: 44, gap: 8 },
   inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputIconWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   strengthBar: { flex: 1, height: 4, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden', minWidth: 80 },
@@ -173,12 +168,6 @@ const s = StyleSheet.create({
   checkLabel: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600' },
   primaryBtn: { backgroundColor: theme.colors.primary, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  divider: { flex: 1, height: 1, backgroundColor: theme.colors.border },
-  dividerText: { fontSize: 11, color: theme.colors.mutedSoft, fontWeight: '600' },
-  secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  secondaryIcon: { fontSize: 12, color: theme.colors.primary },
-  secondaryText: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '700' },
   legal: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'center', lineHeight: 14 },
   supportRow: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
   supportLabel: { fontSize: 10, color: theme.colors.mutedSoft },
