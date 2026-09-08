@@ -1,7 +1,7 @@
 // RF-03 — Cambio de contraseña (logueado) web — Stitch + NIST 800-63B
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, validatePassword, validatePasswordSync, PasswordStrength, Card, Button } from '@helpdesk/shared';
+import { theme, validatePassword, validatePasswordSync, PasswordStrength, Card, Button, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -81,19 +81,19 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
           <View style={[s.card, isDesktop ? { width: 440, alignSelf: 'center' } : { width: '100%' }]}>
             <Text style={s.label}>Contraseña actual</Text>
             <View style={s.inputWrap}>
-              <Text style={s.inputIcon}>🔒</Text>
+              <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
               <TextInput placeholder="••••••••" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showCurrent} value={current} onChangeText={setCurrent} style={s.inputInner} />
-              <Pressable onPress={() => setShowCurrent((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showCurrent ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Text style={s.eyeText}>{showCurrent ? '🙈' : '👁'}</Text></Pressable>
+              <Pressable onPress={() => setShowCurrent((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showCurrent ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showCurrent ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable>
             </View>
             <Text style={s.label}>Nueva contraseña</Text>
             <View style={s.inputWrap}>
-              <Text style={s.inputIcon}>🔒</Text>
+              <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
               <TextInput placeholder="Mín. 8 caracteres" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showNext} value={next} onChangeText={setNext} style={s.inputInner} />
-              <Pressable onPress={() => setShowNext((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showNext ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Text style={s.eyeText}>{showNext ? '🙈' : '👁'}</Text></Pressable>
+              <Pressable onPress={() => setShowNext((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showNext ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showNext ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable>
             </View>
             <PasswordStrength validation={sync} />
             <View style={[s.inputWrap, next && confirm && next !== confirm ? s.inputWrapError : null]}>
-              <Text style={s.inputIcon}>🔒</Text>
+              <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
               <TextInput
                 placeholder="Confirmar nueva"
                 placeholderTextColor={theme.colors.mutedSoft}
@@ -102,7 +102,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
                 onChangeText={setConfirm}
                 style={s.inputInner}
               />
-              <Pressable onPress={() => setShowConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}><Text style={s.eyeText}>{showConfirm ? '🙈' : '👁'}</Text></Pressable>
+              <Pressable onPress={() => setShowConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showConfirm ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable>
             </View>
             {next && confirm && next !== confirm ? <Text style={s.inlineError}>No coinciden</Text> : null}
             {serverError ? (
@@ -147,8 +147,9 @@ const s = StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.2, borderColor: theme.colors.border, borderRadius: theme.radius.md, backgroundColor: '#FFFEFB', paddingHorizontal: 10, height: 44, gap: 8 },
   inputWrapError: { borderColor: '#FCA5A5' },
   inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputIconWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   inputInner: { flex: 1, fontSize: 14, color: theme.colors.text, paddingVertical: 0 },
-  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   input: { borderWidth: 1.2, borderColor: theme.colors.border, borderRadius: theme.radius.md, paddingHorizontal: 14, paddingVertical: 13, backgroundColor: '#FFFEFB', fontSize: 14, color: theme.colors.text },
   inputError: { borderColor: '#FCA5A5' },

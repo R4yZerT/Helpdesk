@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { theme, Sidebar } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
+import { AdminCategoriasScreen } from './AdminCategoriasScreen';
 import type { AdminStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
 
@@ -66,7 +67,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
             <Stack.Navigator screenOptions={screenOpts}>
               <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
               <Stack.Screen name="Mesas" component={AdminMesasScreen} options={{ title: 'Mesas' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} />
-              <Stack.Screen name="Categorias" options={{ title: 'Categorías' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Categorías pendiente</Text></View>}</Stack.Screen>
+              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} options={{ title: 'Categorías' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
               <Stack.Screen name="Import" options={{ title: 'Import' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
             </Stack.Navigator>
           </View>
@@ -90,7 +91,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
           <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
             <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
             <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} />
-            <Stack.Screen name="Categorias" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Categorías pendiente</Text></View>}</Stack.Screen>
+            <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
             <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
           </Stack.Navigator>
         </View>

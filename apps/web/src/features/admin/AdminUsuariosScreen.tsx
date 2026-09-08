@@ -1,7 +1,7 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser } from '@helpdesk/shared';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 const PAGE_SIZE = 20;
@@ -271,7 +271,7 @@ export function AdminUsuariosScreen() {
             <TextInput value={form.fullName} onChangeText={(v) => setForm((p) => ({ ...p, fullName: v }))} placeholder="Nombre completo *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
             <TextInput value={form.cedula} onChangeText={(v) => setForm((p) => ({ ...p, cedula: v.replace(/[^0-9]/g, '') }))} placeholder="Cédula (5-15 dígitos) *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} keyboardType="number-pad" maxLength={15} />
             <TextInput value={form.email} onChangeText={(v) => setForm((p) => ({ ...p, email: v }))} placeholder="Correo corporativo *" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoCapitalize="none" keyboardType="email-address" />
-            <View style={s.inputWrap}><Text style={s.inputIcon}>🔒</Text><TextInput value={form.password} onChangeText={(v) => setForm((p) => ({ ...p, password: v }))} placeholder="Contraseña *" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showCreatePass} /><Pressable onPress={() => setShowCreatePass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showCreatePass ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showCreatePass ? '🙈' : '👁'}</Text></Pressable></View>
+            <View style={s.inputWrap}><View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View><TextInput value={form.password} onChangeText={(v) => setForm((p) => ({ ...p, password: v }))} placeholder="Contraseña *" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showCreatePass} /><Pressable onPress={() => setShowCreatePass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showCreatePass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showCreatePass ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable></View>
             <View style={s.rowGap}>
               {ROLES.map((r) => (
                 <Pressable key={r} onPress={() => setForm((p) => ({ ...p, rol: r }))} style={[s.chip, form.rol === r && s.chipActive]}><Text style={[s.chipText, form.rol === r && s.chipTextActive]}>{r}</Text></Pressable>
@@ -338,8 +338,8 @@ export function AdminUsuariosScreen() {
               </Pressable>
               {formEdit.cambiarPass ? (
                 <View style={{ gap: 10, marginTop: 8 }}>
-                  <View style={s.inputWrap}><Text style={s.inputIcon}>🔒</Text><TextInput value={formEdit.password} onChangeText={(v) => setFormEdit((p) => ({ ...p, password: v }))} placeholder="Nueva contraseña" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showEditPass} /><Pressable onPress={() => setShowEditPass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showEditPass ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showEditPass ? '🙈' : '👁'}</Text></Pressable></View>
-                  <View style={s.inputWrap}><Text style={s.inputIcon}>🔒</Text><TextInput value={formEdit.passwordConfirm} onChangeText={(v) => setFormEdit((p) => ({ ...p, passwordConfirm: v }))} placeholder="Repetir contraseña" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showEditConfirm} /><Pressable onPress={() => setShowEditConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showEditConfirm ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showEditConfirm ? '🙈' : '👁'}</Text></Pressable></View>
+                  <View style={s.inputWrap}><View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View><TextInput value={formEdit.password} onChangeText={(v) => setFormEdit((p) => ({ ...p, password: v }))} placeholder="Nueva contraseña" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showEditPass} /><Pressable onPress={() => setShowEditPass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showEditPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showEditPass ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable></View>
+                  <View style={s.inputWrap}><View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View><TextInput value={formEdit.passwordConfirm} onChangeText={(v) => setFormEdit((p) => ({ ...p, passwordConfirm: v }))} placeholder="Repetir contraseña" style={s.inputInner} placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showEditConfirm} /><Pressable onPress={() => setShowEditConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showEditConfirm ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showEditConfirm ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable></View>
                   <Text style={s.helpText}>Mín. 8–64, sin datos personales, evita secuencias/common. Se valida en cliente con NIST/OWASP.</Text>
                   {formEdit.password.length > 0 ? (() => { const v = validatePasswordSync(formEdit.password, { email: formEdit.email, nombre: formEdit.fullName, rol: formEdit.rol }); return <Text style={[s.helpText, v.ok ? { color: '#15803D' } : { color: theme.colors.danger }]}>{v.ok ? '✓ Contraseña válida' : v.reasons.join(' · ')}</Text>; })() : null}
                   {formEdit.password && formEdit.passwordConfirm && formEdit.password !== formEdit.passwordConfirm ? <Text style={[s.helpText, { color: theme.colors.danger }]}>Las contraseñas no coinciden</Text> : null}
@@ -447,8 +447,9 @@ const s = StyleSheet.create({
   input: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, paddingHorizontal: 12, height: 42, fontSize: 13, color: theme.colors.text },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, paddingHorizontal: 10, height: 42, gap: 8 },
   inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputIconWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   inputInner: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   rowGap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 },

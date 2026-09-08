@@ -1,7 +1,7 @@
 // RF-03 — Update password tras recovery link (supabase.auth recovery session)
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, validatePassword, validatePasswordSync, PasswordStrength } from '@helpdesk/shared';
+import { theme, validatePassword, validatePasswordSync, PasswordStrength, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function UpdatePasswordScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
@@ -83,18 +83,18 @@ export function UpdatePasswordScreen({ navigation }: { navigation?: { navigate: 
             <View style={s.field}>
               <Text style={s.label}>Nueva contraseña *</Text>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>🔒</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput placeholder="Mín. 8 caracteres" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showNext} value={next} onChangeText={setNext} style={s.inputInner} />
-                <Pressable onPress={() => setShowNext((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showNext ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showNext ? '🙈' : '👁'}</Text></Pressable>
+                <Pressable onPress={() => setShowNext((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showNext ? 'Ocultar' : 'Mostrar'}>{showNext ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable>
               </View>
               <PasswordStrength validation={sync} />
             </View>
             <View style={s.field}>
               <Text style={s.label}>Confirmar *</Text>
               <View style={[s.inputWrap, next && confirm && next !== confirm ? s.inputWrapError : null]}>
-                <Text style={s.inputIcon}>🔒</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput placeholder="Repite la contraseña" placeholderTextColor={theme.colors.mutedSoft} secureTextEntry={!showConfirm} value={confirm} onChangeText={setConfirm} style={s.inputInner} />
-                <Pressable onPress={() => setShowConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showConfirm ? 'Ocultar' : 'Mostrar'}><Text style={s.eyeText}>{showConfirm ? '🙈' : '👁'}</Text></Pressable>
+                <Pressable onPress={() => setShowConfirm((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showConfirm ? 'Ocultar' : 'Mostrar'}>{showConfirm ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}</Pressable>
               </View>
               {next && confirm && next !== confirm ? <Text style={s.inlineError}>No coinciden</Text> : null}
             </View>
@@ -132,8 +132,9 @@ const s = StyleSheet.create({
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 8, backgroundColor: theme.colors.surface, paddingHorizontal: 10, height: 44, gap: 8 } as unknown as object,
   inputWrapError: { borderColor: '#FCA5A5' } as unknown as object,
   inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputIconWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   inputInner: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   input: { borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: 8, backgroundColor: theme.colors.surface, paddingHorizontal: 12, height: 44, fontSize: 13, color: theme.colors.text } as unknown as object,
   inputError: { borderColor: '#FCA5A5' },

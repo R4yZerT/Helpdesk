@@ -2,7 +2,7 @@
 // Screenshot 0500513c Desktop & Mobile — fidelity #0E87E2 / #FD7C06 / #F6F8FB / Inter+JetBrains
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme } from '@helpdesk/shared';
+import { theme, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
 
 export function LoginScreen({ navigation }: { navigation?: { navigate: (r: string) => void } }) {
@@ -61,7 +61,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
             <View style={s.field}>
               <Text style={s.label}>Cédula o correo corporativo *</Text>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>🪪</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
                   placeholder="1023456789 o tu.correo@empresa.com"
                   placeholderTextColor={theme.colors.mutedSoft}
@@ -81,7 +81,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
                 <Pressable onPress={() => navigation?.navigate('ForgotPassword' as never)}><Text style={s.forgotLink}>¿Olvidaste tu contraseña?</Text></Pressable>
               </View>
               <View style={s.inputWrap}>
-                <Text style={s.inputIcon}>🔒</Text>
+                <View style={s.inputIconWrap}><IconLock size={14} color={theme.colors.mutedSoft} /></View>
                 <TextInput
                   placeholder="••••••••"
                   placeholderTextColor={theme.colors.mutedSoft}
@@ -92,7 +92,7 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
                   accessibilityLabel="Contraseña"
                 />
                 <Pressable onPress={() => setShowPass((v) => !v)} style={s.eyeBtn} accessibilityRole="button" accessibilityLabel={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
-                  <Text style={s.eyeText}>{showPass ? '🙈' : '👁'}</Text>
+                  {showPass ? <IconEyeOff size={18} color={theme.colors.mutedSoft} /> : <IconEye size={18} color={theme.colors.mutedSoft} />}
                 </Pressable>
               </View>
               <View style={s.strengthRow}>
@@ -158,8 +158,9 @@ const s = StyleSheet.create({
   forgotLink: { fontSize: 10, color: theme.colors.primary, fontWeight: '600' },
   inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, backgroundColor: theme.colors.surface, paddingHorizontal: 10, height: 44, gap: 8 },
   inputIcon: { fontSize: 12, color: theme.colors.mutedSoft },
+  inputIconWrap: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   input: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+  eyeBtn: { paddingHorizontal: 6, paddingVertical: 4, alignItems: 'center', justifyContent: 'center' },
   eyeText: { fontSize: 13, color: theme.colors.mutedSoft },
   strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   strengthBar: { flex: 1, height: 4, backgroundColor: theme.colors.border, borderRadius: 999, overflow: 'hidden', minWidth: 80 },
