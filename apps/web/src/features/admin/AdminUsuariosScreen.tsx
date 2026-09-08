@@ -1,8 +1,9 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal } from '@helpdesk/shared';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
 
@@ -28,6 +29,9 @@ function pillRol(rol: string) {
 
 export function AdminUsuariosScreen() {
   const { width } = useWindowDimensions();
+  const { profile } = useAuth();
+  const adminMesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
+  const isGeneralAdmin = adminMesaId == null;
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const [rol, setRol] = useState<(typeof ROLES)[number] | 'todos'>('todos');
@@ -73,10 +77,11 @@ export function AdminUsuariosScreen() {
     if (first) setLoading(true); else setLoadingMore(true);
     setErrorMsg(null);
     try {
+      const effectiveMesaId = isGeneralAdmin ? ((mesaId === 'todos' ? 'todos' : Number(mesaId)) as never) : (adminMesaId as never);
       const res = await listUsers(supabase, {
         search: qDebounced || undefined,
         rol: rol as never,
-        mesaId: mesaId as never,
+        mesaId: effectiveMesaId as never,
         activo: activo as never,
         page: targetPage + 1,
         pageSize: PAGE_SIZE,
@@ -94,7 +99,7 @@ export function AdminUsuariosScreen() {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [qDebounced, rol, mesaId, activo]);
+  }, [qDebounced, rol, mesaId, activo, adminMesaId, isGeneralAdmin]);
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
 
@@ -104,8 +109,8 @@ export function AdminUsuariosScreen() {
     fetchPage(page + 1);
   }, [loadingMore, loading, hasMore, page, fetchPage]);
 
-  const hasActiveFilters = !!qDebounced || rol !== 'todos' || mesaId !== 'todos' || activo !== 'todos';
-  const clearFilters = () => { setQ(''); setRol('todos'); setMesaId('todos'); setActivo('todos'); };
+  const hasActiveFilters = !!qDebounced || rol !== 'todos' || (isGeneralAdmin && mesaId !== 'todos') || activo !== 'todos';
+  const clearFilters = () => { setQ(''); setRol('todos'); if (isGeneralAdmin) setMesaId('todos'); setActivo('todos'); };
 
   const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
   const doToggleActivo = async () => {
@@ -220,7 +225,7 @@ export function AdminUsuariosScreen() {
     <View style={s.wrap}>
       <View style={s.header}>
         <View style={s.headerRow}>
-          <Text style={s.h1}>Usuarios · {total}</Text>
+          <Text style={s.h1}>Usuarios</Text>
           <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button"><Text style={s.btnPrimaryText}>+ Nuevo usuario</Text></Pressable>
         </View>
         <Text style={s.subtitle}>Gestión centralizada. Usa la tabla para acciones rápidas.</Text>
@@ -231,36 +236,16 @@ export function AdminUsuariosScreen() {
       <View style={s.filterCard}>
         <View style={s.searchWrap}>
           <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre…" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
+          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipsScroll}>
-          <View style={s.chipsBlock}>
-            <Text style={s.chipsLabel}>Rol</Text>
-            <View style={s.chipsRow}>
-              {(['todos', ...ROLES] as const).map((r) => (
-                <Pressable key={String(r)} onPress={() => setRol(r as never)} style={[s.chip, rol === r && s.chipActive]}><Text style={[s.chipText, rol === r && s.chipTextActive]}>{(r === 'todos' ? 'Todos' : String(r)).toUpperCase()}</Text></Pressable>
-              ))}
-            </View>
-          </View>
-          <View style={s.chipsBlock}>
-            <Text style={s.chipsLabel}>Dependencia</Text>
-            <View style={s.chipsRow}>
-              <Pressable onPress={() => setMesaId('todos')} style={[s.chip, mesaId === 'todos' && s.chipActive]}><Text style={[s.chipText, mesaId === 'todos' && s.chipTextActive]}>Todas</Text></Pressable>
-              {mesas.map((m) => (
-                <Pressable key={m.id} onPress={() => setMesaId(m.id)} style={[s.chip, mesaId === m.id && s.chipActive]}><Text style={[s.chipText, mesaId === m.id && s.chipTextActive]}>{m.nombre}</Text></Pressable>
-              ))}
-            </View>
-          </View>
-          <View style={s.chipsBlock}>
-            <Text style={s.chipsLabel}>Estado</Text>
-            <View style={s.chipsRow}>
-              {(['todos', true, false] as const).map((v) => (
-                <Pressable key={String(v)} onPress={() => setActivo(v as never)} style={[s.chip, activo === v && s.chipActive]}><Text style={[s.chipText, activo === v && s.chipTextActive]}>{v === 'todos' ? 'Todos' : v ? 'Activos' : 'Inactivos'}</Text></Pressable>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
+        <View style={s.dropdownRow}>
+          <FilterDropdown label="Rol" value={rol} onSelect={(v) => setRol(v as never)} options={[{ value: 'todos', label: 'Todos' }, ...ROLES.map((r) => ({ value: r, label: formatRol(r as never) }))]} />
+          {isGeneralAdmin ? (
+            <FilterDropdown label="Dependencia" value={(mesaId as unknown as string) as never} onSelect={(v) => setMesaId(v === 'todos' ? 'todos' : (v as unknown as number))} options={[{ value: 'todos' as const, label: 'Todas' }, ...mesas.map((m) => ({ value: String(m.id) as unknown as never, label: m.nombre }))]} />
+          ) : null}
+          <FilterDropdown label="Estado" value={activo as never} onSelect={(v) => setActivo(v as never)} options={[{ value: 'todos' as const, label: 'Todos' }, { value: true as const, label: 'Activos' }, { value: false as const, label: 'Inactivos' }]} />
+        </View>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
@@ -417,6 +402,7 @@ const s = StyleSheet.create({
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   clearBtn: { padding: 6, marginLeft: 6 },
   clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
+  dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   chipsScroll: { gap: 12 },
   chipsBlock: { gap: 6, marginRight: 12 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },

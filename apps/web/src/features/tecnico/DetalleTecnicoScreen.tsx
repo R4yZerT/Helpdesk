@@ -150,7 +150,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <Text style={s.section}>Agregar avance técnico</Text>
         {!canComment ? <Text style={s.muted}>No tienes permiso para comentar</Text> : (
           <>
-            <TextInput value={mensaje} onChangeText={setMensaje} placeholder="Describe diagnóstico, pasos o solución…" placeholderTextColor={theme.colors.mutedSoft} style={s.input} multiline maxLength={2000} accessibilityLabel="Mensaje técnico" />
+            <TextInput value={mensaje} onChangeText={setMensaje} placeholder="Describe diagnóstico, pasos o solución" placeholderTextColor={theme.colors.mutedSoft} style={s.input} multiline maxLength={2000} accessibilityLabel="Mensaje técnico" />
             <Text style={s.hint}>{mensaje.length}/2000</Text>
             {canInternal ? <View style={s.switchRow}><Text style={s.switchLabel}>Interno — solo equipo técnico</Text><Switch value={interno} onValueChange={setInterno} trackColor={{ true: theme.colors.accent }} thumbColor="#fff" /></View> : null}
             {sendError ? <View style={s.errorBox}><Text style={s.error}>{sendError}</Text></View> : null}
@@ -168,7 +168,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <Pressable onPress={()=>setShowTrans(v=>!v)} style={[s.btn, s.btnAccent]} accessibilityRole="button"><Text style={s.btnAccentText}>{showTrans?'Ocultar transición':'Solucionar incidente'}</Text></Pressable>
         {showTrans && nextEstados.length>0 ? (
           <View style={{ gap: 8 }}>
-            <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución (requerida para solucionado)…" style={s.input} multiline maxLength={5000} />
+            <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución (requerida para solucionado)" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
             <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}> // 8
               {nextEstados.map((e)=>(

@@ -1,4 +1,4 @@
-// RF-27 / RF-28 — Administración de usuarios (solo administrador)
+// Administración de usuarios (solo administrador)
 // Contrato espejo de supabase/migrations/*_schema_inicial.sql y handle_new_user
 import type { RolUsuario } from './types.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -6,14 +6,15 @@ import type { Mesa } from './tickets.js';
 import { ROLES, isRolUsuario } from './roles.js';
 import { validatePasswordSync } from './password.js';
 
-// La DB usa 'empleado' pero la app usa 'usuario' (compatibilidad histórica)
-// Reusa ROLES de roles.ts; aquí solo mapeo DB<->app
+// Unificado a 'usuario' — la DB ya migró enum empleado->usuario (20260903135212)
+// Se mantiene compatibilidad de lectura con 'empleado' legacy
 export function mapRolToDb(rol: RolUsuario): string {
-  return rol === 'usuario' ? 'empleado' : rol;
+  return rol;
 }
 
 export function mapRolFromDb(dbRol: string): RolUsuario {
-  return dbRol === 'empleado' ? 'usuario' : (dbRol as RolUsuario);
+  if (dbRol === 'empleado') return 'usuario';
+  return dbRol as RolUsuario;
 }
 
 // Entidad leída de public.profiles (con join mesa)
@@ -30,7 +31,7 @@ export type AdminUser = {
   actualizadoEn: string;
 };
 
-// Input creación (RF-27: admin crea usuario con rol+mesa+cedula obligatorios)
+// Input creación
 export type CreateUserInput = {
   fullName: string;
   email: string;
@@ -201,7 +202,7 @@ export async function getUserById(supabase: SupabaseClient, id: string): Promise
   };
 }
 
-// Crear usuario (RF-27): vía Edge Function admin-create-user (service_role).
+// Crear usuario: vía Edge Function admin-create-user (service_role).
 // Fallback: intenta auth.admin.createUser si el cliente tiene service_role (local/dev).
 export async function createUser(
   supabase: SupabaseClient,

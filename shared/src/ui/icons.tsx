@@ -105,6 +105,23 @@ export function IconUpload({ size = 16, color = '#64748b' }: P) {
   );
 }
 
+// Mesa / Dependencia — tablero con 4 patas (ícono de mesa)
+export function IconTable({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* tablero */}
+      <View style={{ width: size * 0.9, height: size * 0.18, borderWidth: 1.4, borderColor: color, borderRadius: 1, backgroundColor: color, opacity: 0.95 }} />
+      {/* patas */}
+      <View style={{ flexDirection: 'row', width: size * 0.75, justifyContent: 'space-between', marginTop: 1 }}>
+        <View style={{ width: 1.6, height: size * 0.45, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 1.6, height: size * 0.45, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 1.6, height: size * 0.45, backgroundColor: color, borderRadius: 1 }} />
+        <View style={{ width: 1.6, height: size * 0.45, backgroundColor: color, borderRadius: 1 }} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   eyeOuter: { borderWidth: 1.8, alignItems: 'center', justifyContent: 'center' },
   eyeInner: { borderWidth: 1.8 },

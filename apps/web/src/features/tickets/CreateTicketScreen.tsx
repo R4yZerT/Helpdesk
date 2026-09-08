@@ -78,8 +78,8 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       const res = classifyLocal(texto, categorias);
       setSugerencia(res);
       setIaLoading(false);
-      // auto-aplicar solo si aún no hay categoría elegida
-      if (res && form.categoriaId === 0) {
+      // auto-preseleccionar categoría + dependencia en cada predicción
+      if (res) {
         const cat = categorias.find(c => c.id === res.categoriaId);
         setForm(f => ({
           ...f,
@@ -150,20 +150,40 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     setSubmitting(true);
     try {
       console.log('[CreateTicket] submit', form);
+      const { data: { user } } = await supabase.auth.getUser();
       const res = await createTicket(supabase, form);
-      // Subir adjuntos si hay (RF-07) — no bloquea éxito del ticket si falla
+      // Subir adjuntos si hay (RF-07) — ticket ya creado, informar fallos sin revertir
+      const adjuntosFailed: string[] = [];
       if (adjuntos.length) {
         for (const a of adjuntos) {
           try {
             const path = `${res.id}/${Date.now()}-${a.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
             const { error: upErr } = await supabase.storage.from('ticket-adjuntos').upload(path, a.file, { contentType: a.type, upsert: false });
             if (upErr) throw upErr;
-            const { error: insErr } = await supabase.from('ticket_adjuntos').insert({ ticket_id: res.id, storage_path: path, nombre_original: a.name, mime: a.type, tamano_bytes: a.size, subido_por: (await supabase.auth.getUser()).data.user?.id });
+            const { error: insErr } = await supabase.from('ticket_adjuntos').insert({ ticket_id: res.id, storage_path: path, nombre_original: a.name, mime: a.type, tamano_bytes: a.size, subido_por: user?.id ?? null });
             if (insErr) throw insErr;
           } catch (upE) {
             console.warn('[CreateTicket] adjunto fail', a.name, upE);
+            adjuntosFailed.push(a.name);
           }
         }
+      }
+      if (adjuntosFailed.length) {
+        const msg = `Ticket #${res.numero} creado, pero falló la subida de: ${adjuntosFailed.join(', ')}. Reintenta desde el detalle.`;
+        setAdjuntoError(msg);
+        setFeedback({
+          visible: true,
+          variant: 'info',
+          title: adjuntosFailed.length === adjuntos.length ? 'Ticket creado — adjuntos fallaron' : 'Solicitud creada — algunos adjuntos fallaron',
+          message: msg,
+        });
+        // limpiar formulario pero dejar visible el error de adjuntos
+        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
+        setAdjuntos([]);
+        setErrors({});
+        setTouched({});
+        setSugerencia(null);
+        return;
       }
       setFeedback({
         visible: true,
@@ -256,7 +276,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             value={form.descripcion}
             onChangeText={(v) => setForm((f) => ({ ...f, descripcion: v }))}
             onBlur={() => setTouched((t) => ({ ...t, descripcion: true }))}
-            placeholder="Describe el problema con detalle (mín. 20 caracteres para activar la IA). Ej: El wifi del bloque 3 se cae cada 10 min desde ayer..."
+            placeholder="Describe el problema con detalle (mín. 20 caracteres para activar la IA). Ej: El wifi del bloque 3 se cae cada 10 min desde ayer"
             placeholderTextColor={theme.colors.mutedSoft}
             style={[s.input, s.textarea]}
             multiline

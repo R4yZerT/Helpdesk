@@ -142,7 +142,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
       {/* Header */}
       <View style={s.header}>
         <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Técnico · Solo asignados a mí</Text></View>
-        <Text style={s.h1}>Bandeja asignada · {total}</Text>
+        <Text style={s.h1}>Bandeja asignada</Text>
         <Text style={s.subtitle}>Ordenada por prioridad (crítica → baja) y antigüedad. Realtime activo.</Text>
       </View>
 
@@ -153,7 +153,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Buscar en asunto…"
+            placeholder="Buscar en asunto"
             placeholderTextColor={theme.colors.mutedSoft}
             style={s.search}
             returnKeyType="search"

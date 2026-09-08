@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
+import { formatRol } from '../../filters.js';
 
 export type SidebarItem = { id: string; label: string; active?: boolean; onPress?: () => void; icon?: React.ReactNode };
 
@@ -9,7 +10,7 @@ export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[
   return (
     <View style={s.wrap}>
       <View style={s.head}>
-        <View style={s.logoDot} />
+        <View style={s.logoDot}><Text style={s.logoDotText}>◈</Text></View>
         <View>
           <Text style={s.logoTitle}>HelpDesk</Text>
           <Text style={s.logoSub}>Mesa de Ayuda</Text>
@@ -32,7 +33,7 @@ export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[
           </View>
           <View>
             <Text style={s.userName}>{user.name}</Text>
-            <Text style={s.userRole}>{user.role}</Text>
+            <Text style={s.userRole}>{formatRol(user.role as never)}</Text>
           </View>
         </View>
       ) : null}
@@ -55,7 +56,8 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  logoDot: { width: 32, height: 32, borderRadius: theme.radius.sm, backgroundColor: theme.colors.primary },
+  logoDot: { width: 32, height: 32, borderRadius: theme.radius.sm, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' },
+  logoDotText: { color: '#fff', fontWeight: '800', fontSize: 14, lineHeight: 14 },
   logoTitle: { fontSize: 13, fontWeight: '800', color: theme.colors.text },
   logoSub: { fontSize: 10, color: theme.colors.muted, fontWeight: '600' },
   nav: { gap: theme.space[1] }, // 4 — token space-1

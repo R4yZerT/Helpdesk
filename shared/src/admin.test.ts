@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { mapRolFromDb, mapRolToDb, validateCreateUser, validateUpdateUser, isCreateUserValid } from './admin.js';
 import { isRolUsuario } from './roles.js';
 
-describe('RF-27 admin — mapeo rol usuario↔empleado', () => {
-  it('mapRolToDb usuario -> empleado', () => expect(mapRolToDb('usuario')).toBe('empleado'));
+describe('admin — mapeo rol usuario (unificado)', () => {
+  it('mapRolToDb usuario -> usuario', () => expect(mapRolToDb('usuario')).toBe('usuario'));
   it('mapRolFromDb empleado -> usuario', () => expect(mapRolFromDb('empleado')).toBe('usuario'));
   it('isRolUsuario', () => {
     expect(isRolUsuario('tecnico')).toBe(true);
@@ -12,7 +12,7 @@ describe('RF-27 admin — mapeo rol usuario↔empleado', () => {
   });
 });
 
-describe('RF-27 validateCreateUser', () => {
+describe('validateCreateUser', () => {
   const base = {
     fullName: 'Ana Pérez',
     cedula: '1023456789',
@@ -32,7 +32,7 @@ describe('RF-27 validateCreateUser', () => {
   it('isCreateUserValid false si hay errores', () => expect(isCreateUserValid({ ...base, email: 'bad' })).toBe(false));
 });
 
-describe('RF-27 validateUpdateUser', () => {
+describe('validateUpdateUser', () => {
   it('nombre corto en update', () => expect(validateUpdateUser({ fullName: 'A' }).fullName).toBeDefined());
   it('rol inválido', () => expect(validateUpdateUser({ rol: 'bad' as never }).rol).toBeDefined());
   it('mesa null permitido', () => expect(validateUpdateUser({ mesaId: null })).toEqual({}));
