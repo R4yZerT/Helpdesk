@@ -139,12 +139,6 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
 
   return (
     <View style={s.wrap}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Técnico · Solo asignados a mí</Text></View>
-        <Text style={s.h1}>Bandeja asignada</Text>
-        <Text style={s.subtitle}>Ordenada por prioridad (crítica → baja) y antigüedad. Realtime activo.</Text>
-      </View>
 
       {/* Filter Card — Stitch Card p16 */}
       <View style={s.filterCard}>

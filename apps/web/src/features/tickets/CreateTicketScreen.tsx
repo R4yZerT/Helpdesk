@@ -250,11 +250,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
       <View style={s.breadcrumb}><Text style={s.breadcrumbText}>Inicio / Mis Solicitudes / Nueva</Text></View>
-      <View style={s.hero}>
-        <Text style={s.kicker}>Nueva incidencia</Text>
-        <Text style={s.h1}>Crear Solicitud de Soporte</Text>
-        <Text style={s.subtitle}>Describe el problema: la IA analizará tu texto y sugerirá la categoría. La prioridad se asigna automáticamente.</Text>
-      </View>
 
       <View style={[s.formWrap, isWide && { maxWidth: 680, alignSelf: 'center', width: '100%' }]}>
         <Card style={s.formCard}>
