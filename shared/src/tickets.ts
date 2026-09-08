@@ -103,6 +103,7 @@ export type TicketDetail = {
   ticket: Ticket;
   estados: TicketEstado[];
   comentarios: TicketComentario[];
+  adjuntos?: TicketAdjunto[];
 };
 
 // RF-15 — validación comentario (DB check 1-2000)
@@ -202,10 +203,68 @@ export async function createTicket(
   return data as { id: string; numero: number };
 }
 
+// RF-07 — Adjuntos solo imágenes 10MB, max 5
+export const ADJUNTO_MAX_MB = 10;
+export const ADJUNTO_MAX_BYTES = ADJUNTO_MAX_MB * 1024 * 1024;
+export const ADJUNTO_MAX_COUNT = 5;
+export const ADJUNTO_ALLOWED_MIMES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+export const ADJUNTO_ALLOWED_EXTS: readonly string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif'] as const;
+
+export type TicketAdjunto = {
+  id: number;
+  ticketId: string;
+  storagePath: string;
+  nombre: string;
+  mime: string;
+  size: number;
+  creadoEn: string;
+};
+
+export function validateAdjunto(file: { name: string; size: number; type: string }): string | null {
+  const ext = '.' + (file.name.split('.').pop() ?? '').toLowerCase();
+  const mimeOk = (ADJUNTO_ALLOWED_MIMES as readonly string[]).includes(file.type);
+  const extOk = (ADJUNTO_ALLOWED_EXTS as readonly string[]).includes(ext === '.jpg' ? '.jpg' : ext === '.jpeg' ? '.jpeg' : ext);
+  // permitir si mime o ext coincide (algunos pickers no traen mime)
+  if (!mimeOk && !extOk) return 'Solo imágenes JPG, PNG, WebP o GIF';
+  if (file.size > ADJUNTO_MAX_BYTES) return `Máximo ${ADJUNTO_MAX_MB} MB por archivo`;
+  if (file.size <= 0) return 'Archivo vacío';
+  return null;
+}
+
+export function validateAdjuntos(files: { name: string; size: number; type: string }[]): string | null {
+  if (files.length > ADJUNTO_MAX_COUNT) return `Máximo ${ADJUNTO_MAX_COUNT} archivos`;
+  for (const f of files) {
+    const e = validateAdjunto(f);
+    if (e) return `${f.name}: ${e}`;
+  }
+  return null;
+}
+
+function mapAdjunto(row: Record<string, unknown>): TicketAdjunto {
+  return {
+    id: row.id as number,
+    ticketId: (row.ticket_id as string) ?? '',
+    storagePath: (row.storage_path as string) ?? (row.ruta as string) ?? '',
+    nombre: (row.nombre as string) ?? (row.filename as string) ?? '',
+    mime: (row.mime as string) ?? (row.mime_type as string) ?? '',
+    size: (row.size as number) ?? (row.bytes as number) ?? 0,
+    creadoEn: (row.creado_en as string) ?? '',
+  };
+}
+
+export async function fetchAdjuntos(client: SupabaseClient, ticketId: string): Promise<TicketAdjunto[]> {
+  const { data, error } = await client.from('ticket_adjuntos').select('*').eq('ticket_id', ticketId).order('creado_en');
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map(mapAdjunto);
+}
+
 // RF-08 — Listado paginado server-side (Performance: filtra/ordena/pagina en DB)
 export type ListMyTicketsParams = {
   estado?: EstadoTicket;
   prioridad?: PrioridadTicket;
+  categoriaId?: number;
+  numero?: number;
+  mesaId?: number;
   q?: string;
   page?: number;
   pageSize?: number;
@@ -242,6 +301,15 @@ export async function listMyTickets(
   }
   if (params.prioridad && isPrioridadTicket(params.prioridad)) {
     query = query.eq('prioridad', params.prioridad);
+  }
+  if (params.categoriaId && Number.isInteger(params.categoriaId)) {
+    query = query.eq('categoria_id', params.categoriaId);
+  }
+  if (params.numero && Number.isInteger(params.numero)) {
+    query = query.eq('numero', params.numero);
+  }
+  if (params.mesaId && Number.isInteger(params.mesaId)) {
+    query = query.eq('mesa_id', params.mesaId);
   }
   const q = params.q?.trim();
   if (q) {
@@ -491,7 +559,8 @@ export async function getTicketDetail(
     .eq('ticket_id', ticketId)
     .order('creado_en', { ascending: true });
 
-  const [ticketRes, estadosRes, comentariosRes] = await Promise.all([ticketPromise, estadosPromise, comentariosPromise]);
+  const adjuntosPromise = client.from('ticket_adjuntos').select('*').eq('ticket_id', ticketId).order('creado_en');
+  const [ticketRes, estadosRes, comentariosRes, adjuntosRes] = await Promise.all([ticketPromise, estadosPromise, comentariosPromise, adjuntosPromise]);
 
   if (ticketRes.error) throw new Error(ticketRes.error.message);
   if (!ticketRes.data) throw new Error('Ticket no encontrado');
@@ -502,5 +571,6 @@ export async function getTicketDetail(
     ticket: mapTicket(ticketRes.data as unknown as Record<string, unknown>),
     estados: ((estadosRes.data ?? []) as Record<string, unknown>[]).map(mapEstado),
     comentarios: ((comentariosRes.data ?? []) as Record<string, unknown>[]).map(mapComentario),
+    adjuntos: adjuntosRes.error ? [] : ((adjuntosRes.data ?? []) as Record<string, unknown>[]).map(mapAdjunto),
   };
 }

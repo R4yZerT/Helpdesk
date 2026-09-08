@@ -316,11 +316,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </View>
           {touched.prioridad && errors.prioridad ? <Text style={s.error}>{errors.prioridad}</Text> : null}
 
-          {/* Adjuntos */}
+          {/* Adjuntos RF-07 solo imágenes */}
           <View style={s.dropZone}>
             <Text style={s.dropIcon}>⤒</Text>
             <Text style={s.dropTitle}>Adjuntos (opcional)</Text>
-            <Text style={s.dropSub}>Arrastra o toca para subir · 10 MB máx</Text>
+            <Text style={s.dropSub}>Solo imágenes JPG/PNG/WebP/GIF · 10 MB máx · 5 máx</Text>
           </View>
 
           {/* Acciones */}

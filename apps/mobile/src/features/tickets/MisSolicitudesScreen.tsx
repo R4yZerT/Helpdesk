@@ -25,6 +25,8 @@ export function MisSolicitudesScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [estado, setEstado] = useState<EstadoTicket | ''>('');
   const [prioridad, setPrioridad] = useState<PrioridadTicket | ''>('');
+  const [categoriaId, setCategoriaId] = useState<number | ''>('');
+  const [numeroStr, setNumeroStr] = useState('');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,9 +46,12 @@ export function MisSolicitudesScreen({ navigation }: Props) {
     if (isFirst) setLoading(true);
     else setLoadingMore(true);
     try {
+      const numero = numeroStr.trim() ? parseInt(numeroStr.trim(), 10) : undefined;
       const res = await listMyTickets(supabase, {
         estado: estado || undefined,
         prioridad: prioridad || undefined,
+        categoriaId: categoriaId || undefined,
+        numero: Number.isFinite(numero) ? numero : undefined,
         q: qDebounced || undefined,
         page: targetPage,
         pageSize: PAGE_SIZE,
@@ -62,7 +67,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [estado, prioridad, qDebounced]);
+  }, [estado, prioridad, categoriaId, numeroStr, qDebounced]);
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
 
@@ -152,11 +157,17 @@ export function MisSolicitudesScreen({ navigation }: Props) {
           {PRIORIDADES.map((p) => <Chip key={p} label={p} active={prioridad === p} onPress={() => setPrioridad(p as PrioridadTicket)} />)}
         </View>
 
+        <Text style={s.filterLabel}>Filtros extra (RF-08)</Text>
+        <View style={s.extraRow}>
+          <TextInput value={numeroStr} onChangeText={setNumeroStr} placeholder="# número" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
+          <TextInput value={String(categoriaId)} onChangeText={(v) => setCategoriaId(v ? (parseInt(v,10)||'' as unknown as number) : '')} placeholder="categoría ID" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
+        </View>
+
         <View style={s.totalRow}>
           <View style={s.totalDot} />
           <Text style={s.total}>{total} resultado{total !== 1 ? 's' : ''} · {qDebounced ? `"${qDebounced}"` : 'sin búsqueda'}</Text>
-          {(!!estado || !!prioridad || !!qDebounced) && (
-            <Pressable onPress={() => { setEstado(''); setPrioridad(''); setQ(''); }} style={s.resetBtn}>
+          {(!!estado || !!prioridad || !!qDebounced || !!numeroStr || !!categoriaId) && (
+            <Pressable onPress={() => { setEstado(''); setPrioridad(''); setQ(''); setNumeroStr(''); setCategoriaId(''); }} style={s.resetBtn}>
               <Text style={s.resetText}>Limpiar filtros</Text>
             </Pressable>
           )}
@@ -291,6 +302,8 @@ const s = StyleSheet.create({
   chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
   chipText: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', textTransform: 'capitalize' },
   chipTextActive: { color: '#fff' },
+  extraRow: { flexDirection: 'row', gap: 8 },
+  miniInput: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, height: 36, fontSize: 12, color: theme.colors.text, backgroundColor: theme.colors.surface },
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   totalDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary },
   total: { fontSize: 11, color: theme.colors.muted, fontWeight: '600', flex: 1 },
