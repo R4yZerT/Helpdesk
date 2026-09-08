@@ -2,7 +2,7 @@
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad } from '@helpdesk/shared';
+import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -30,6 +30,9 @@ export function AdminMesaTicketsScreen() {
   const [q, setQ] = useState('');
   const [qDeb, setQDeb] = useState('');
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [tecnicoFilter, setTecnicoFilter] = useState<string | ''>('');
+  const [asignacionFilter, setAsignacionFilter] = useState<string>('');
+  const [prioridadFilter, setPrioridadFilter] = useState<string>('');
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -50,12 +53,28 @@ export function AdminMesaTicketsScreen() {
     if (mesaId == null) { setTickets([]); setTotal(0); setLoading(false); return; }
     setLoading(true); setErrorMsg(null);
     try {
-      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, page: 0, pageSize: 50 });
+      let tecnicoIdParam: string | null | undefined = undefined;
+      if (tecnicoFilter) {
+        tecnicoIdParam = tecnicoFilter === '__unassigned' ? null : tecnicoFilter;
+      } else if (asignacionFilter === 'asignadas') tecnicoIdParam = '__assigned';
+      else if (asignacionFilter === 'no_asignadas') tecnicoIdParam = null;
+      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as any) || undefined, page: 0, pageSize: 50 });
       setTickets(res.data); setTotal(res.total);
     } catch (e) { const m=getErrorMessage(e); setErrorMsg(m); } finally { setLoading(false); }
-  }, [mesaId, qDeb]);
+  }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter]);
 
   useEffect(()=>{ fetchTickets(); }, [fetchTickets]);
+
+  // cargar técnicos para filtro
+  useEffect(() => {
+    if (mesaId == null) { setTecnicos([]); return; }
+    (async () => {
+      try {
+        const { data } = await supabase.from('profiles').select('id,full_name,email').eq('mesa_id', mesaId).eq('rol', 'tecnico').eq('activo', true).order('full_name');
+        setTecnicos((data ?? []) as TecnicoOpt[]);
+      } catch {}
+    })();
+  }, [mesaId]);
 
   const openAssign = async (t: Ticket) => {
     setAssignOpen(t); setAssignId(t.tecnicoAsignadoId ?? '');
@@ -92,7 +111,12 @@ export function AdminMesaTicketsScreen() {
         {errorMsg? <Text style={s.error}>{errorMsg}</Text>:null}
       </View>
       <View style={s.filterCard}>
-        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por asunto" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />{!!q && <Pressable onPress={()=>setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}</View>
+        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />{!!q && <Pressable onPress={()=>setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}</View>
+        <View style={s.dropdownRow}>
+          <FilterDropdown label="Técnico" value={tecnicoFilter as never} options={[{ value: '' as never, label: 'Todos' }, ...tecnicos.map(t=> ({ value: t.id as never, label: (t.full_name ?? t.email ?? t.id) }))]} onSelect={v=> { setTecnicoFilter(v as string); if (v) setAsignacionFilter(''); }} placeholder="Todos" />
+          <FilterDropdown label="Asignación" value={asignacionFilter as never} options={[{ value: '' as never, label: 'Todas' }, { value: 'asignadas' as never, label: 'Asignadas' }, { value: 'no_asignadas' as never, label: 'Sin asignar' }]} onSelect={v=> { setAsignacionFilter(v as string); if (v) setTecnicoFilter(''); }} placeholder="Todas" />
+          <FilterDropdown label="Prioridad" value={prioridadFilter as never} options={PRIORIDAD_OPTIONS as never} onSelect={v=> setPrioridadFilter(v as string)} placeholder="Todas" />
+        </View>
       </View>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin tickets</Text><Text style={s.mutedCenter}>No hay tickets para esta dependencia.</Text></View>}
@@ -142,6 +166,7 @@ const s = StyleSheet.create({
   h1:{fontSize:22, fontWeight:'800', color:theme.colors.text},
   subtitle:{fontSize:12, color:theme.colors.muted, lineHeight:16},
   filterCard:{marginHorizontal:12, marginBottom:12, gap:12, backgroundColor:theme.colors.surface, borderRadius:theme.radius.lg, padding:16, borderWidth:1, borderColor:theme.colors.border},
+  dropdownRow:{flexDirection:'row', gap:12, flexWrap:'wrap'},
   searchWrap:{flexDirection:'row', alignItems:'center', backgroundColor:theme.colors.surfaceAlt, borderWidth:1, borderColor:theme.colors.borderStrong, borderRadius:theme.radius.sm, paddingHorizontal:12, height:40},
   searchIcon:{color:theme.colors.mutedSoft, marginRight:8, fontSize:14},
   search:{flex:1, fontSize:13, color:theme.colors.text},

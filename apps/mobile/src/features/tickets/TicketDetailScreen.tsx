@@ -1,6 +1,6 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
@@ -77,6 +77,7 @@ export function TicketDetailScreen({ route }: Props) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets', filter: `id=eq.${id}` }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_estados', filter: `ticket_id=eq.${id}` }, load)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_comentarios', filter: `ticket_id=eq.${id}` }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ticket_adjuntos', filter: `ticket_id=eq.${id}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id, load]);
@@ -160,7 +161,14 @@ export function TicketDetailScreen({ route }: Props) {
   }
   if (!detail) return <View style={s.center}><Text style={s.muted}>Sin datos</Text></View>;
 
-  const { ticket, estados, comentarios } = detail;
+  const { ticket, estados, comentarios, adjuntos = [] } = detail;
+  const onOpenAdjunto = async (a: { storagePath: string }) => {
+    try {
+      const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
+      const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl;
+      if (url) await Linking.openURL(url);
+    } catch {}
+  };
   const isOwner = profile?.id === ticket.usuarioId;
   const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;
   const canCancel = canEdit;
@@ -220,7 +228,7 @@ export function TicketDetailScreen({ route }: Props) {
         <View style={s.tabs}>
           {(['comentarios', 'historial', 'archivos'] as const).map((t) => (
             <Pressable key={t} onPress={() => setActiveTab(t)} style={[s.tab, activeTab === t && s.tabActive]}>
-              <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>{t === 'comentarios' ? `Comentarios (${comentarios.length})` : t === 'historial' ? `Historial (${estados.length})` : `Archivos`}</Text>
+              <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>{t === 'comentarios' ? `Comentarios (${comentarios.length})` : t === 'historial' ? `Historial (${estados.length})` : `Archivos (${adjuntos.length})`}</Text>
             </Pressable>
           ))}
         </View>
@@ -247,8 +255,21 @@ export function TicketDetailScreen({ route }: Props) {
                 </View>
               </View>
             ))
+          ) : adjuntos.length === 0 ? (
+            <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
           ) : (
-            <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos. Subida 10 MB próximamente.</Text></View>
+            <View style={{ gap: 8 }}>
+              {adjuntos.map((a) => (
+                <Pressable key={a.id} onPress={() => onOpenAdjunto(a)} style={s.adjRow}>
+                  <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={s.adjThumb} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={s.adjName}>{a.nombre}</Text>
+                    <Text style={s.mutedSmall}>{(a.size / 1024).toFixed(0)} KB · {a.mime}</Text>
+                  </View>
+                  <Text style={s.adjLink}>Ver</Text>
+                </Pressable>
+              ))}
+            </View>
           )}
         </View>
       </Card>
@@ -459,4 +480,8 @@ const s = StyleSheet.create({
   attrGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 8 },
   attrLabel: { fontSize: 10, color: theme.colors.mutedSoft, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, width: 90 },
   attrValue: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', flex: 1 },
+  adjRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 8 },
+  adjThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.border } as any,
+  adjName: { fontSize: 12, fontWeight: '700', color: theme.colors.text, flex: 1 },
+  adjLink: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
 });

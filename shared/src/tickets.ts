@@ -257,9 +257,9 @@ function mapAdjunto(row: Record<string, unknown>): TicketAdjunto {
     id: row.id as number,
     ticketId: (row.ticket_id as string) ?? '',
     storagePath: (row.storage_path as string) ?? (row.ruta as string) ?? '',
-    nombre: (row.nombre as string) ?? (row.filename as string) ?? '',
+    nombre: (row.nombre_original as string) ?? (row.nombre as string) ?? (row.filename as string) ?? '',
     mime: (row.mime as string) ?? (row.mime_type as string) ?? '',
-    size: (row.size as number) ?? (row.bytes as number) ?? 0,
+    size: (row.tamano_bytes as number) ?? (row.size as number) ?? (row.bytes as number) ?? 0,
     creadoEn: (row.creado_en as string) ?? '',
   };
 }
@@ -277,6 +277,7 @@ export type ListMyTicketsParams = {
   categoriaId?: number;
   numero?: number;
   mesaId?: number;
+  tecnicoId?: string | null;
   q?: string;
   page?: number;
   pageSize?: number;
@@ -323,11 +324,21 @@ export async function listMyTickets(
   if (params.mesaId && Number.isInteger(params.mesaId)) {
     query = query.eq('mesa_id', params.mesaId);
   }
+  if (params.tecnicoId !== undefined) {
+    if (params.tecnicoId === null) query = query.is('tecnico_asignado_id', null);
+    else if (params.tecnicoId === '__assigned') query = query.not('tecnico_asignado_id', 'is', null);
+    else query = query.eq('tecnico_asignado_id', params.tecnicoId);
+  }
   const q = params.q?.trim();
   if (q) {
-    // Usa ILIKE; con pg_trgm + GIN acelera %q% si existe índice
+    // Usa ILIKE; con pg_trgm + GIN acelera %q% si existe índice. Si q es numérico, busca también por número de ticket
     const escaped = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    query = query.ilike('asunto', `%${escaped}%`);
+    const num = Number(q.replace(/^#/, ''));
+    if (Number.isInteger(num) && String(num) === q.replace(/^#/, '').trim()) {
+      query = query.or(`numero.eq.${num},asunto.ilike.%${escaped}%`);
+    } else {
+      query = query.ilike('asunto', `%${escaped}%`);
+    }
   }
 
   const { data, error, count } = await query;

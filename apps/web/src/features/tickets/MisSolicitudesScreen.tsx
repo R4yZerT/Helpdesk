@@ -1,9 +1,10 @@
 // RF-08 — Mis solicitudes: server paginado + Realtime + pull-to-refresh (Stitch: grid 2cols, FAB naranja)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ESTADOS, PRIORIDADES, fetchMesas, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
+import { fetchMesas, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { Badge, Card, Divider } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
+import { FilterDropdown, ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EmpleadoStackParamList } from '../../navigation/types';
@@ -25,8 +26,6 @@ export function MisSolicitudesScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [estado, setEstado] = useState<EstadoTicket | ''>('');
   const [prioridad, setPrioridad] = useState<PrioridadTicket | ''>('');
-  const [categoriaId, setCategoriaId] = useState<number | ''>('');
-  const [numeroStr, setNumeroStr] = useState('');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,12 +45,9 @@ export function MisSolicitudesScreen({ navigation }: Props) {
     if (isFirst) setLoading(true);
     else setLoadingMore(true);
     try {
-      const numero = numeroStr.trim() ? parseInt(numeroStr.trim(), 10) : undefined;
       const res = await listMyTickets(supabase, {
         estado: estado || undefined,
         prioridad: prioridad || undefined,
-        categoriaId: categoriaId || undefined,
-        numero: Number.isFinite(numero) ? numero : undefined,
         q: qDebounced || undefined,
         page: targetPage,
         pageSize: PAGE_SIZE,
@@ -67,7 +63,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
       setLoadingMore(false);
       setRefreshing(false);
     }
-  }, [estado, prioridad, categoriaId, numeroStr, qDebounced]);
+  }, [estado, prioridad, qDebounced]);
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
 
@@ -132,7 +128,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Buscar en asunto"
+            placeholder="Buscar por ticket (#, asunto)"
             placeholderTextColor={theme.colors.mutedSoft}
             style={s.search}
             returnKeyType="search"
@@ -145,29 +141,16 @@ export function MisSolicitudesScreen({ navigation }: Props) {
           )}
         </View>
 
-        <Text style={s.filterLabel}>Estado</Text>
-        <View style={s.chips}>
-          <Chip label="Todos" active={!estado} onPress={() => setEstado('')} />
-          {ESTADOS.map((e) => <Chip key={e} label={prettyEstado(e)} active={estado === e} onPress={() => setEstado(e as EstadoTicket)} />)}
-        </View>
-
-        <Text style={s.filterLabel}>Prioridad</Text>
-        <View style={s.chips}>
-          <Chip label="Todas" active={!prioridad} onPress={() => setPrioridad('')} />
-          {PRIORIDADES.map((p) => <Chip key={p} label={p} active={prioridad === p} onPress={() => setPrioridad(p as PrioridadTicket)} />)}
-        </View>
-
-        <Text style={s.filterLabel}>Filtros extra</Text>
-        <View style={s.extraRow}>
-          <TextInput value={numeroStr} onChangeText={setNumeroStr} placeholder="# Número" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
-          <TextInput value={String(categoriaId)} onChangeText={(v) => setCategoriaId(v ? (parseInt(v,10)||'' as unknown as number) : '')} placeholder="Categoría ID" placeholderTextColor={theme.colors.mutedSoft} style={s.miniInput} keyboardType="number-pad" />
+        <View style={s.dropdownRow}>
+          <FilterDropdown label="Estado" value={estado as never} options={ESTADO_OPTIONS as never} onSelect={(v) => setEstado((v as string) as EstadoTicket | '')} placeholder="Todos" />
+          <FilterDropdown label="Prioridad" value={prioridad as never} options={PRIORIDAD_OPTIONS as never} onSelect={(v) => setPrioridad((v as string) as PrioridadTicket | '')} placeholder="Todas" />
         </View>
 
         <View style={s.totalRow}>
           <View style={s.totalDot} />
           <Text style={s.total}>{total} resultado{total !== 1 ? 's' : ''} · {qDebounced ? `"${qDebounced}"` : 'sin búsqueda'}</Text>
-          {(!!estado || !!prioridad || !!qDebounced || !!numeroStr || !!categoriaId) && (
-            <Pressable onPress={() => { setEstado(''); setPrioridad(''); setQ(''); setNumeroStr(''); setCategoriaId(''); }} style={s.resetBtn}>
+          {(!!estado || !!prioridad || !!qDebounced) && (
+            <Pressable onPress={() => { setEstado(''); setPrioridad(''); setQ(''); }} style={s.resetBtn}>
               <Text style={s.resetText}>Limpiar filtros</Text>
             </Pressable>
           )}
@@ -235,19 +218,6 @@ export function MisSolicitudesScreen({ navigation }: Props) {
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[s.chip, active && s.chipActive]}
-      accessibilityRole="button"
-      accessibilityLabel={`Filtro ${label}`}
-      accessibilityState={{ selected: active }}>
-      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 function prioridadTone(p: string): 'success' | 'warning' | 'danger' | 'accent' | 'info' {
   if (p === 'critica') return 'accent';
   if (p === 'alta') return 'danger';
@@ -296,14 +266,7 @@ const s = StyleSheet.create({
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   clearBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border },
   clearText: { color: theme.colors.muted, fontSize: 16, fontWeight: '700', marginTop: -1 },
-  filterLabel: { fontSize: 10, fontWeight: '700', color: theme.colors.mutedSoft, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 4 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  chipText: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', textTransform: 'capitalize' },
-  chipTextActive: { color: '#fff' },
-  extraRow: { flexDirection: 'row', gap: 8 },
-  miniInput: { flex: 1, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, height: 36, fontSize: 12, color: theme.colors.text, backgroundColor: theme.colors.surface },
+  dropdownRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   totalDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary },
   total: { fontSize: 11, color: theme.colors.muted, fontWeight: '600', flex: 1 },
