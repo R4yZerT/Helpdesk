@@ -10,6 +10,45 @@ function corsHeaders(origin?: string): Record<string, string> {
 }
 function isEmail(v: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function isCedula(v: string) { return /^[0-9]{5,15}$/.test(v); }
+const COMMON_PASSWORDS = new Set(['password','123456','123456789','qwerty','12345678','12345','1234567','password1','123123','qwerty123','abc123','password123','admin','letmein','welcome','monkey','dragon','passw0rd','master','hello','freedom','whatever','qazwsx','trustno1','1234','1234567890','000000','1q2w3e4r','qwertyuiop','123qwe','zxcvbnm','superman','iloveyou','starwars','123321','654321','qwerty12345','password12','admin123','welcome123','login','princess','solo','qwerty1','baseball','football','jesus']);
+function stripAccents(s: string){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function containsAttr(pwLower: string, attr?: string){
+  if(!attr) return false;
+  const clean = stripAccents(attr.toLowerCase().trim());
+  if(clean.length<3) return false;
+  const tokens = clean.split(/[@._\-\s]+/).filter(t=>t.length>=3);
+  return tokens.some(t=> pwLower.includes(stripAccents(t.toLowerCase())));
+}
+function hasRepetitionOrSequence(pw: string){
+  if(/(.)\1{3,}/.test(pw)) return true;
+  const seq='abcdefghijklmnopqrstuvwxyz0123456789';
+  const lower=pw.toLowerCase();
+  for(let i=0;i<=lower.length-4;i++){ const sub=lower.slice(i,i+4); if(seq.includes(sub) || seq.split('').reverse().join('').includes(sub)) return true; }
+  return false;
+}
+function validatePasswordNIST(pw: string, ctx:{email?:string;nombre?:string;rol?:string}){
+  const reasons:string[]=[];
+  const len=pw.length;
+  if(len<8) reasons.push('Mínimo 8 caracteres');
+  if(len>64) reasons.push('Máximo 64 caracteres');
+  const lower=pw.toLowerCase();
+  if(COMMON_PASSWORDS.has(lower)) reasons.push('Contraseña muy común, elige otra');
+  if(hasRepetitionOrSequence(pw)) reasons.push('Evita repeticiones o secuencias (aaaa, 1234)');
+  if(containsAttr(lower, ctx.email)) reasons.push('No debe contener tu correo');
+  if(containsAttr(lower, ctx.nombre)) reasons.push('No debe contener tu nombre');
+  if(containsAttr(lower, ctx.rol)) reasons.push('No debe contener tu rol');
+  if(reasons.length===0){
+    let score=0;
+    if(len>=8) score++;
+    if(len>=12) score++;
+    const hasLower=/[a-z]/.test(pw), hasUpper=/[A-Z]/.test(pw), hasDigit=/[0-9]/.test(pw), hasSymbol=/[^a-zA-Z0-9]/.test(pw);
+    const variety=[hasLower,hasUpper,hasDigit,hasSymbol].filter(Boolean).length;
+    if(variety>=3) score++;
+    if(variety===4 && len>=12) score++;
+    if(score<2) reasons.push('Contraseña demasiado débil, añade longitud y variedad (mayúsculas, números, símbolos)');
+  }
+  return reasons;
+}
 
 Deno.serve(async (req: Request) => {
   const headers = corsHeaders(req.headers.get('origin') ?? undefined);
@@ -67,8 +106,18 @@ Deno.serve(async (req: Request) => {
   }
   if (body.password !== undefined) {
     const pwd = body.password;
-    if (pwd.length < 8) return Response.json({ error: 'Mínimo 8 caracteres' }, { status: 400, headers });
-    if (pwd.length > 72) return Response.json({ error: 'Máximo 72 caracteres' }, { status: 400, headers });
+    // obtener contexto para validar atributos (email/nombre si vienen en body, sino buscar profile)
+    let ctxEmail = newEmail;
+    let ctxNombre: string | undefined;
+    if (!ctxEmail || !ctxNombre) {
+      const { data: prof } = await adminClient.from('profiles').select('email, full_name, rol').eq('id', id).maybeSingle();
+      if (prof) {
+        ctxEmail = ctxEmail ?? (prof as { email: string }).email ?? undefined;
+        ctxNombre = (prof as { full_name: string }).full_name ?? undefined;
+      }
+    }
+    const reasons = validatePasswordNIST(pwd, { email: ctxEmail, nombre: ctxNombre });
+    if (reasons.length) return Response.json({ error: reasons.join(' · ') }, { status: 400, headers });
     authPatch.password = pwd;
   }
 
@@ -78,26 +127,36 @@ Deno.serve(async (req: Request) => {
   if (newCedula !== undefined) {
     const { data: dup } = await adminClient.from('profiles').select('id').eq('cedula', newCedula).maybeSingle();
     if (dup && (dup as { id: string }).id !== id) return Response.json({ error: 'Cédula ya registrada' }, { status: 409, headers });
+    if (newEmail !== undefined) {
+      const { data: dupEmail } = await adminClient.from('profiles').select('id').eq('email', newEmail).maybeSingle();
+      if (dupEmail && (dupEmail as { id: string }).id !== id) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
+    }
     const updates: Record<string, unknown> = { cedula: newCedula };
     if (newEmail !== undefined) updates.email = newEmail;
     const { error: upErr } = await adminClient.from('profiles').update(updates).eq('id', id);
     if (upErr) {
       if (/duplicate|unique/i.test(upErr.message) && /cedula/i.test(upErr.message)) return Response.json({ error: 'Cédula ya registrada' }, { status: 409, headers });
+      if (/duplicate|unique/i.test(upErr.message) && /email/i.test(upErr.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
       return Response.json({ error: upErr.message }, { status: 400, headers });
     }
     // Si solo era cédula (sin email/password), ya terminamos
     if (Object.keys(authPatch).length === 0) return Response.json({ ok: true }, { headers });
   } else if (newEmail !== undefined && Object.keys(authPatch).length === 1 && authPatch.email) {
-    // Si solo cambió email (sin password/cedula), también espejar en profile antes de auth
+    // Verificar correo duplicado antes de actualizar
+    const { data: dupEmail } = await adminClient.from('profiles').select('id').eq('email', newEmail).maybeSingle();
+    if (dupEmail && (dupEmail as { id: string }).id !== id) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
     const { error: upErr } = await adminClient.from('profiles').update({ email: newEmail }).eq('id', id);
-    if (upErr) return Response.json({ error: upErr.message }, { status: 400, headers });
+    if (upErr) {
+      if (/duplicate|unique/i.test(upErr.message) && /email/i.test(upErr.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
+      return Response.json({ error: upErr.message }, { status: 400, headers });
+    }
   }
 
   // Actualizar auth (email/password)
   if (Object.keys(authPatch).length > 0) {
     const { error } = await adminClient.auth.admin.updateUserById(id, authPatch);
     if (error) {
-      if (/already.*exists|duplicate/i.test(error.message)) return Response.json({ error: 'Email ya registrado' }, { status: 409, headers });
+      if (/already.*exists|duplicate/i.test(error.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
       return Response.json({ error: error.message }, { status: 400, headers });
     }
     // Si auth email cambió y no se actualizó profile aún (caso password+email sin cédula previa)

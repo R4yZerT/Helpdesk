@@ -13,6 +13,46 @@ function corsHeaders(origin?: string): Record<string, string> {
 }
 function isEmail(v: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function isCedula(v: string) { return /^[0-9]{5,15}$/.test(v); }
+const COMMON_PASSWORDS = new Set(['password','123456','123456789','qwerty','12345678','12345','1234567','password1','123123','qwerty123','abc123','password123','admin','letmein','welcome','monkey','dragon','passw0rd','master','hello','freedom','whatever','qazwsx','trustno1','1234','1234567890','000000','1q2w3e4r','qwertyuiop','123qwe','zxcvbnm','superman','iloveyou','starwars','123321','654321','qwerty12345','password12','admin123','welcome123','login','princess','solo','qwerty1','baseball','football','jesus']);
+function stripAccents(s: string){ return s.normalize('NFD').replace(/[\u0300-\u036f]/g,''); }
+function containsAttr(pwLower: string, attr?: string){
+  if(!attr) return false;
+  const clean = stripAccents(attr.toLowerCase().trim());
+  if(clean.length<3) return false;
+  const tokens = clean.split(/[@._\-\s]+/).filter(t=>t.length>=3);
+  return tokens.some(t=> pwLower.includes(stripAccents(t.toLowerCase())));
+}
+function hasRepetitionOrSequence(pw: string){
+  if(/(.)\1{3,}/.test(pw)) return true;
+  const seq='abcdefghijklmnopqrstuvwxyz0123456789';
+  const lower=pw.toLowerCase();
+  for(let i=0;i<=lower.length-4;i++){ const sub=lower.slice(i,i+4); if(seq.includes(sub) || seq.split('').reverse().join('').includes(sub)) return true; }
+  return false;
+}
+function validatePasswordNIST(pw: string, ctx:{email?:string;nombre?:string;rol?:string}){
+  const reasons:string[]=[];
+  const len=pw.length;
+  if(len<8) reasons.push('Mínimo 8 caracteres');
+  if(len>64) reasons.push('Máximo 64 caracteres');
+  const lower=pw.toLowerCase();
+  if(COMMON_PASSWORDS.has(lower)) reasons.push('Contraseña muy común, elige otra');
+  if(hasRepetitionOrSequence(pw)) reasons.push('Evita repeticiones o secuencias (aaaa, 1234)');
+  if(containsAttr(lower, ctx.email)) reasons.push('No debe contener tu correo');
+  if(containsAttr(lower, ctx.nombre)) reasons.push('No debe contener tu nombre');
+  if(containsAttr(lower, ctx.rol)) reasons.push('No debe contener tu rol');
+  // score <2 fallback
+  if(reasons.length===0){
+    let score=0;
+    if(len>=8) score++;
+    if(len>=12) score++;
+    const hasLower=/[a-z]/.test(pw), hasUpper=/[A-Z]/.test(pw), hasDigit=/[0-9]/.test(pw), hasSymbol=/[^a-zA-Z0-9]/.test(pw);
+    const variety=[hasLower,hasUpper,hasDigit,hasSymbol].filter(Boolean).length;
+    if(variety>=3) score++;
+    if(variety===4 && len>=12) score++;
+    if(score<2) reasons.push('Contraseña demasiado débil, añade longitud y variedad (mayúsculas, números, símbolos)');
+  }
+  return reasons;
+}
 
 Deno.serve(async (req: Request) => {
   const headers = corsHeaders(req.headers.get('origin') ?? undefined);
@@ -61,8 +101,11 @@ Deno.serve(async (req: Request) => {
   else if (fullName.length > 80) errs.fullName = 'Nombre máximo 80 caracteres';
   if (!isEmail(email)) errs.email = 'Email inválido';
   if (!isCedula(cedula)) errs.cedula = 'Cédula 5-15 dígitos';
-  if (!password || password.length < 8) errs.password = 'Mínimo 8 caracteres';
-  else if (password.length > 72) errs.password = 'Máximo 72 caracteres';
+  if (!password) errs.password = 'Contraseña requerida';
+  else {
+    const pwReasons = validatePasswordNIST(password, { email, nombre: fullName, rol: rolIn });
+    if (pwReasons.length) errs.password = pwReasons.join(' · ');
+  }
   const rolDb = MAP_ROL[rolIn];
   if (!rolDb || !ALLOWED_ROLES_DB.has(rolDb)) errs.rol = 'Rol inválido';
   if (mesaId !== null && (!Number.isInteger(mesaId) || mesaId <= 0)) errs.mesaId = 'Mesa inválida';
@@ -72,9 +115,11 @@ Deno.serve(async (req: Request) => {
     const { data: mesa, error: mesaErr } = await adminClient.from('mesas').select('id').eq('id', mesaId).single();
     if (mesaErr || !mesa) return Response.json({ error: 'Mesa no existe' }, { status: 400, headers });
   }
-  // Verificar cédula duplicada antes de crear auth
+  // Verificar cédula y correo duplicados antes de crear auth
   const { data: dupCed } = await adminClient.from('profiles').select('id').eq('cedula', cedula).maybeSingle();
   if (dupCed) return Response.json({ error: 'Cédula ya registrada' }, { status: 409, headers });
+  const { data: dupEmail } = await adminClient.from('profiles').select('id').eq('email', email).maybeSingle();
+  if (dupEmail) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
 
   const { data, error } = await adminClient.auth.admin.createUser({
     email,
@@ -83,7 +128,7 @@ Deno.serve(async (req: Request) => {
     user_metadata: { full_name: fullName, rol: rolDb, cedula },
   });
   if (error) {
-    if (/already.*exists|duplicate/i.test(error.message)) return Response.json({ error: 'Email ya registrado' }, { status: 409, headers });
+    if (/already.*exists|duplicate/i.test(error.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
     return Response.json({ error: error.message }, { status: 400, headers });
   }
   const newId = data.user?.id;
@@ -93,7 +138,7 @@ Deno.serve(async (req: Request) => {
   const { error: upErr } = await adminClient.from('profiles').update({ cedula, email, mesa_id: mesaId }).eq('id', newId);
   if (upErr) {
     if (/duplicate|unique/i.test(upErr.message) && /cedula/i.test(upErr.message)) return Response.json({ error: 'Cédula ya registrada' }, { status: 409, headers });
-    if (/duplicate|unique/i.test(upErr.message)) return Response.json({ error: 'Email ya registrado' }, { status: 409, headers });
+    if (/duplicate|unique/i.test(upErr.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
     return Response.json({ id: newId, warning: `Usuario creado pero no se asignó cédula/mesa: ${upErr.message}` }, { status: 201, headers });
   }
 
