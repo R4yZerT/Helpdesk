@@ -400,7 +400,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>Crear solicitud</Text>}
             </Pressable>
           </View>
-          <Text style={s.footnote}>Se creará como “abierto” con la prioridad bloqueada por categoría.</Text>
         </Card>
       </View>
     </ScrollView>

@@ -2,6 +2,15 @@
 import type { EstadoTicket, PrioridadTicket } from './types.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+// RF-06: prioridad bloqueada por categoría — mapa espejo de ia.ts para evitar ciclo tickets<->ia
+const PRIORIDAD_POR_CATEGORIA_TICKETS: Record<number, PrioridadTicket> = {
+  1: 'media', 2: 'alta', 3: 'alta', 4: 'media', 5: 'critica', 6: 'alta', 7: 'baja', 8: 'media', 9: 'critica', 10: 'alta',
+  11: 'baja', 12: 'media', 13: 'media', 14: 'baja', 15: 'critica', 16: 'alta', 17: 'baja', 18: 'media', 19: 'media',
+};
+function getPrioridadPorCategoriaLocal(categoriaId: number): PrioridadTicket {
+  return PRIORIDAD_POR_CATEGORIA_TICKETS[categoriaId] ?? 'media';
+}
+
 export const PRIORIDADES: readonly PrioridadTicket[] = ['baja', 'media', 'alta', 'critica'] as const;
 export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto', 'programado'] as const;
 
@@ -189,11 +198,14 @@ export async function createTicket(
     const { data } = await client.auth.getUser();
     usuario_id = data.user?.id ?? null;
   } catch { /* trigger suple */ }
+  // RF-06: prioridad bloqueada por categoría — no se confía en el input del cliente
+  const prioridadFinal = getPrioridadPorCategoriaLocal(input.categoriaId);
   const payload: Record<string, unknown> = {
     categoria_id: input.categoriaId,
     asunto: input.asunto.trim(),
     descripcion: input.descripcion.trim(),
-    prioridad: input.prioridad,
+    prioridad: prioridadFinal,
+    estado: 'abierto',
     mesa_id: input.mesaId,
     ...(usuario_id ? { usuario_id } : {}),
     ...(opts?.id ? { id: opts.id } : {}),
