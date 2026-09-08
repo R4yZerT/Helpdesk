@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, FeedbackModal } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -206,7 +206,6 @@ export function TicketDetailScreen({ route }: Props) {
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
   const nextEstados = ESTADOS.filter((e) => canTransition(ticket.estado as any, e as any));
-  const charCount = mensaje.length;
   const slaPct = 75; // demo Stitch 35 min restantes 75%
 
   const header = (
@@ -268,18 +267,7 @@ export function TicketDetailScreen({ route }: Props) {
           ))}
         </View>
         <View style={{ padding: 14, gap: 10 }}>
-          {activeTab === 'comentarios' ? (
-            comentarios.length === 0 ? <Text style={s.muted}>Sin comentarios — inicia el hilo con tu avance.</Text> : comentarios.map((c) => (
-              <View key={c.id} style={[s.comment, c.interno && s.commentInternal]}>
-                <View style={s.rowHeader}>
-                  <Text style={s.rowTitle}>{c.usuarioId.slice(0, 8)}…</Text>
-                  {c.interno ? <Badge label="interno · confidencial" tone="accent" /> : <Badge label="público" tone="muted" />}
-                  <Text style={s.mutedSmall}>{new Date(c.creadoEn).toLocaleDateString('es-ES')}</Text>
-                </View>
-                <Text style={s.desc}>{c.comentario}</Text>
-              </View>
-            ))
-          ) : activeTab === 'historial' ? (
+          {activeTab === 'comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab === 'historial' ? (
             estados.length === 0 ? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e) => (
               <View key={e.id} style={s.timelineRow}>
                 <View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View>
@@ -309,42 +297,8 @@ export function TicketDetailScreen({ route }: Props) {
         </View>
       </Card>
 
-      {/* Composer */}
-      <View style={s.composer} accessibilityRole="none" accessibilityLabel="Agregar comentario">
-        <Text style={s.section}>Agregar avance</Text>
-        {!canComment ? <Text style={s.muted}>No tienes permiso para comentar en este ticket</Text> : (
-          <>
-            <TextInput
-              value={mensaje}
-              onChangeText={setMensaje}
-              placeholder="Escribe tu avance"
-              placeholderTextColor={theme.colors.mutedSoft}
-              style={s.input}
-              multiline
-              numberOfLines={3}
-              maxLength={2000}
-              accessibilityLabel="Mensaje del comentario"
-              editable={!sending}
-            />
-            <Text style={[s.hint, charCount > 1800 && { color: theme.colors.warning }]}>{charCount}/2000</Text>
-            {canInternal ? (
-              <View style={s.switchRow}>
-                <Text style={s.switchLabel}>Interno — solo equipo</Text>
-                <Switch value={interno} onValueChange={setInterno} disabled={sending} trackColor={{ true: theme.colors.accent }} thumbColor="#fff" accessibilityLabel="Marcar como interno" />
-              </View>
-            ) : null}
-            {sendError ? <View style={s.errorBox}><Text style={s.error} accessibilityRole="alert">{sendError}</Text></View> : null}
-            <Pressable
-              onPress={onSend}
-              disabled={sending || !mensaje.trim()}
-              style={[s.sendBtn, (sending || !mensaje.trim()) && { opacity: 0.45 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Enviar comentario"
-              accessibilityState={{ disabled: sending || !mensaje.trim() }}>
-              {sending ? <ActivityIndicator color="#fff" /> : <Text style={s.sendText}>Enviar avance</Text>}
-            </Pressable>
-          </>
-        )}
+      <View style={s.composer}>
+        <TicketCommentComposer mensaje={mensaje} onChange={setMensaje} interno={interno} onInternoChange={setInterno} canInternal={canInternal} sending={sending} error={sendError} onSend={onSend} canComment={canComment} />
       </View>
     </View>
   );
