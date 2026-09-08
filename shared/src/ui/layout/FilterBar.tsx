@@ -1,7 +1,9 @@
-// FilterBar — Stitch sticky top-16: Hoy/7d/30d + Mesas + Categoría + Estado + Export
+// FilterBar — RF-17 filtros combinables: rango/dependencia/tecnico/categoria/prioridad/estado
 import * as React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme.js';
+import { FilterDropdown } from '../FilterDropdown.js';
+import { ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '../../filters.js';
 
 export type FilterRange = 'hoy' | '7d' | '30d' | 'custom';
 
@@ -12,6 +14,20 @@ export function FilterBar({
   onToggleMesa,
   mesas,
   onExport,
+  estado,
+  onEstadoChange,
+  prioridad,
+  onPrioridadChange,
+  categoriaId,
+  onCategoriaChange,
+  categorias,
+  tecnicoId,
+  onTecnicoChange,
+  tecnicos,
+  customDesde,
+  customHasta,
+  onCustomDesdeChange,
+  onCustomHastaChange,
 }: {
   range: FilterRange;
   onRangeChange: (r: FilterRange) => void;
@@ -19,6 +35,20 @@ export function FilterBar({
   onToggleMesa: (id: number) => void;
   mesas: { id: number; nombre: string }[];
   onExport?: () => void;
+  estado?: string;
+  onEstadoChange?: (v: string) => void;
+  prioridad?: string;
+  onPrioridadChange?: (v: string) => void;
+  categoriaId?: number | '';
+  onCategoriaChange?: (v: number | '') => void;
+  categorias?: { id: number; nombre: string }[];
+  tecnicoId?: string;
+  onTecnicoChange?: (v: string) => void;
+  tecnicos?: { id: string; nombre: string }[];
+  customDesde?: string;
+  customHasta?: string;
+  onCustomDesdeChange?: (v: string) => void;
+  onCustomHastaChange?: (v: string) => void;
 }) {
   const ranges: { id: FilterRange; label: string }[] = [
     { id: 'hoy', label: 'Hoy' },
@@ -63,6 +93,40 @@ export function FilterBar({
           </Pressable>
         ) : null}
       </ScrollView>
+      {(onEstadoChange || onPrioridadChange || onCategoriaChange || onTecnicoChange) ? (
+        <View style={s.secondRow}>
+          {onEstadoChange ? (
+            <FilterDropdown label="Estado" value={estado ?? ''} onSelect={(v) => onEstadoChange(String(v))} options={ESTADO_OPTIONS as any} />
+          ) : null}
+          {onPrioridadChange ? (
+            <FilterDropdown label="Prioridad" value={prioridad ?? ''} onSelect={(v) => onPrioridadChange(String(v))} options={PRIORIDAD_OPTIONS as any} />
+          ) : null}
+          {onCategoriaChange && categorias ? (
+            <FilterDropdown
+              label="Categoría"
+              value={categoriaId ?? ''}
+              onSelect={(v) => onCategoriaChange(v as number | '')}
+              options={[{ value: '', label: 'Todas' }, ...categorias.map((c) => ({ value: c.id, label: c.nombre }))]}
+            />
+          ) : null}
+          {onTecnicoChange && tecnicos ? (
+            <FilterDropdown
+              label="Técnico"
+              value={tecnicoId ?? ''}
+              onSelect={(v) => onTecnicoChange(String(v))}
+              options={[{ value: '', label: 'Todos' }, ...tecnicos.map((t) => ({ value: t.id, label: t.nombre }))]}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {range === 'custom' && onCustomDesdeChange && onCustomHastaChange ? (
+        <View style={s.dateRow}>
+          <Text style={s.dateLabel}>Desde</Text>
+          <TextInput value={customDesde ?? ''} onChangeText={onCustomDesdeChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.colors.muted} style={s.dateInput} />
+          <Text style={s.dateLabel}>Hasta</Text>
+          <TextInput value={customHasta ?? ''} onChangeText={onCustomHastaChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.colors.muted} style={s.dateInput} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -82,4 +146,8 @@ const s = StyleSheet.create({
   pillTextActive: { color: theme.colors.primaryDark },
   exportBtn: { marginLeft: 8, backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   exportText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  secondRow: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  dateLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.muted },
+  dateInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12, minWidth: 110, backgroundColor: theme.colors.surface },
 });

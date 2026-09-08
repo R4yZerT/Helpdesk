@@ -8,6 +8,8 @@ export type DashboardFilters = {
   mesaIds?: number[];
   categoriaId?: number;
   estado?: EstadoTicket;
+  prioridad?: PrioridadTicket;
+  tecnicoId?: string;
 };
 
 export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number; ingresadosHoy: number; total: number };
@@ -23,6 +25,8 @@ function applyFilters(q: any, f: DashboardFilters) {
   if (f.mesaIds?.length) q = q.in('mesa_id', f.mesaIds);
   if (f.categoriaId) q = q.eq('categoria_id', f.categoriaId);
   if (f.estado) q = q.eq('estado', f.estado);
+  if (f.prioridad) q = q.eq('prioridad', f.prioridad);
+  if (f.tecnicoId) q = q.eq('tecnico_asignado_id', f.tecnicoId);
   return q;
 }
 
