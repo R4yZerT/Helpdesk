@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { theme, Sidebar, IconUsers, IconLayers, IconTag, IconUpload } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
+import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
 import { AdminCategoriasScreen } from './AdminCategoriasScreen';
 import type { AdminStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
@@ -34,6 +35,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
   const isActive = (id: string) => {
     if (id === 'usuarios') return activeName === 'Usuarios';
     if (id === 'mesas') return activeName === 'Mesas';
+    if (id === 'mesaTickets') return activeName === 'MesaTickets';
     if (id === 'categorias') return activeName === 'Categorias';
     if (id === 'import') return activeName === 'Import';
     return false;
@@ -60,10 +62,11 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
   const sidebarContent = (
     <Sidebar
       items={[
-        { id: 'usuarios', label: 'Usuarios', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
-        { id: 'mesas', label: 'Mesas', active: isActive('mesas'), onPress: () => navigateAndClose('Mesas'), icon: <IconLayers size={14} color={ic(isActive('mesas'))} /> },
-        { id: 'categorias', label: 'Categorías', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
-        { id: 'import', label: 'Import', active: isActive('import'), onPress: () => navigateAndClose('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
+        { id: 'usuarios', label: 'USUARIOS', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
+        { id: 'mesas', label: 'DEPENDENCIAS', active: isActive('mesas'), onPress: () => navigateAndClose('Mesas'), icon: <IconLayers size={14} color={ic(isActive('mesas'))} /> },
+        { id: 'mesaTickets', label: 'MESAS', active: isActive('mesaTickets'), onPress: () => navigateAndClose('MesaTickets'), icon: <IconLayers size={14} color={ic(isActive('mesaTickets'))} /> },
+        { id: 'categorias', label: 'CATEGORÍAS', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
+        { id: 'import', label: 'IMPORT', active: isActive('import'), onPress: () => navigateAndClose('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Administrador') as string, role: profile.rol } : undefined}
       onLogout={signOut}
@@ -80,10 +83,11 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
         <View style={w.main}>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={screenOpts}>
-              <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
-              <Stack.Screen name="Mesas" component={AdminMesasScreen} options={{ title: 'Mesas' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} />
-              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} options={{ title: 'Categorías' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-              <Stack.Screen name="Import" options={{ title: 'Import' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
+              <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'USUARIOS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
+              <Stack.Screen name="Mesas" component={AdminMesasScreen} options={{ title: 'DEPENDENCIAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} />
+              <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} options={{ title: 'MESAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
+              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} options={{ title: 'CATEGORÍAS' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
+              <Stack.Screen name="Import" options={{ title: 'IMPORT' }} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
             </Stack.Navigator>
           </View>
         </View>
@@ -91,7 +95,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
     );
   }
 
-  const mobileTitle = activeName === 'Mesas' ? 'Mesas' : activeName === 'Categorias' ? 'Categorías' : activeName === 'Import' ? 'Import' : 'Usuarios';
+  const mobileTitle = activeName === 'Mesas' ? 'DEPENDENCIAS' : activeName === 'MesaTickets' ? 'MESAS' : activeName === 'Categorias' ? 'CATEGORÍAS' : activeName === 'Import' ? 'IMPORT' : 'USUARIOS';
   return (
     <View style={w.rootMobile}>
       <View style={w.mobileTopBar}>
@@ -106,8 +110,9 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
           <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
             <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
             <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} />
+            <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
             <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-            <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>Import pendiente</Text></View>}</Stack.Screen>
+            <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
           </Stack.Navigator>
         </View>
         {drawerOpen ? (
