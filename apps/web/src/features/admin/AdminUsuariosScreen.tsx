@@ -1,8 +1,10 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -111,6 +113,44 @@ export function AdminUsuariosScreen() {
 
   const hasActiveFilters = !!qDebounced || rol !== 'todos' || (isGeneralAdmin && mesaId !== 'todos') || activo !== 'todos';
   const clearFilters = () => { setQ(''); setRol('todos'); if (isGeneralAdmin) setMesaId('todos'); setActivo('todos'); };
+
+  // Export: CSV/PNG/PDF — mismo patrón que DashboardScreen (RF-18) via html2canvas + jsPDF, id admin-export-root
+  const onExportCsv = useCallback(() => {
+    try {
+      const header = ['nombre', 'cedula', 'correo', 'rol', 'dependencia', 'estado'];
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = users.map((u) => [u.fullName, u.cedula ?? '', u.email ?? '', u.rol, u.mesaNombre ?? (u.mesaId ? String(u.mesaId) : ''), u.activo ? 'activo' : 'inactivo']);
+      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${users.length}`, `# Filtros: ${hasActiveFilters ? 'filtrado' : 'sin filtros'}`].join('\r\n') + '\r\n' + csv;
+      const ok = downloadCsv(buildExportFilename('admin-usuarios', 'csv'), meta);
+      if (!ok) window.alert(`CSV generado (${users.length} filas).`);
+    } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+  }, [users, hasActiveFilters]);
+  const onExportPng = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-usuarios', 'png'); a.click();
+    } catch (e: any) { console.warn('[AdminUsuarios] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+  }, []);
+  const onExportPdf = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      // jsPDF importado estático arriba
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(buildExportFilename('admin-usuarios', 'pdf'));
+    } catch (e: any) { console.warn('[AdminUsuarios] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+  }, []);
 
   const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
   const doToggleActivo = async () => {
@@ -252,8 +292,15 @@ export function AdminUsuariosScreen() {
         </View>
       </View>
 
+      {/* Acciones export — web: PNG/PDF via html2canvas, CSV via downloadCsv. Misma UX que Dashboard RF-18 */}
+      <View style={s.exportRow}>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button" accessibilityLabel="Exportar CSV usuarios"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button" accessibilityLabel="Exportar PNG usuarios"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
+        <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button" accessibilityLabel="Exportar PDF usuarios"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+      </View>
+
       {/* Tabla */}
-      <View style={s.tableWrap}>
+      <View nativeID="admin-export-root" style={s.tableWrap}>
         <View style={s.thead}>
           <Text style={[s.th, s.thUser]}>Usuario</Text>
           <Text style={[s.th, s.thCedula]}>Cédula</Text>
@@ -386,6 +433,10 @@ const s = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
   h1: { fontSize: 20, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
   subtitle: { fontSize: 11, color: theme.colors.muted, lineHeight: 14 },
+  exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
+  exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
+  exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+  exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 36, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filterCard: {

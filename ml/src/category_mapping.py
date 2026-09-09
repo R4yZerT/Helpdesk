@@ -160,6 +160,9 @@ CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "Limpieza": ("infraestructura", "Obra civil y mantenimiento locativo"),
     "Traslado e instalación de carpa": ("infraestructura", "Obra civil y mantenimiento locativo"),
     "Préstamo de herramientas o equipos": ("infraestructura", "Obra civil y mantenimiento locativo"),
+    # ── Casos faltantes detectados auditoría 2026-09-07 (32 Greca + 1 Acompañamiento) ──
+    "Reparación de Greca": ("infraestructura", "Obra civil y mantenimiento locativo"),
+    "Acompañamiento para rendición de informes": ("tic", "Software y Sistemas"),
     # ── General (residual - será reclasificado, no debe permanecer en dataset final) ──
     "N/A": ("general", "Sin clasificar / Otros"),
     # Nota: "Otros equipos de oficina..." ya mapeado arriba a Equipos y hardware (no duplicar)
@@ -193,6 +196,7 @@ CONSOLIDATED_LABEL_MAP: dict[str, str] = {
 # Fallback por keywords si el tipo no está mapeado (casos con typos raros)
 # Nota: ya apuntan a categorías consolidadas (13 finales)
 FALLBACK_KEYWORDS: list[tuple[str, tuple[str, str]]] = [
+    ("greca", ("infraestructura", "Obra civil y mantenimiento locativo")),
     ("pieza gráfica", ("comunicaciones", "Piezas gráficas y diseño")),
     ("reel", ("comunicaciones", "Piezas gráficas y diseño")),
     ("carrusel", ("comunicaciones", "Piezas gráficas y diseño")),
@@ -246,6 +250,10 @@ GENERAL_RECLASSIFICATION_RULES: list[tuple[str, tuple[str, str]]] = [
 
 
 import unicodedata, re
+
+# Tipos genéricos donde el texto manda sobre el Tipo para correo (limpieza híbrida)
+_AMBIGUOUS_TIPOS_CORREO = {"soporte", "soporte / capacitacion", "sistema lento", "instalacion", "instalacion de software"}
+_STRONG_CORREO_PATTERNS = ["correo electronico", "sin correo", "no llegan correos", "buzon", "outlook", "mail.sabaneta", "contactenos@sabaneta"]
 
 def _apply_consolidation(cat: tuple[str, str]) -> tuple[str, str]:
     """Aplica consolidación 19→14 si existe mapping."""
@@ -318,6 +326,13 @@ def resolve_category(tipo_raw: str, texto: str | None = None) -> tuple[str, str]
                             break
                 if cat is None:
                     cat = ("general", "Sin clasificar / Otros")
+    # ── Corrección híbrida texto-vs-Tipo para correo ──
+    # Si Tipo es genérico ambiguo pero texto tiene señal fuerte de correo, priorizar correo
+    if texto and _norm(tipo_raw) in _AMBIGUOUS_TIPOS_CORREO:
+        norm_texto = _norm(texto)
+        if any(p in norm_texto for p in _STRONG_CORREO_PATTERNS):
+            # no sobrescribir casos GAS legítimos de contraseña ya resueltos arriba (Cambio de contraseña no está en ambiguos)
+            cat = ("tic", "Correo electrónico")
     # aplicar consolidación 19→14
     cat = _apply_consolidation(cat)
     # eliminar comodín: redistribuir si aún es general

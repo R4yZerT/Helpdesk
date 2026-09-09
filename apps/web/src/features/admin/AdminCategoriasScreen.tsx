@@ -1,8 +1,10 @@
 // RF-32 — Admin: categorías maestras ticket_categories
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -84,6 +86,42 @@ export function AdminCategoriasScreen() {
   const onEndReached = useCallback(() => { if (loadingMore || loading || !hasMore) return; fetchPage(page + 1); }, [loadingMore, loading, hasMore, page, fetchPage]);
   const hasFilters = !!qDeb || effectiveDominio !== 'todos' || activa !== 'todos';
   const clearFilters = () => { setQ(''); if (isGeneralAdmin) setDominio('todos'); setActiva('todos'); };
+  const onExportCsv = useCallback(() => {
+    try {
+      const header = ['id', 'dominio', 'subcategoria', 'orden', 'estado'];
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const exportRows = rows.map((r) => [String(r.id), r.dominio, r.subcategoria, String(r.orden), r.activa ? 'activa' : 'inactiva']);
+      const csv = [header.map(esc).join(','), ...exportRows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${exportRows.length}`].join('\r\n') + '\r\n' + csv;
+      const ok = downloadCsv(buildExportFilename('admin-categorias', 'csv'), meta);
+      if (!ok) window.alert(`CSV generado (${exportRows.length} filas).`);
+    } catch (e: any) { console.warn('[AdminCategorias] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+  }, [rows]);
+  const onExportPng = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de categorías'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-categorias', 'png'); a.click();
+    } catch (e: any) { console.warn('[AdminCategorias] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+  }, []);
+  const onExportPdf = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de categorías'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      // jsPDF importado estático arriba
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(buildExportFilename('admin-categorias', 'pdf'));
+    } catch (e: any) { console.warn('[AdminCategorias] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+  }, []);
 
   const toggleActiva = (r: TicketCategoria) => setConfirmToggle(r);
   const doToggleActiva = async () => {
@@ -167,6 +205,12 @@ export function AdminCategoriasScreen() {
         </View>
       </View>
 
+      <View style={s.exportRow}>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
+        <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+      </View>
+      <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList
         data={rows}
         keyExtractor={(x) => String(x.id)}
@@ -179,6 +223,7 @@ export function AdminCategoriasScreen() {
         onEndReachedThreshold={0.4}
         ListFooterComponent={loadingMore ? <ActivityIndicator color={theme.colors.primary} /> : hasFilters && rows.length === 0 ? <View style={s.empty}><Text style={s.muted}>Sin resultados</Text></View> : null}
       />
+      </View>
 
       {/* Crear */}
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
@@ -226,6 +271,10 @@ export function AdminCategoriasScreen() {
 }
 
 const s = StyleSheet.create({
+  exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: 16, marginBottom: 8, justifyContent: 'flex-end' },
+  exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
+  exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+  exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
   muted: { color: theme.colors.muted, fontSize: 12 },
