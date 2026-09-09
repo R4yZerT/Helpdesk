@@ -1,9 +1,11 @@
 // RF replanteo — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
 
 function getErrorMessage(e: unknown): string {
@@ -76,6 +78,42 @@ export function AdminMesaTicketsScreen() {
     })();
   }, [mesaId]);
 
+  const onExportCsv = useCallback(() => {
+    try {
+      const header = ['numero', 'asunto', 'estado', 'prioridad', 'tecnico'];
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const csvRows = tickets.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ?? 'Sin asignar']);
+      const csv = [header.map(esc).join(','), ...csvRows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${tickets.length}`, `# Mesa: ${mesaId ?? '—'}`].join('\r\n') + '\r\n' + csv;
+      const ok = downloadCsv(buildExportFilename('admin-mesa-tickets', 'csv'), meta);
+      if (!ok) window.alert(`CSV generado (${tickets.length} filas).`);
+    } catch (e: any) { console.warn('[AdminMesaTickets] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+  }, [tickets, mesaId]);
+  const onExportPng = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de tickets'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-mesa-tickets', 'png'); a.click();
+    } catch (e: any) { console.warn('[AdminMesaTickets] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+  }, []);
+  const onExportPdf = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de tickets'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      // jsPDF importado estático arriba
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(buildExportFilename('admin-mesa-tickets', 'pdf'));
+    } catch (e: any) { console.warn('[AdminMesaTickets] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+  }, []);
   const openAssign = async (t: Ticket) => {
     setAssignOpen(t); setAssignId(t.tecnicoAsignadoId ?? '');
     // fetch tecnicos de esa mesa
@@ -113,6 +151,12 @@ export function AdminMesaTicketsScreen() {
           <FilterDropdown label="Prioridad" value={prioridadFilter as never} options={PRIORIDAD_OPTIONS as never} onSelect={v=> setPrioridadFilter(v as string)} placeholder="Todas" />
         </View>
       </View>
+      <View style={s.exportRow}>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
+        <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+      </View>
+      <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}
         ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin tickets</Text><Text style={s.mutedCenter}>No hay tickets para esta dependencia.</Text></View>}
         renderItem={({item})=> (
@@ -127,6 +171,7 @@ export function AdminMesaTicketsScreen() {
           </Card>
         )}
       />
+      </View>
       <Modal visible={!!assignOpen} transparent animationType="fade" onRequestClose={()=>setAssignOpen(null)}>
         <View style={s.modalBackdrop}><View style={s.modalCard}>
           <Text style={s.modalTitle}>Asignar técnico · #{assignOpen?.numero}</Text>
@@ -149,6 +194,10 @@ export function AdminMesaTicketsScreen() {
 }
 
 const s = StyleSheet.create({
+  exportRow:{flexDirection:'row', gap:8, marginHorizontal:12, marginBottom:8, justifyContent:'flex-end'},
+  exportBtn:{backgroundColor:theme.colors.primary, paddingHorizontal:12, height:32, borderRadius:theme.radius.sm, alignItems:'center', justifyContent:'center', borderWidth:1, borderColor:theme.colors.primary},
+  exportBtnGhost:{backgroundColor:theme.colors.surface, borderColor:theme.colors.border},
+  exportBtnText:{color:'#fff', fontWeight:'800', fontSize:11},
   wrap:{flex:1, backgroundColor:theme.colors.bg},
   center:{flex:1, alignItems:'center', justifyContent:'center', gap:10, backgroundColor:theme.colors.bg, padding:24},
   muted:{color:theme.colors.muted, fontSize:12},

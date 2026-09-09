@@ -2,9 +2,11 @@
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -90,6 +92,42 @@ export function AdminMesasScreen() {
 
   const hasActiveFilters = !!qDeb || activa !== 'todos';
   const clearFilters = () => { setQ(''); setActiva('todos'); };
+  const onExportCsv = useCallback(() => {
+    try {
+      const header = ['id', 'nombre', 'estado'];
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = mesas.map((m) => [String(m.id), m.nombre, m.activa ? 'activa' : 'inactiva']);
+      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${mesas.length}`].join('\r\n') + '\r\n' + csv;
+      const ok = downloadCsv(buildExportFilename('admin-dependencias', 'csv'), meta);
+      if (!ok) window.alert(`CSV generado (${mesas.length} filas).`);
+    } catch (e: any) { console.warn('[AdminMesas] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+  }, [mesas]);
+  const onExportPng = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de dependencias'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const url = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-dependencias', 'png'); a.click();
+    } catch (e: any) { console.warn('[AdminMesas] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+  }, []);
+  const onExportPdf = useCallback(async () => {
+    try {
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      const el = document.getElementById('admin-export-root') as HTMLElement | null;
+      if (!el) { alert('No se encontró el contenedor de dependencias'); return; }
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      // jsPDF importado estático arriba
+      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(buildExportFilename('admin-dependencias', 'pdf'));
+    } catch (e: any) { console.warn('[AdminMesas] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+  }, []);
 
   const toggleActiva = (m: Mesa) => setConfirmToggle(m);
   const doToggleActiva = async () => {
@@ -187,6 +225,13 @@ export function AdminMesasScreen() {
         </View>
       </View>
 
+      {/* Export row — mismo patrón Dashboard RF-18 */}
+      <View style={s.exportRow}>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
+        <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+      </View>
+      <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList
         data={mesas}
         keyExtractor={(m) => String(m.id)}
@@ -201,6 +246,7 @@ export function AdminMesasScreen() {
         ListFooterComponent={loadingMore ? <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
         contentContainerStyle={s.listContent}
       />
+      </View>
 
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={s.modalBackdrop}>
@@ -237,6 +283,10 @@ export function AdminMesasScreen() {
 }
 
 const s = StyleSheet.create({
+  exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
+  exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
+  exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+  exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
   muted: { color: theme.colors.muted, fontSize: 12 },

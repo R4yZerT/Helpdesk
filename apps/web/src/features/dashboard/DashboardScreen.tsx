@@ -3,6 +3,8 @@ import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -103,25 +105,25 @@ export function DashboardScreen() {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
       if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
-      const html2canvas = (await import('html2canvas')).default;
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('dashboard', 'png'); a.click();
-    } catch (e) { console.warn('[Dashboard] export png', e); alert('Error al exportar PNG'); }
+    } catch (e: any) { console.warn('[Dashboard] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
       if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
-      const html2canvas = (await import('html2canvas')).default;
-      const { jsPDF } = await import('jspdf');
+      // html2canvas importado estático arriba — evita Cannot find module en Metro web
+      // jsPDF importado estático arriba
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('dashboard', 'pdf'));
-    } catch (e) { console.warn('[Dashboard] export pdf', e); alert('Error al exportar PDF'); }
+    } catch (e: any) { console.warn('[Dashboard] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
   }, []);
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
