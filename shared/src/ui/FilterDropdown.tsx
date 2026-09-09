@@ -15,6 +15,8 @@ type Props<T extends string | number | boolean> = {
   onSelect: (value: T | '' | 'todos') => void;
   placeholder?: string;
   testID?: string;
+  disabled?: boolean;
+  disabledPlaceholder?: string;
 };
 
 export function FilterDropdown<T extends string | number | boolean>({
@@ -23,6 +25,8 @@ export function FilterDropdown<T extends string | number | boolean>({
   options,
   onSelect,
   placeholder = 'Seleccionar',
+  disabled = false,
+  disabledPlaceholder,
 }: Props<T>) {
   const [open, setOpen] = React.useState(false);
   const [anchor, setAnchor] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -30,6 +34,7 @@ export function FilterDropdown<T extends string | number | boolean>({
   const selected = options.find((o) => String(o.value) === String(value));
 
   const handleOpen = React.useCallback(() => {
+    if (disabled) return;
     const node = triggerRef.current as unknown as {
       measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
       measure?: (cb: (x: number, y: number, w: number, h: number, px: number, py: number) => void) => void;
@@ -57,7 +62,7 @@ export function FilterDropdown<T extends string | number | boolean>({
     };
     // pequeño delay para asegurar layout en web
     requestAnimationFrame(() => setTimeout(doMeasure, 30));
-  }, []);
+  }, [disabled]);
 
   const dropdownStyle = anchor
     ? {
@@ -77,12 +82,13 @@ export function FilterDropdown<T extends string | number | boolean>({
       <Text style={s.label}>{label}</Text>
       <Pressable
         onPress={handleOpen}
-        style={({ pressed }) => [s.trigger, pressed && { opacity: 0.85 }]}
+        disabled={disabled}
+        style={({ pressed }) => [s.trigger, pressed && { opacity: 0.85 }, disabled && s.triggerDisabled]}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${selected?.label ?? placeholder}`}
       >
-        <Text style={[s.triggerText, !selected && s.placeholderText]} numberOfLines={1}>
-          {selected?.label ?? placeholder}
+        <Text style={[s.triggerText, (!selected || disabled) && s.placeholderText, disabled && s.disabledText]} numberOfLines={1}>
+          {disabled ? (disabledPlaceholder ?? placeholder) : (selected?.label ?? placeholder)}
         </Text>
         <Text style={s.chevron}>{open ? '▴' : '▾'}</Text>
       </Pressable>
@@ -128,6 +134,8 @@ export function FilterDropdown<T extends string | number | boolean>({
 const s = StyleSheet.create({
   wrap: { gap: 5, minWidth: 132, flex: 1 },
   label: { fontSize: 11, fontWeight: '600', letterSpacing: 0.2, color: theme.colors.muted },
+  triggerDisabled: { opacity: 0.55, backgroundColor: theme.colors.surfaceAlt },
+  disabledText: { color: theme.colors.mutedSoft },
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',

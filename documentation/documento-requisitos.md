@@ -224,3 +224,51 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-27.12 | Aplica los **requisitos mínimos definidos para la contraseña** (NIST SP 800-63B §5.1.1.2 + OWASP ASVS 2.1): 8–64 chars (NFKC), sin truncar, sin composición forzada, no común (Top 10k), sin secuencias/repeticiones 4+, no contener email/nombre/rol, estimación fuerza ≥ aceptable; feedback en vivo con `validatePasswordSync` | M | Implementado |
 | RF-27.13 | Se exige coincidencia exacta entre ambos campos; error "Las contraseñas no coinciden" si difieren | M | Implementado |
 | RF-27.14 | El cambio se persiste vía `admin-update-user` (service_role) y no expone la contraseña en logs | M | Implementado |
+
+---
+
+## 7. Extensiones Dashboard — Exportación (implementado 2026-09)
+
+> Refinamientos de RF-18 surgidos de validar export con filtros combinables (RF-17). CSV respeta los 6 filtros, PDF/PNG usan snapshot del dashboard.
+
+### RF-18.1 — Exportación CSV filtrada
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-18.1 | El dashboard debe permitir **Exportar CSV** con los **6 filtros combinables** aplicados (rango/dependencia/categoría/estado/prioridad/técnico) vía `fetchTicketsFiltrados` + `applyFilters` centralizado | S | Implementado |
+| RF-18.2 | El CSV incluye **metadatos en comentarios `#`**: fecha generación, resumen de filtros legible (`formatFiltrosResumen`) y conteo de registros; header fijo `numero,asunto,estado,prioridad,mesa,categoria,creado,actualizado` con escape `""` y BOM UTF-8 | S | Implementado |
+| RF-18.3 | Nombre de archivo `dashboard-YYYY-MM-DD.csv` vía `buildExportFilename`; `ticketsToRows` acepta tanto `Ticket` camelCase como filas crudas snake_case y resuelve `mesa_id → nombre` | S | Implementado |
+| RF-18.4 | En web `downloadCsv` dispara Blob + `<a download>`; en móvil (sin `document`) retorna `false` y se alerta contador de filas (fallback hasta integrar Sharing) | S | Implementado |
+
+### RF-18.5 — Exportación gráfica PNG/PDF
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-18.5 | Botones **PNG gráficas** y **PDF gráficas** capturan `dashboard-export-root` con `html2canvas` (scale 2) y generan PNG (`canvas.toDataURL`) o PDF (`jsPDF` landscape/portrait) — solo en web | S | Implementado |
+| RF-18.6 | `nativeID="dashboard-export-root"` presente en web y móvil para consistencia; en móvil PNG/PDF muestran mensaje “solo en web — usa CSV” | S | Implementado |
+| RF-18.7 | Manejo de errores con `try/catch` + `alert/window.alert` y `FeedbackModal` (RF-02) para confirmación/error tras cada exportación | S | Implementado |
+| RF-18.8 | Tests en `shared/src/export.test.ts` cubren `ticketsToRows`, `toCsv`, `buildExportFilename`, `formatFiltrosResumen` y `toCsvWithMeta` | S | Implementado |
+
+---
+
+## 8. Control de compromiso SLA (implementado 2026-09)
+
+> Sistema de compromiso por prioridad: **crítica 60m, alta 4h, media 24h, baja 72h** (espejo `ticket_sla_config` / `shared/src/sla.ts`). Cada ticket calcula `sla_vence_en = creado_en + duración` vía trigger `trg_set_sla_vence_en` (backfill + índices).
+
+### RF-11.1 — Cálculo y estado SLA
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-11.1 | Al crear ticket fijar `sla_vence_en`; helpers `getSlaVencimiento`, `getSlaMinutosRestantes`, `getSlaProgreso`, `formatSlaRestante` y `getSlaEstado` (vigente/por_vencer/vencido/cumplido/vencido_tarde) en `shared/src/sla.ts` | M | Implementado |
+| RF-11.2 | `por_vencer` = queda ≤25% de duración (cap 60 min para SLA largos); `vencido` = `now() > vence`; cerrados distinguen `cumplido` vs `vencido_tarde` | M | Implementado |
+| RF-11.3 | Función SQL `sla_estado` y `sla_interval` para queries/alertas; índices `sla_vence_en` y `estado+sla` | M | Implementado |
+
+### RF-16.1 — KPIs y alertas por SLA
+
+| ID | Requisito | Prio | Estado |
+|---|---|---|---|
+| RF-16.1 | `dashboard_kpis` redefine `sla_riesgo = vencidos + por_vencer` (no stub 0.06); retorna además `sla_vencidos`/`sla_por_vencer`; compat wrapper `dashboard_kpis_compat` | M | Implementado |
+| RF-16.2 | `getKPIs` fallback web/móvil calcula riesgo con `sla_vence_en` y umbral `min(60, dur/4)` por prioridad; card SLA muestra `vencidos · por vencer` con deltaTone danger/warn/success | M | Implementado |
+| RF-16.3 | Detalle de ticket muestra semáforo SLA (color/tone por estado), progreso % y `Vence … / 35 min restantes / Vencido hace…` usando `slaVenceEn ?? getSlaVencimiento` | M | Implementado |
+| RF-16.4 | `generar_alertas_ia` extendida: bloque C inserta alerta `ticket_estancado` con mensaje `SLA vencido — Ticket #…` (dedup 12h) para tickets con `now() > vence` | S | Implementado |
+| RF-16.5 | Tests `shared/src/sla.test.ts` cubren duraciones, vencimiento, estados vigente/por_vencer/vencido/cumplido/vencido_tarde, `formatSlaRestante` y `getSlaProgreso`; migración `20260911000000_sla_compromiso.sql` | M | Implementado |

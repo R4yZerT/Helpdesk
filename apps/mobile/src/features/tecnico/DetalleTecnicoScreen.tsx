@@ -198,7 +198,6 @@ export function DetalleTecnicoScreen({ route }: Props) {
           </View>
         ) : null}
         <View style={s.ghostStack}>
-          <Pressable onPress={()=> Alert.alert('Escalar','Escalado a Infra N3 — próximamente')} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Escalar a Infra N3</Text></Pressable>
           <Pressable onPress={()=> setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir información</Text></Pressable>
           {canReassign ? <Pressable onPress={()=>setShowReassign(v=>!v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign?'Ocultar reasignar':'Reasignar'}</Text></Pressable> : null}
         </View>

@@ -352,11 +352,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </View>
           {touched.prioridad && errors.prioridad ? <Text style={s.error}>{errors.prioridad}</Text> : null}
 
-          {/* Adjuntos RF-07 solo imágenes — clic abre picker */}
-          <Pressable onPress={() => (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.()} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar imágenes adjuntas">
+          {/* Adjuntos RF-07 imágenes + PDF/DOCX — clic abre picker */}
+          <Pressable onPress={() => (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.()} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar adjuntos">
             <Text style={s.dropIcon}>⤒</Text>
             <Text style={s.dropTitle}>Adjuntos (opcional) — tocar para cargar</Text>
-            <Text style={s.dropSub}>Solo imágenes JPG/PNG/WebP/GIF · 10 MB máx · 5 máx {adjuntos.length ? `· ${adjuntos.length} seleccionado(s)` : ''}</Text>
+            <Text style={s.dropSub}>Imágenes, PDF o Word (DOC/DOCX) · 10 MB máx · 5 máx {adjuntos.length ? `· ${adjuntos.length} seleccionado(s)` : ''}</Text>
           </Pressable>
           {/* input web nativo oculto */}
           <View style={{ display: 'none' } as unknown as object}>
@@ -364,7 +364,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             <input
               ref={fileInputRef as unknown as never}
               type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
+              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.doc,.docx"
               multiple
               onChange={(e: { target: { files: FileList | null; value: string } }) => { onPickFiles(e.target.files); e.target.value = ''; }}
             />

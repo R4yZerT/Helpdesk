@@ -84,6 +84,7 @@ export type Ticket = {
   solucionAplicada: string | null;
   creadoEn: string;
   actualizadoEn: string;
+  slaVenceEn?: string | null;
 };
 
 export type TicketEstado = {
@@ -139,6 +140,7 @@ function mapTicket(row: Record<string, unknown>): Ticket {
     solucionAplicada: (row.solucion_aplicada as string | null) ?? null,
     creadoEn: row.creado_en as string,
     actualizadoEn: row.actualizado_en as string,
+    slaVenceEn: (row.sla_vence_en as string | null) ?? null,
   };
 }
 
@@ -219,8 +221,8 @@ export async function createTicket(
 export const ADJUNTO_MAX_MB = 10;
 export const ADJUNTO_MAX_BYTES = ADJUNTO_MAX_MB * 1024 * 1024;
 export const ADJUNTO_MAX_COUNT = 5;
-export const ADJUNTO_ALLOWED_MIMES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
-export const ADJUNTO_ALLOWED_EXTS: readonly string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif'] as const;
+export const ADJUNTO_ALLOWED_MIMES: readonly string[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'] as const;
+export const ADJUNTO_ALLOWED_EXTS: readonly string[] = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.doc', '.docx'] as const;
 
 export type TicketAdjunto = {
   id: number;
@@ -237,7 +239,7 @@ export function validateAdjunto(file: { name: string; size: number; type: string
   const mimeOk = (ADJUNTO_ALLOWED_MIMES as readonly string[]).includes(file.type);
   const extOk = (ADJUNTO_ALLOWED_EXTS as readonly string[]).includes(ext === '.jpg' ? '.jpg' : ext === '.jpeg' ? '.jpeg' : ext);
   // permitir si mime o ext coincide (algunos pickers no traen mime)
-  if (!mimeOk && !extOk) return 'Solo imágenes JPG, PNG, WebP o GIF';
+  if (!mimeOk && !extOk) return 'Solo imágenes (JPG, PNG, WebP, GIF), PDF o Word (DOC/DOCX)';
   if (file.size > ADJUNTO_MAX_BYTES) return `Máximo ${ADJUNTO_MAX_MB} MB por archivo`;
   if (file.size <= 0) return 'Archivo vacío';
   return null;

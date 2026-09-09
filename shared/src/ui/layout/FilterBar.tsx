@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme.js';
+import { getMesaIdPorDominio } from '../../ia.js';
 import { FilterDropdown } from '../FilterDropdown.js';
 import { ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '../../filters.js';
 
@@ -14,6 +15,8 @@ export function FilterBar({
   onToggleMesa,
   mesas,
   onExport,
+  onExportPng,
+  onExportPdf,
   estado,
   onEstadoChange,
   prioridad,
@@ -35,13 +38,15 @@ export function FilterBar({
   onToggleMesa: (id: number) => void;
   mesas: { id: number; nombre: string }[];
   onExport?: () => void;
+  onExportPng?: () => void;
+  onExportPdf?: () => void;
   estado?: string;
   onEstadoChange?: (v: string) => void;
   prioridad?: string;
   onPrioridadChange?: (v: string) => void;
   categoriaId?: number | '';
   onCategoriaChange?: (v: number | '') => void;
-  categorias?: { id: number; nombre: string }[];
+  categorias?: { id: number; nombre: string; dominio: string }[];
   tecnicoId?: string;
   onTecnicoChange?: (v: string) => void;
   tecnicos?: { id: string; nombre: string }[];
@@ -72,24 +77,41 @@ export function FilterBar({
             </Pressable>
           ))}
         </View>
-        <View style={s.divider} />
-        {mesas.map((m) => {
-          const active = mesaIds.includes(m.id);
-          return (
-            <Pressable
-              key={m.id}
-              onPress={() => onToggleMesa(m.id)}
-              style={[s.pill, active && s.pillActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <Text style={[s.pillText, active && s.pillTextActive]}>{m.nombre}</Text>
-            </Pressable>
-          );
-        })}
+        {mesas.length ? <View style={s.divider} /> : null}
+        {mesas.length ? (
+          <FilterDropdown
+            label="Dependencia"
+            value={(mesaIds[0] ?? '') as never}
+            placeholder="Todas"
+            options={[{ value: '' as never, label: 'Todas' }, ...mesas.map((m) => ({ value: m.id as never, label: m.nombre }))]}
+            onSelect={(v) => {
+              const id = v as unknown as number | '';
+              if (id === '' || id == null) { mesaIds.slice().forEach((mid) => onToggleMesa(mid)); return; }
+              else {
+                // single-select dropdown: limpia y setea uno; si ya activo lo limpia
+                if (mesaIds.includes(id as number)) onToggleMesa(id as number);
+                else {
+                  // limpia anteriores y activa solo este
+                  mesaIds.slice().forEach((mid) => onToggleMesa(mid));
+                  onToggleMesa(id as number);
+                }
+              }
+            }}
+          />
+        ) : null}
         {onExport ? (
           <Pressable onPress={onExport} style={s.exportBtn}>
             <Text style={s.exportText}>Exportar CSV</Text>
+          </Pressable>
+        ) : null}
+        {onExportPng ? (
+          <Pressable onPress={onExportPng} style={[s.exportBtn, { backgroundColor: '#0F172A' }]}>
+            <Text style={s.exportText}>PNG gráficas</Text>
+          </Pressable>
+        ) : null}
+        {onExportPdf ? (
+          <Pressable onPress={onExportPdf} style={[s.exportBtn, { backgroundColor: theme.colors.accent }]}>
+            <Text style={s.exportText}>PDF gráficas</Text>
           </Pressable>
         ) : null}
       </ScrollView>
@@ -105,8 +127,10 @@ export function FilterBar({
             <FilterDropdown
               label="Categoría"
               value={categoriaId ?? ''}
+              disabled={mesaIds.length === 0}
+              disabledPlaceholder="Elige dependencia primero"
               onSelect={(v) => onCategoriaChange(v as number | '')}
-              options={[{ value: '', label: 'Todas' }, ...categorias.map((c) => ({ value: c.id, label: c.nombre }))]}
+              options={[{ value: '', label: 'Todas' }, ...(mesaIds.length ? categorias.filter((c) => getMesaIdPorDominio(c.dominio) === mesaIds[0]) : categorias).map((c) => ({ value: c.id, label: c.nombre }))]}
             />
           ) : null}
           {onTecnicoChange && tecnicos ? (

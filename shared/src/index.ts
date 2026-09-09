@@ -31,6 +31,7 @@ export * from './ui/charts/TimelineAlertas.js';
 export * from './ui/ticket/TicketComments.js';
 export * from './dashboard.js';
 export * from './export.js';
+export * from './sla.js';
 export * from './ia.js';
 export * from './admin.js';
 export * from './mesas.js';
