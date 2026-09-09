@@ -1,7 +1,7 @@
 // RF-12 — Bandeja técnico asignados orden prioridad/antigüedad + Realtime
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
+import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket, getSlaEstado, getSlaVencimiento, formatSlaRestante, getSlaMinutosRestantes } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,6 +17,7 @@ const tonoEstado = (e: string) => {
   if (e === 'solucionado') return 'success' as const;
   if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
+  if (e === 'programado') return 'warning' as const;
   return 'muted' as const;
 };
 const tonoPrioridad = (p: string) => {
@@ -85,12 +86,17 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
     fetchPage(page + 1);
   }, [loadingMore, loading, hasMore, page, fetchPage]);
 
-  const renderItem = ({ item }: { item: Ticket }) => (
+  const renderItem = ({ item }: { item: Ticket }) => {
+    const vence = (item as any).slaVenceEn ? new Date((item as any).slaVenceEn) : getSlaVencimiento(item.creadoEn, item.prioridad as any);
+    const sla = getSlaEstado({ creadoEn: item.creadoEn, prioridad: item.prioridad as any, estado: item.estado, venceEn: vence.toISOString(), fechaResolucion: item.fechaResolucion });
+    const slaTone = sla === 'vencido' || sla === 'vencido_tarde' ? 'danger' : sla === 'por_vencer' ? 'warning' : sla === 'cumplido' || sla === 'vigente' ? 'success' : 'muted';
+    const slaLabel = sla === 'vencido' ? 'Vencido' : sla === 'por_vencer' ? formatSlaRestante(getSlaMinutosRestantes(vence)) : '';
+    return (
     <Pressable onPress={() => navigation.navigate('DetalleTicket', { id: item.id })} style={({ pressed }) => [s.cardPress, pressed && { opacity: 0.96 }]}>
       <Card style={s.card}>
         <View style={s.cardTop}>
           <Text style={s.numero}>#{String(item.numero).padStart(4, '0')}</Text>
-          <View style={s.badges}><Badge label={item.prioridad} tone={tonoPrioridad(item.prioridad)} /><Badge label={prettyEstado(item.estado)} tone={tonoEstado(item.estado)} /></View>
+          <View style={s.badges}><Badge label={item.prioridad} tone={tonoPrioridad(item.prioridad)} /><Badge label={prettyEstado(item.estado)} tone={tonoEstado(item.estado)} />{slaLabel ? <Badge label={slaLabel} tone={slaTone as any} /> : null}</View>
         </View>
         <Text style={s.asunto} numberOfLines={2}>{item.asunto}</Text>
         <Text style={s.desc} numberOfLines={2}>{item.descripcion}</Text>
@@ -99,7 +105,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         {item.fechaResolucion ? <Text style={s.metaSoft}>Resuelto {new Date(item.fechaResolucion).toLocaleDateString('es-ES')}</Text> : null}
       </Card>
     </Pressable>
-  );
+  )};
 
   if (loading && tickets.length === 0) {
     return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando bandeja…</Text></View>;
