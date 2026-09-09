@@ -1,7 +1,7 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail } from '@helpdesk/shared';
+import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -206,7 +206,12 @@ export function TicketDetailScreen({ route }: Props) {
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
   const nextEstados = ESTADOS.filter((e) => canTransition(ticket.estado as any, e as any));
-  const slaPct = 75; // demo Stitch 35 min restantes 75%
+  const slaVence = (ticket as any).slaVenceEn ? new Date((ticket as any).slaVenceEn) : getSlaVencimiento(ticket.creadoEn, ticket.prioridad as any);
+  const slaEstado = getSlaEstado({ creadoEn: ticket.creadoEn, prioridad: ticket.prioridad as any, estado: ticket.estado, venceEn: slaVence.toISOString(), fechaResolucion: ticket.fechaResolucion });
+  const slaPct = Math.round(Math.min(100, getSlaProgreso(ticket.creadoEn, slaVence.toISOString())));
+  const slaRest = formatSlaRestante(getSlaMinutosRestantes(slaVence));
+  const slaFillColor = slaEstado === 'vencido' || slaEstado === 'vencido_tarde' ? theme.colors.danger : slaEstado === 'por_vencer' ? theme.colors.accent : slaEstado === 'cumplido' || slaEstado === 'vigente' ? theme.colors.success : theme.colors.muted;
+  const slaBigLabel = ticket.estado === 'cerrado' || ticket.estado === 'solucionado' ? slaEstadoLabel(slaEstado) : slaRest;
 
   const header = (
     <View style={s.header}>
@@ -322,7 +327,6 @@ export function TicketDetailScreen({ route }: Props) {
           </View>
         ) : null}
         <View style={s.ghostStack}>
-          <Pressable onPress={() => setFeedback({ visible: true, variant: 'info', title: 'Próximamente', message: 'Escalado N3 estará disponible pronto' })} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Escalar a Infra N3</Text></Pressable>
           <Pressable onPress={() => setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir Información</Text></Pressable>
           {(canReassign) ? <Pressable onPress={() => setShowReassign((v) => !v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
         </View>
@@ -360,9 +364,10 @@ export function TicketDetailScreen({ route }: Props) {
 
       <Card style={{ gap: 8 }}>
         <Text style={s.section}>Control Compromiso SLA</Text>
-        <Text style={s.slaBig}>{ticket.estado === 'cerrado' || ticket.estado === 'solucionado' ? 'Cumplido' : '35 min restantes'}</Text>
-        <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado === 'solucionado' || ticket.estado === 'cerrado' ? theme.colors.success : theme.colors.danger }]} /></View>
-        <View style={s.slaAlert}><Text style={s.slaAlertText}>{ticket.estado === 'cerrado' ? 'Cerrado dentro de compromiso' : ticket.prioridad === 'critica' ? 'Crítico <60 min · Riesgo alto' : 'Vigilar si no avanza en 2 h'}</Text></View>
+        <Text style={[s.slaBig, slaEstado === 'vencido' ? { color: theme.colors.danger } : slaEstado === 'por_vencer' ? { color: '#B45309' } : slaEstado === 'cumplido' ? { color: theme.colors.success } : {}]}>{slaBigLabel}</Text>
+        <Text style={s.mutedSmall}>Vence {slaVence.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {slaEstadoLabel(slaEstado)} · {slaPct}%</Text>
+        <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: slaFillColor }]} /></View>
+        <View style={[s.slaAlert, slaEstado === 'vencido' ? { backgroundColor: '#FEF2F2', borderColor: '#FECACA' } : slaEstado === 'por_vencer' ? { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' } : slaEstado === 'vigente' || slaEstado === 'cumplido' ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' } : {}]}><Text style={s.slaAlertText}>{slaEstado === 'vencido' ? 'Fuera de compromiso — requiere acción inmediata' : slaEstado === 'por_vencer' ? `Por vencer — quedan ~${getSlaMinutosRestantes(slaVence)} min` : slaEstado === 'cumplido' ? 'Cerrado dentro de compromiso ✓' : slaEstado === 'vencido_tarde' ? 'Cerrado fuera de compromiso' : 'Dentro de compromiso'}</Text></View>
         <View style={s.attrGrid}>
           <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{ticket.prioridad}</Text>
           <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{ticket.estado}</Text>

@@ -12,7 +12,7 @@ export type DashboardFilters = {
   tecnicoId?: string;
 };
 
-export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number; ingresadosHoy: number; total: number };
+export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number };
 export type StatsEstado = { estado: EstadoTicket; count: number }[];
 export type StatsPrioridad = { prioridad: PrioridadTicket; count: number }[];
 export type EvolucionPunto = { dia: string; mesaId: number; count: number };
@@ -30,6 +30,23 @@ function applyFilters(q: any, f: DashboardFilters) {
   return q;
 }
 
+/** RF-18: tickets filtrados para export — respeta los 6 filtros combinables (RF-17) */
+export async function fetchTicketsFiltrados(
+  client: SupabaseClient,
+  f: DashboardFilters,
+  limit = 2000,
+): Promise<any[]> {
+  let q: any = client
+    .from('tickets')
+    .select('numero,asunto,estado,prioridad,mesa_id,categoria_id,creado_en,actualizado_en')
+    .order('creado_en', { ascending: false })
+    .limit(limit);
+  q = applyFilters(q, f);
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  return (data ?? []) as any[];
+}
+
 export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}): Promise<Kpis> {
   // Intenta RPC dashboard_kpis si existe (Sprint 6 migración); fallback a agregación cliente
   try {
@@ -38,20 +55,33 @@ export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}):
     });
     if (!error && data?.length) {
       const r = data[0];
-      return { abiertos: Number(r.abiertos), total: Number(r.total), slaRiesgo: Number(r.sla_riesgo), ttrHoras: Number(r.ttr_horas), ingresadosHoy: Number(r.ingresados_hoy) };
+      return { abiertos: Number(r.abiertos), total: Number(r.total), slaRiesgo: Number(r.sla_riesgo), ttrHoras: Number(r.ttr_horas), ingresadosHoy: Number(r.ingresados_hoy), slaVencidos: r.sla_vencidos != null ? Number(r.sla_vencidos) : undefined, slaPorVencer: r.sla_por_vencer != null ? Number(r.sla_por_vencer) : undefined };
     }
   } catch (_) { /* fallback */ }
-  let q = client.from('tickets').select('id,estado,creado_en', { count: 'exact' });
+  // Fallback cliente usando SLA real (critica 60m, alta 4h, media 24h, baja 72h)
+  let q = client.from('tickets').select('id,estado,prioridad,creado_en,sla_vence_en', { count: 'exact' });
   q = applyFilters(q, f);
   const { data, count, error } = await q;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as any[];
   const total = count ?? rows.length;
-  const abiertos = rows.filter((r) => ['abierto', 'en_proceso'].includes(r.estado)).length;
+  const abiertos = rows.filter((r) => ['abierto', 'en_proceso', 'programado'].includes(r.estado)).length;
   const hoy = new Date().toISOString().slice(0, 10);
   const ingresadosHoy = rows.filter((r) => String(r.creado_en).slice(0, 10) === hoy).length;
-  const slaRiesgo = rows.filter((r) => r.estado !== 'cerrado' && r.estado !== 'solucionado').length > 100 ? 8 : Math.min(8, Math.floor(abiertos * 0.06));
-  return { abiertos, slaRiesgo, ttrHoras: 4.2, ingresadosHoy, total };
+  const SLA_MIN = { critica: 60, alta: 240, media: 1440, baja: 4320 } as Record<string, number>;
+  const ahora = Date.now();
+  let slaVencidos = 0, slaPorVencer = 0;
+  for (const r of rows) {
+    if (r.estado === 'cerrado' || r.estado === 'solucionado') continue;
+    const vence = r.sla_vence_en ? new Date(r.sla_vence_en).getTime() : (new Date(r.creado_en).getTime() + (SLA_MIN[r.prioridad] ?? 1440) * 60000);
+    if (ahora > vence) slaVencidos++;
+    else {
+      const porVencerMs = Math.max(60, Math.floor((SLA_MIN[r.prioridad] ?? 1440) * 0.25)) * 60000;
+      if (ahora >= vence - porVencerMs) slaPorVencer++;
+    }
+  }
+  const slaRiesgo = slaVencidos + slaPorVencer;
+  return { abiertos, slaRiesgo, ttrHoras: 4.2, ingresadosHoy, total, slaVencidos, slaPorVencer };
 }
 
 export async function getStatsPorEstado(client: SupabaseClient, f: DashboardFilters = {}): Promise<StatsEstado> {

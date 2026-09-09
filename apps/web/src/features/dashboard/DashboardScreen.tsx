@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
+import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function DashboardScreen() {
@@ -85,18 +85,19 @@ export function DashboardScreen() {
   }, [mesaIds, categorias, categoriaId]);
   const onExport = React.useCallback(async () => {
     try {
-      let q: any = supabase.from('tickets').select('numero,asunto,estado,prioridad,mesa_id,categoria_id,creado_en,actualizado_en').order('creado_en', { ascending: false }).limit(2000);
-      if (filters.desde) q = q.gte('creado_en', filters.desde);
-      if (filters.hasta) q = q.lte('creado_en', filters.hasta);
-      if (filters.mesaIds?.length) q = q.in('mesa_id', filters.mesaIds);
-      const { data, error } = await q;
-      if (error) throw error;
+      const data = await fetchTicketsFiltrados(supabase as any, filters, 2000);
       const mesaName = (id: number | null) => mesas.find((m) => m.id === id)?.nombre ?? String(id ?? '—');
+      const categoriaName = (id: number) => categorias.find((c) => c.id === id)?.nombre ?? String(id);
+      const tecnicoName = (id: string) => tecnicos.find((t) => t.id === id)?.nombre ?? id;
       const rows = ticketsToRows((data as any) ?? [], mesaName);
-      const csv = toCsv(rows);
-      downloadCsv(`dashboard-${new Date().toISOString().slice(0,10)}.csv`, csv);
-    } catch (e) { console.warn('[Dashboard] export', e); }
-  }, [filters, mesas]);
+      const csv = toCsvWithMeta(rows, filters, { mesaName, categoriaName, tecnicoName });
+      const ok = downloadCsv(buildExportFilename('dashboard', 'csv'), csv);
+      if (!ok && typeof window !== 'undefined') window.alert(`CSV generado (${rows.length} filas). Copia desde consola.`);
+    } catch (e: any) {
+      console.warn('[Dashboard] export', e);
+      if (typeof window !== 'undefined') window.alert(e?.message ?? 'Error al exportar CSV');
+    }
+  }, [filters, mesas, categorias, tecnicos]);
   const onExportPng = React.useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
@@ -105,7 +106,7 @@ export function DashboardScreen() {
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = `dashboard-${new Date().toISOString().slice(0,10)}.png`; a.click();
+      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('dashboard', 'png'); a.click();
     } catch (e) { console.warn('[Dashboard] export png', e); alert('Error al exportar PNG'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
@@ -119,7 +120,7 @@ export function DashboardScreen() {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`dashboard-${new Date().toISOString().slice(0,10)}.pdf`);
+      pdf.save(buildExportFilename('dashboard', 'pdf'));
     } catch (e) { console.warn('[Dashboard] export pdf', e); alert('Error al exportar PDF'); }
   }, []);
   const onGenerarAlertas = React.useCallback(async () => {
@@ -137,10 +138,11 @@ export function DashboardScreen() {
     );
   }
 
+  const slaDelta = kpis ? (kpis.slaVencidos != null ? `${kpis.slaVencidos} vencidos · ${kpis.slaPorVencer ?? 0} por vencer` : kpis.slaRiesgo > 0 ? `${kpis.slaRiesgo} en riesgo` : 'Dentro de compromiso') : '<45 min';
   const kpiGrid = (
     <View style={[s.kpiGrid, !isWide && { flexDirection: 'column' }]}>
       <KpiCard label="Tickets abiertos" value={String(kpis?.abiertos ?? 0)} delta="+12% vs ayer" />
-      <KpiCard label="SLA en riesgo" value={String(kpis?.slaRiesgo ?? 0)} delta="<45 min" deltaTone="warn" accent="orange" />
+      <KpiCard label="SLA en riesgo" value={String(kpis?.slaRiesgo ?? 0)} delta={slaDelta} deltaTone={ (kpis?.slaVencidos ?? 0) > 0 ? 'danger' as any : (kpis?.slaRiesgo ?? 0) > 0 ? 'warn' as any : undefined } accent="orange" />
       <KpiCard label="Tiempo medio" value={`${kpis?.ttrHoras ?? 4.2}h`} delta="-0.3h" />
       <KpiCard label="Ingresados hoy" value={String(kpis?.ingresadosHoy ?? 0)} delta={`${kpis?.total ?? 0} total`} />
     </View>
