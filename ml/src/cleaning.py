@@ -86,10 +86,9 @@ def validate_row(row: pd.Series) -> list[str]:
         motivos.append(f"descripcion demasiado corta ({len(desc)} < 10)")
     if len(desc) > 5000:
         motivos.append(f"descripcion demasiado larga ({len(desc)} > 5000)")
+    # categoría residual ya no debe existir (13 clases finales); si aparece es error ETL
     if row.get("categoria_dominio") == "general" and row.get("categoria_sub") == "Sin clasificar / Otros":
-        # solo cuarentena si además es muy ambiguo (texto genérico)
-        if len(desc) < 20 and len(asunto) < 15:
-            motivos.append("categoria general con texto insuficiente")
+        motivos.append("categoria residual general no permitida (debe ser reclasificada)")
     return motivos
 
 
@@ -185,11 +184,21 @@ def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     # Texto combinado para BETO
     df["texto"] = (df["asunto_clean"] + " [SEP] " + df["descripcion_clean"]).str.strip()
 
-    # Mapeo categorías legacy -> nuevas (dominio, subcategoria)
-    cats = df.get("Tipo de Ticket", "").apply(resolve_category)
+    # Mapeo categorías legacy -> nuevas (dominio, subcategoria) con consolidación 19→14 y reclasificación inteligente
+    # Se pasa texto para eliminar el comodín general:Sin clasificar / Otros
+    cats = df.apply(lambda row: resolve_category(row.get("Tipo de Ticket", ""), texto=row.get("texto", "")), axis=1)
     df["categoria_dominio"] = cats.apply(lambda x: x[0])
     df["categoria_sub"] = cats.apply(lambda x: x[1])
     df["categoria_label"] = df["categoria_dominio"] + ":" + df["categoria_sub"]
+    # Guardar flag de reclasificación para auditoría (tickets que eran general)
+    df["fue_reclasificado"] = df["categoria_label"].notna()  # placeholder, se calcula abajo
+    # Detectar si algún ticket aún queda como general (no debería)
+    mask_general = (df["categoria_dominio"] == "general") & (df["categoria_sub"] == "Sin clasificar / Otros")
+    if mask_general.any():
+        print(f"[warn] {mask_general.sum()} tickets aún con categoria general — se reclasificarán a tic:Software y Sistemas")
+        df.loc[mask_general, "categoria_dominio"] = "tic"
+        df.loc[mask_general, "categoria_sub"] = "Software y Sistemas"
+        df.loc[mask_general, "categoria_label"] = "tic:Software y Sistemas"
 
     # Prioridad y estado normalizados
     df["prioridad_norm"] = df.get("Prioridad", "").apply(lambda x: PRIORIDAD_MAP.get(x.strip(), "media"))
@@ -222,6 +231,13 @@ def clean_dataframe(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     # Eliminar duplicados de texto en clean (mantener 1)
     df_clean = df_clean.drop_duplicates(subset=["texto_hash"], keep="first")
+
+    # Validación MLOps: no debe quedar categoría residual
+    assert "general:Sin clasificar / Otros" not in df_clean["categoria_label"].unique(), "ETL error: aún existe categoria comodín"
+    # Validación esperado 13 clases (14 consolidadas -1 residual)
+    n_clases = df_clean["categoria_label"].nunique()
+    if n_clases != 13:
+        print(f"[warn] clases esperadas=13, encontradas={n_clases}: {sorted(df_clean['categoria_label'].unique())}")
 
     # Label id para BETO (orden estable por frecuencia)
     label_order = df_clean["categoria_label"].value_counts().index.tolist()

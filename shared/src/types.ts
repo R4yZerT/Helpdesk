@@ -4,7 +4,7 @@
 export type RolUsuario = 'usuario' | 'tecnico' | 'jefe' | 'administrador';
 
 export type EstadoTicket =
-  'abierto' | 'en_proceso' | 'solucionado' | 'cerrado' | 'devuelto';
+  'abierto' | 'en_proceso' | 'solucionado' | 'cerrado' | 'devuelto' | 'programado';
 
 export type PrioridadTicket = 'baja' | 'media' | 'alta' | 'critica';
 

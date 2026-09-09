@@ -160,12 +160,38 @@ CATEGORY_MAP: dict[str, tuple[str, str]] = {
     "Limpieza": ("infraestructura", "Obra civil y mantenimiento locativo"),
     "Traslado e instalación de carpa": ("infraestructura", "Obra civil y mantenimiento locativo"),
     "Préstamo de herramientas o equipos": ("infraestructura", "Obra civil y mantenimiento locativo"),
-    # ── General ──
+    # ── General (residual - será reclasificado, no debe permanecer en dataset final) ──
     "N/A": ("general", "Sin clasificar / Otros"),
-    "Otros equipos de oficina (no equipos de cómputo ni periféricos)": ("general", "Sin clasificar / Otros"),
+    # Nota: "Otros equipos de oficina..." ya mapeado arriba a Equipos y hardware (no duplicar)
+}
+
+# ── Consolidación 19 → 14 clases macro (optimización MLOps) ──
+# Unifica ramas TIC con alta superposición léxica
+CONSOLIDATED_MAP: dict[tuple[str, str], tuple[str, str]] = {
+    ("tic", "Gestión de usuarios"): ("tic", "Gestión de Accesos y Seguridad"),
+    ("tic", "Permisos y accesos"): ("tic", "Gestión de Accesos y Seguridad"),
+    ("tic", "Contraseñas y seguridad"): ("tic", "Gestión de Accesos y Seguridad"),
+    ("tic", "Software y aplicaciones"): ("tic", "Software y Sistemas"),
+    ("tic", "Soporte y aplicaciones institucionales"): ("tic", "Software y Sistemas"),
+    ("tic", "Equipos y hardware"): ("tic", "Equipos e Infraestructura"),
+    ("tic", "Impresoras y escáneres"): ("tic", "Equipos e Infraestructura"),
+    ("tic", "Datos y respaldos"): ("tic", "Equipos e Infraestructura"),
+}
+
+# Mapeo string → string para uso directo en DataFrames (notebook)
+CONSOLIDATED_LABEL_MAP: dict[str, str] = {
+    "tic:Gestión de usuarios": "tic:Gestión de Accesos y Seguridad",
+    "tic:Permisos y accesos": "tic:Gestión de Accesos y Seguridad",
+    "tic:Contraseñas y seguridad": "tic:Gestión de Accesos y Seguridad",
+    "tic:Software y aplicaciones": "tic:Software y Sistemas",
+    "tic:Soporte y aplicaciones institucionales": "tic:Software y Sistemas",
+    "tic:Equipos y hardware": "tic:Equipos e Infraestructura",
+    "tic:Impresoras y escáneres": "tic:Equipos e Infraestructura",
+    "tic:Datos y respaldos": "tic:Equipos e Infraestructura",
 }
 
 # Fallback por keywords si el tipo no está mapeado (casos con typos raros)
+# Nota: ya apuntan a categorías consolidadas (13 finales)
 FALLBACK_KEYWORDS: list[tuple[str, tuple[str, str]]] = [
     ("pieza gráfica", ("comunicaciones", "Piezas gráficas y diseño")),
     ("reel", ("comunicaciones", "Piezas gráficas y diseño")),
@@ -179,12 +205,17 @@ FALLBACK_KEYWORDS: list[tuple[str, tuple[str, str]]] = [
     ("vpn", ("tic", "Conectividad y redes")),
     ("wifi", ("tic", "Conectividad y redes")),
     ("internet", ("tic", "Conectividad y redes")),
-    ("impresora", ("tic", "Impresoras y escáneres")),
-    ("tonner", ("tic", "Impresoras y escáneres")),
-    ("atasco", ("tic", "Impresoras y escáneres")),
-    ("backup", ("tic", "Datos y respaldos")),
-    ("respaldo", ("tic", "Datos y respaldos")),
-    ("contraseña", ("tic", "Contraseñas y seguridad")),
+    ("impresora", ("tic", "Equipos e Infraestructura")),
+    ("tonner", ("tic", "Equipos e Infraestructura")),
+    ("atasco", ("tic", "Equipos e Infraestructura")),
+    ("backup", ("tic", "Equipos e Infraestructura")),
+    ("respaldo", ("tic", "Equipos e Infraestructura")),
+    ("contraseña", ("tic", "Gestión de Accesos y Seguridad")),
+    ("permiso", ("tic", "Gestión de Accesos y Seguridad")),
+    ("usuario", ("tic", "Gestión de Accesos y Seguridad")),
+    ("software", ("tic", "Software y Sistemas")),
+    ("sistema", ("tic", "Software y Sistemas")),
+    ("aplicacion", ("tic", "Software y Sistemas")),
     ("luminaria", ("infraestructura", "Eléctrica")),
     ("eléctrica", ("infraestructura", "Eléctrica")),
     ("fuga", ("infraestructura", "Hidrosanitaria")),
@@ -196,9 +227,45 @@ FALLBACK_KEYWORDS: list[tuple[str, tuple[str, str]]] = [
     ("muro", ("infraestructura", "Obra civil y mantenimiento locativo")),
 ]
 
+# Reglas de reclasificación inteligente para categoría residual
+# Cuando texto es genérico, se distribuye a las áreas transversales más probables
+GENERAL_RECLASSIFICATION_RULES: list[tuple[str, tuple[str, str]]] = [
+    ("software", ("tic", "Software y Sistemas")),
+    ("sistema", ("tic", "Software y Sistemas")),
+    ("aplicacion", ("tic", "Software y Sistemas")),
+    ("plataforma", ("tic", "Software y Sistemas")),
+    ("equipo", ("tic", "Equipos e Infraestructura")),
+    ("computador", ("tic", "Equipos e Infraestructura")),
+    ("impresora", ("tic", "Equipos e Infraestructura")),
+    ("hardware", ("tic", "Equipos e Infraestructura")),
+    ("red", ("tic", "Conectividad y redes")),
+    ("internet", ("tic", "Conectividad y redes")),
+    ("correo", ("tic", "Correo electrónico")),
+]
+
 
 
 import unicodedata, re
+
+def _apply_consolidation(cat: tuple[str, str]) -> tuple[str, str]:
+    """Aplica consolidación 19→14 si existe mapping."""
+    return CONSOLIDATED_MAP.get(cat, cat)
+
+def _reclassify_general(texto: str) -> tuple[str, str]:
+    """Reclasificación inteligente de tickets residuales basándose en contenido léxico.
+    Elimina el comodín forzando asignación a 13 clases estrictas."""
+    if not texto:
+        return ("tic", "Software y Sistemas")  # fallback transversal
+    norm_text = _norm(texto)
+    for kw, cat in GENERAL_RECLASSIFICATION_RULES:
+        if _norm(kw) in norm_text:
+            return cat
+    # fallback por fallback keywords consolidados
+    for kw_norm, cat in _NORM_FALLBACK:
+        if kw_norm in norm_text:
+            return _apply_consolidation(cat)
+    # último fallback: área transversal más frecuente
+    return ("tic", "Software y Sistemas")
 
 def _norm(s: str) -> str:
     s = s.replace("\ufeff","").replace("ï»¿","").strip()
@@ -219,24 +286,44 @@ def _norm(s: str) -> str:
 _NORM_MAP = {_norm(k): v for k, v in CATEGORY_MAP.items()}
 _NORM_FALLBACK = [(_norm(kw), cat) for kw, cat in FALLBACK_KEYWORDS]
 
-def resolve_category(tipo_raw: str) -> tuple[str, str]:
-    """Resuelve (dominio, subcategoria) robusto a mojibake y acentos."""
+def resolve_category(tipo_raw: str, texto: str | None = None) -> tuple[str, str]:
+    """Resuelve (dominio, subcategoria) robusto a mojibake y acentos.
+    Aplica consolidación 19→14 y reclasificación inteligente del comodín.
+    Args:
+        tipo_raw: valor de 'Tipo de Ticket' del CSV
+        texto: texto combinado opcional para reclasificar categoría general
+    """
     if not tipo_raw or not tipo_raw.strip():
-        return ("general", "Sin clasificar / Otros")
-    key = tipo_raw.strip()
-    # intento exacto primero
-    if key in CATEGORY_MAP:
-        return CATEGORY_MAP[key]
-    nk = _norm(key)
-    if nk in _NORM_MAP:
-        return _NORM_MAP[nk]
-    # fallback por keywords normalizados
-    for kw_norm, cat in _NORM_FALLBACK:
-        if kw_norm in nk:
-            return cat
-    # último intento: sin normalizar pero case-insensitive
-    low = key.lower()
-    for kw, cat in FALLBACK_KEYWORDS:
-        if kw in low:
-            return cat
-    return ("general", "Sin clasificar / Otros")
+        cat = ("general", "Sin clasificar / Otros")
+    else:
+        key = tipo_raw.strip()
+        cat = None
+        if key in CATEGORY_MAP:
+            cat = CATEGORY_MAP[key]
+        else:
+            nk = _norm(key)
+            if nk in _NORM_MAP:
+                cat = _NORM_MAP[nk]
+            else:
+                # fallback por keywords normalizados
+                for kw_norm, c in _NORM_FALLBACK:
+                    if kw_norm in nk:
+                        cat = c
+                        break
+                if cat is None:
+                    low = key.lower()
+                    for kw, c in FALLBACK_KEYWORDS:
+                        if kw in low:
+                            cat = c
+                            break
+                if cat is None:
+                    cat = ("general", "Sin clasificar / Otros")
+    # aplicar consolidación 19→14
+    cat = _apply_consolidation(cat)
+    # eliminar comodín: redistribuir si aún es general
+    if cat[0] == "general" and cat[1] == "Sin clasificar / Otros":
+        if texto:
+            return _reclassify_general(texto)
+        # sin texto, mantener general temporalmente (será filtrado en cleaning.py)
+        return cat
+    return cat

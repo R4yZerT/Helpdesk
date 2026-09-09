@@ -25,6 +25,7 @@ as $$
 declare
   v_estancados bigint := 0;
   v_picos bigint := 0;
+  v_sla bigint := 0;
 begin
   -- A) Tickets estancados > 2 días sin movimiento (abierto/en_proceso/devuelto)
   with candidatos as (
@@ -117,7 +118,21 @@ begin
   from picos p;
   GET DIAGNOSTICS v_picos = ROW_COUNT;
 
-  return query select (v_estancados + v_picos)::bigint;
+  -- C) SLA vencidos (sincronizado con 20260911000000)
+  with vencidos as (
+    select t.id, t.numero, t.mesa_id, t.prioridad, m.nombre as mesa_nombre, c.subcategoria, t.sla_vence_en
+    from public.tickets t
+    left join public.mesas m on m.id=t.mesa_id
+    left join public.ticket_categories c on c.id=t.categoria_id
+    where t.estado not in ('cerrado','solucionado')
+      and now() > coalesce(t.sla_vence_en, t.creado_en + public.sla_interval(t.prioridad))
+      and not exists (select 1 from public.alertas_ia a where a.tipo='ticket_estancado'::public.tipo_alerta_ia and a.ticket_id=t.id and a.mensaje like '%SLA vencido%' and a.creado_en > now()-interval '12 hours')
+  )
+  insert into public.alertas_ia (tipo, ticket_id, mesa_id, mensaje, severidad, estado)
+  select 'ticket_estancado'::public.tipo_alerta_ia, v.id, v.mesa_id, format('SLA vencido — Ticket #%s (%s) en %s · vence %s', v.numero, v.subcategoria, coalesce(v.mesa_nombre,'Sin mesa'), to_char(v.sla_vence_en,'YYYY-MM-DD HH24:MI')), case v.prioridad when 'critica' then 'critica' when 'alta' then 'alta' else 'media' end, 'nueva' from vencidos v;
+  GET DIAGNOSTICS v_sla = ROW_COUNT;
+
+  return query select (v_estancados + v_picos + v_sla)::bigint;
 end;
 $$;
 
@@ -128,7 +143,7 @@ grant execute on function public.generar_alertas_ia() to service_role;
 do $$
 begin
   if exists (select 1 from pg_extension where extname='pg_cron') then
-    perform cron.schedule('generar_alertas_ia_cada_hora', '0 * * * *', $$select public.generar_alertas_ia()$$);
+    perform cron.schedule('generar_alertas_ia_cada_hora', '0 * * * *', $cron$select public.generar_alertas_ia()$cron$);
   end if;
 exception when others then null;
 end $$;

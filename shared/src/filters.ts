@@ -7,6 +7,7 @@ import type { DominioCategoria } from './categorias.js';
 export const ESTADO_LABELS: Record<EstadoTicket, string> = {
   abierto: 'Abierto',
   en_proceso: 'En proceso',
+  programado: 'Programado',
   solucionado: 'Solucionado',
   cerrado: 'Cerrado',
   devuelto: 'Devuelto',
@@ -69,7 +70,7 @@ function capitalize(s: string): string {
 
 export const ESTADO_OPTIONS: { value: EstadoTicket | ''; label: string }[] = [
   { value: '', label: 'Todos' },
-  ...(['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto'] as EstadoTicket[]).map((e) => ({
+  ...(['abierto', 'en_proceso', 'programado', 'solucionado', 'cerrado', 'devuelto'] as EstadoTicket[]).map((e) => ({
     value: e,
     label: formatEstado(e),
   })),

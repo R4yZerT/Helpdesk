@@ -86,7 +86,7 @@ language sql security definer set search_path = public as $$
     and (p_mesa_ids is null or t.mesa_id = any(p_mesa_ids))
     and (p_categoria_id is null or t.categoria_id = p_categoria_id)
     and (public.is_jefe_admin() or public.puede_ver_ticket(t.id))
-  group by t.estado order by cnt desc;
+  group by t.estado order by 2 desc;
 $$;
 
 -- 5) RPC: por prioridad
@@ -100,7 +100,7 @@ language sql security definer set search_path = public as $$
     and (p_mesa_ids is null or t.mesa_id = any(p_mesa_ids))
     and (p_categoria_id is null or t.categoria_id = p_categoria_id)
     and (public.is_jefe_admin() or public.puede_ver_ticket(t.id))
-  group by t.prioridad order by cnt desc;
+  group by t.prioridad order by 2 desc;
 $$;
 
 -- 6) RPC: evolucion por dia/mesa (últimos N días)

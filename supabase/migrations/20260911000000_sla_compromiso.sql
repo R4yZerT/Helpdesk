@@ -50,7 +50,8 @@ create or replace function public.sla_estado(
 $$;
 
 -- 3) Redefinir dashboard_kpis: sla_riesgo = vencidos + por_vencer (no solo critica >45m)
-create or replace function public.dashboard_kpis(
+drop function if exists public.dashboard_kpis(timestamptz,timestamptz,int[],int) cascade;
+create function public.dashboard_kpis(
   p_desde timestamptz default null,
   p_hasta timestamptz default null,
   p_mesa_ids int[] default null,

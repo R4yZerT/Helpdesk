@@ -12,7 +12,7 @@ function getPrioridadPorCategoriaLocal(categoriaId: number): PrioridadTicket {
 }
 
 export const PRIORIDADES: readonly PrioridadTicket[] = ['baja', 'media', 'alta', 'critica'] as const;
-export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto'] as const;
+export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto', 'programado'] as const;
 
 export function isPrioridadTicket(v: string): v is PrioridadTicket {
   return (PRIORIDADES as readonly string[]).includes(v);
@@ -306,7 +306,7 @@ export async function listMyTickets(
 
   let query = client
     .from('tickets')
-    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en', { count: 'exact' })
+    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en', { count: 'exact' })
     .order('creado_en', { ascending: false })
     .order('id', { ascending: false })
     .range(from, to);
@@ -431,7 +431,7 @@ export async function updateTicket(client: SupabaseClient, ticketId: string, pat
   if (patch.categoriaId !== undefined) payload.categoria_id = patch.categoriaId;
   if (patch.mesaId !== undefined) payload.mesa_id = patch.mesaId;
   if (!Object.keys(payload).length) throw new Error('Sin cambios');
-  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
   if (error) {
     const m = error.message;
     if (/row-level security|policy/i.test(m)) throw new Error('No puedes editar este ticket (solo abierto y sin asignar)');
@@ -442,7 +442,7 @@ export async function updateTicket(client: SupabaseClient, ticketId: string, pat
 
 export async function cancelTicket(client: SupabaseClient, ticketId: string): Promise<Ticket> {
   if (!ticketId) throw new Error('ticketId requerido');
-  const { data, error } = await client.from('tickets').update({ estado: 'cerrado' }).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  const { data, error } = await client.from('tickets').update({ estado: 'cerrado' }).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
   if (error) {
     const m = error.message;
     if (/row-level security|policy/i.test(m)) throw new Error('No puedes cancelar este ticket');
@@ -453,11 +453,12 @@ export async function cancelTicket(client: SupabaseClient, ticketId: string): Pr
 
 // RF-11/13 — Transición de estado con FSM y solución aplicada
 const ESTADOS_TRANSICION: Record<EstadoTicket, readonly EstadoTicket[]> = {
-  abierto: ['en_proceso', 'cerrado'],
-  en_proceso: ['solucionado', 'cerrado', 'devuelto'],
+  abierto: ['en_proceso', 'programado', 'cerrado'],
+  en_proceso: ['solucionado', 'cerrado', 'devuelto', 'programado'],
+  programado: ['en_proceso', 'solucionado', 'cerrado'],
   solucionado: ['cerrado', 'devuelto'],
   cerrado: [],
-  devuelto: ['en_proceso', 'cerrado'],
+  devuelto: ['en_proceso', 'programado', 'cerrado'],
 };
 
 export function canTransition(de: EstadoTicket, a: EstadoTicket): boolean {
@@ -492,7 +493,7 @@ export async function transitionTicket(
   }
   const payload: Record<string, unknown> = { estado: nuevoEstado };
   if (opts?.solucionAplicada !== undefined) payload.solucion_aplicada = opts.solucionAplicada.trim() || null;
-  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
   if (error) throw new Error(error.message);
   if (opts?.comentario?.trim()) {
     try { await addComentario(client, ticketId, opts.comentario.trim()); } catch { /* no bloquea transición */ }
@@ -514,7 +515,7 @@ export async function reassignTicket(
     if (patch.mesaId !== null && (!Number.isInteger(patch.mesaId) || patch.mesaId <= 0)) throw new Error('Mesa inválida');
     payload.mesa_id = patch.mesaId;
   }
-  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en').single();
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
   if (error) throw new Error(error.message);
   return mapTicket(data as unknown as Record<string, unknown>);
 }
@@ -539,7 +540,7 @@ export async function listAssignedTickets(client: SupabaseClient, params: ListAs
   // Trae técnico asignado = auth.uid() implícito por RLS; filtramos explícitamente para claridad
   const { data: user } = await client.auth.getUser();
   const uid = user.user?.id;
-  let query = client.from('tickets').select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en', { count: 'exact' });
+  let query = client.from('tickets').select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en', { count: 'exact' });
   if (uid) query = query.eq('tecnico_asignado_id', uid);
   // Orden base por antigüedad; prioridad se ordena en memoria para respetar peso sin depender de orden alfabético
   query = query.order('creado_en', { ascending: true }).order('id', { ascending: true }).range(from, to);
@@ -574,7 +575,7 @@ export async function getTicketDetail(
   if (!ticketId) throw new Error('ticketId requerido');
   const ticketPromise = client
     .from('tickets')
-    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en')
+    .select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en')
     .eq('id', ticketId)
     .single();
   const estadosPromise = client

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
+import { getSlaEstado, getSlaVencimiento, formatSlaRestante } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,6 +15,7 @@ type Props = { navigation: NativeStackNavigationProp<TecnicoStackParamList, 'Ban
 const tonoEstado = (e: string) => {
   if (e === 'abierto') return 'muted' as const;
   if (e === 'en_proceso') return 'info' as const;
+  if (e === 'programado') return 'warning' as const;
   if (e === 'solucionado') return 'success' as const;
   if (e === 'cerrado') return 'ink' as const;
   if (e === 'devuelto') return 'danger' as const;
@@ -85,21 +87,26 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
     fetchPage(page + 1);
   }, [loadingMore, loading, hasMore, page, fetchPage]);
 
-  const renderItem = ({ item }: { item: Ticket }) => (
+  const renderItem = ({ item }: { item: Ticket }) => {
+    const venceIso = (item as Ticket & { slaVenceEn?: string | null }).slaVenceEn ?? getSlaVencimiento(item.creadoEn, item.prioridad).toISOString();
+    const slaEstado = getSlaEstado({ creadoEn: item.creadoEn, prioridad: item.prioridad, estado: item.estado, venceEn: venceIso });
+    const slaBadge = slaEstado === 'vencido' ? { label: `SLA vencido`, tone: 'danger' as const } : slaEstado === 'por_vencer' ? { label: `SLA ${formatSlaRestante(Math.floor((new Date(venceIso).getTime() - Date.now())/60000))}`, tone: 'warning' as const } : null;
+    return (
     <Pressable onPress={() => navigation.navigate('DetalleTicket', { id: item.id })} style={({ pressed }) => [s.cardPress, pressed && { opacity: 0.96 }]}>
       <Card style={s.card}>
         <View style={s.cardTop}>
           <Text style={s.numero}>#{String(item.numero).padStart(4, '0')}</Text>
-          <View style={s.badges}><Badge label={item.prioridad} tone={tonoPrioridad(item.prioridad)} /><Badge label={prettyEstado(item.estado)} tone={tonoEstado(item.estado)} /></View>
+          <View style={s.badges}><Badge label={item.prioridad} tone={tonoPrioridad(item.prioridad)} /><Badge label={prettyEstado(item.estado)} tone={tonoEstado(item.estado)} />{slaBadge ? <Badge label={slaBadge.label} tone={slaBadge.tone} /> : null}</View>
         </View>
         <Text style={s.asunto} numberOfLines={2}>{item.asunto}</Text>
         <Text style={s.desc} numberOfLines={2}>{item.descripcion}</Text>
         <Divider />
-        <Text style={s.meta}>{new Date(item.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} · Mesa {item.mesaId} · #{item.numero}</Text>
+        <Text style={s.meta}>{new Date(item.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })} · Mesa {item.mesaId} · #{item.numero}{slaBadge ? ` · ${slaBadge.label}` : ''}</Text>
         {item.fechaResolucion ? <Text style={s.metaSoft}>Resuelto {new Date(item.fechaResolucion).toLocaleDateString('es-ES')}</Text> : null}
       </Card>
     </Pressable>
   );
+  }
 
   if (loading && tickets.length === 0) {
     return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando bandeja…</Text></View>;
