@@ -1,7 +1,7 @@
 """
-Fine-tuning BETO para clasificación de tickets HelpDesk (19 clases).
+Fine-tuning BETO para clasificación de tickets HelpDesk (13 clases consolidadas).
 
-Dataset: data/processed/tickets_clean.parquet (7926 filas, texto + label_id)
+Dataset: data/processed/tickets_clean.parquet (~7926 filas, texto + label_id, 13 clases sin comodín)
 Modelo: dccuchile/bert-base-spanish-wwm-cased (110M params)
 Ciclo: train 80 / val 10 / test 10 estratificado, class_weight, early stopping, macro-F1
 
@@ -43,11 +43,11 @@ def load_data(root: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune BETO para tickets")
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--eval-batch", type=int, default=32)
-    parser.add_argument("--lr", type=float, default=2e-5)
-    parser.add_argument("--max-length", type=int, default=256)
+    parser.add_argument("--lr", type=float, default=3e-5)
+    parser.add_argument("--max-length", type=int, default=128)
     parser.add_argument("--model", type=str, default="dccuchile/bert-base-spanish-wwm-cased")
     parser.add_argument("--output", type=str, default="ml/models/beto-tickets")
     parser.add_argument("--subset", type=int, default=0, help="si >0, entrena solo con N filas (smoke test CPU)")
@@ -149,7 +149,7 @@ def main():
         per_device_train_batch_size=args.batch,
         per_device_eval_batch_size=args.eval_batch,
         learning_rate=args.lr,
-        weight_decay=0.01,
+        weight_decay=0.05,
         warmup_steps=50,
         logging_steps=50,
         eval_strategy="epoch",
