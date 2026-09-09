@@ -10,6 +10,7 @@ import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import type { UsuarioStackParamList } from '../../navigation/types';
 import type { Profile } from '@helpdesk/shared';
+import { PerfilScreen } from '../perfil/PerfilScreen';
 import { useAuth } from '../../context/AuthContext';
 
 const Stack = createNativeStackNavigator<UsuarioStackParamList>();
@@ -176,23 +177,12 @@ function UsuarioMobileTabs() {
       <Tab.Screen
         name="PerfilTab"
         options={{
-          title: 'Perfil',
-          tabBarLabel: profile?.full_name?.split(' ')[0] ?? 'Perfil',
+          title: 'Mi perfil',
+          tabBarLabel: 'Perfil',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>,
         }}
-      >
-        {() => {
-          const { signOut } = useAuth();
-          return (
-            <View style={m.perfilWrap}>
-              <View style={m.avatar}><Text style={m.avatarText}>{(profile?.full_name ?? profile?.email ?? 'U').slice(0, 2).toUpperCase()}</Text></View>
-              <Text style={m.perfilName}>{profile?.full_name ?? profile?.email}</Text>
-              <Text style={m.perfilRole}>{profile?.rol}</Text>
-              <Pressable onPress={signOut} style={m.logoutBtn}><Text style={m.logoutText}>Cerrar sesión</Text></Pressable>
-            </View>
-          );
-        }}
-      </Tab.Screen>
+        component={PerfilScreen}
+      />
     </Tab.Navigator>
   );
 }

@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, Sidebar, IconInbox, IconPlus, Clock } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus, Clock , IconTag } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -56,11 +56,13 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
     setDrawerOpen(false);
   };
   const iconColor = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
+  const onPerfil = () => { try { (nav as any)?.getParent?.()?.navigate?.('Perfil'); } catch {} setDrawerOpen(false); };
   const sidebarContent = (
     <Sidebar
       items={[
         { id: 'bandeja', label: 'Bandeja Asignada', active: isActive('bandeja'), onPress: () => navigateAndClose('Bandeja'), icon: <IconInbox size={14} color={iconColor(isActive('bandeja'))} /> },
         { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
+        { id: 'perfil', label: 'Mi perfil', active: false, onPress: onPerfil, icon: <IconTag size={14} color={iconColor(false)} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Técnico') as string, role: profile.rol } : undefined}
       onLogout={signOut}

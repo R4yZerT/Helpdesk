@@ -67,6 +67,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
         { id: 'usuarios', label: 'USUARIOS', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
         { id: 'categorias', label: 'CATEGORÍAS', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
         { id: 'import', label: 'IMPORT', active: isActive('import'), onPress: () => navigateAndClose('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
+        { id: 'perfil', label: 'Mi perfil', active: false, onPress: () => { try { (nav as any)?.getParent?.()?.navigate?.('Perfil'); } catch {} setDrawerOpen(false); }, icon: <IconTag size={14} color={ic(false)} /> },
       ];
   const sidebarContent = (
     <Sidebar

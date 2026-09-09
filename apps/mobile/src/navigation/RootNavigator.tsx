@@ -11,6 +11,7 @@ import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
 import { Card, theme } from '@helpdesk/shared';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
+import { PerfilScreen } from '../features/perfil/PerfilScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import type { AdminStackParamList, AuthStackParamList, EmpleadoStackParamList, JefeStackParamList, TecnicoStackParamList } from './types';
 
