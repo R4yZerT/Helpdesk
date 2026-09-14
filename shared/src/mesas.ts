@@ -111,3 +111,44 @@ export async function updateMesa(
 export async function setMesaActiva(supabase: SupabaseClient, id: number, activa: boolean): Promise<Mesa> {
   return updateMesa(supabase, id, { activa });
 }
+
+// ---------------------------------------------------------------------------
+// Asignación de técnicos a mesas
+// Técnicos: profiles con rol='tecnico' + mesa_id (asignación directa).
+// ---------------------------------------------------------------------------
+
+export type TecnicoDeMesa = {
+  id: string;
+  fullName: string;
+  email: string;
+  activo: boolean;
+  mesaId: number | null;
+};
+
+/** Técnicos asignados a una mesa (rol=tecnico + mesa_id). */
+export async function listTecnicosPorMesa(supabase: SupabaseClient, mesaId: number): Promise<TecnicoDeMesa[]> {
+  const { data, error } = await (supabase.from('profiles') as any)
+    .select('id, full_name, email, activo, mesa_id')
+    .eq('rol', 'tecnico')
+    .eq('mesa_id', mesaId)
+    .order('full_name', { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Array<{ id: string; full_name: string; email: string | null; activo: boolean; mesa_id: number | null }>).map((r) => ({
+    id: r.id,
+    fullName: r.full_name,
+    email: r.email ?? '',
+    activo: r.activo,
+    mesaId: r.mesa_id,
+  }));
+}
+
+/** Asigna un técnico a una mesa (o lo libera con mesaId=null). Requiere RLS admin. */
+export async function asignarTecnicoAMesa(
+  supabase: SupabaseClient,
+  tecnicoId: string,
+  mesaId: number | null,
+): Promise<void> {
+  if (mesaId !== null && (!Number.isInteger(mesaId) || mesaId <= 0)) throw new Error('Mesa inválida');
+  const { error } = await (supabase.from('profiles') as any).update({ mesa_id: mesaId }).eq('id', tecnicoId).eq('rol', 'tecnico');
+  if (error) throw error;
+}

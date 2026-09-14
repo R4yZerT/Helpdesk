@@ -1,0 +1,330 @@
+// RF-29 / RF-30 — Admin móvil: dependencias + técnicos (paridad web, CSV only)
+// Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
+// Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
+import { MesaEquipoModal } from './MesaEquipoModal';
+
+const PAGE_SIZE = 20;
+
+function getErrorMessage(e: unknown): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object') {
+    const o = e as Record<string, unknown>;
+    if (typeof o.message === 'string' && o.message.trim()) return o.message;
+    if (typeof o.error === 'string' && o.error.trim()) return o.error;
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+  }
+  return String(e ?? 'Error desconocido');
+}
+
+export function AdminMesasScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 1024;
+  const { profile } = useAuth();
+  const secretariaId = (profile as unknown as { mesa_id?: number | null; mesaId?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
+  const [q, setQ] = useState('');
+  const [qDeb, setQDeb] = useState('');
+  const [activa, setActiva] = useState<boolean | 'todos'>('todos');
+  const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editMesa, setEditMesa] = useState<Mesa | null>(null);
+  const [nombreNew, setNombreNew] = useState('');
+  const [nombreEdit, setNombreEdit] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
+  const [confirmToggle, setConfirmToggle] = useState<Mesa | null>(null);
+  const [toggleLoading, setToggleLoading] = useState(false);
+  const [equipoMesa, setEquipoMesa] = useState<Mesa | null>(null);
+  const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debRef.current) clearTimeout(debRef.current);
+    debRef.current = setTimeout(() => setQDeb(q.trim()), 320);
+    return () => { if (debRef.current) clearTimeout(debRef.current); };
+  }, [q]);
+
+  const fetchPage = useCallback(async (targetPage: number, opts: { reset?: boolean } = {}) => {
+    const first = targetPage === 0;
+    if (first) setLoading(true); else setLoadingMore(true);
+    setErrorMsg(null);
+    try {
+      const res = await listMesasPaginated(supabase, {
+        search: qDeb || undefined,
+        activa: activa as never,
+        page: targetPage + 1,
+        pageSize: PAGE_SIZE,
+        secretariaId: secretariaId ?? undefined,
+      });
+      setTotal(res.count);
+      setHasMore(res.data.length === PAGE_SIZE);
+      setPage(targetPage);
+      setMesas((prev) => (opts.reset || first ? res.data : [...prev, ...res.data]));
+    } catch (e) {
+      setErrorMsg(getErrorMessage(e));
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+      setRefreshing(false);
+    }
+  }, [qDeb, activa, secretariaId]);
+
+  useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
+
+  const onRefresh = useCallback(() => { setRefreshing(true); fetchPage(0, { reset: true }); }, [fetchPage]);
+  const onEndReached = useCallback(() => {
+    if (loadingMore || loading || !hasMore) return;
+    fetchPage(page + 1);
+  }, [loadingMore, loading, hasMore, page, fetchPage]);
+
+  const hasActiveFilters = !!qDeb || activa !== 'todos';
+  const clearFilters = () => { setQ(''); setActiva('todos'); };
+  const onExportCsv = useCallback(() => {
+    try {
+      const header = ['id', 'nombre', 'estado'];
+      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const rows = mesas.map((m) => [String(m.id), m.nombre, m.activa ? 'activa' : 'inactiva']);
+      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${mesas.length}`].join('\r\n') + '\r\n' + csv;
+      const ok = downloadCsv(buildExportFilename('admin-dependencias', 'csv'), meta);
+      if (!ok) window.alert(`CSV generado (${mesas.length} filas).`);
+    } catch (e: any) { console.warn('[AdminMesas] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+  }, [mesas]);
+  const onExportPng = useCallback(async () => { alert('Exportar PNG solo disponible en web — en móvil usa CSV'); }, []);
+  const onExportPdf = useCallback(async () => { alert('Exportar PDF solo disponible en web — en móvil usa CSV'); }, []);
+
+  const toggleActiva = (m: Mesa) => setConfirmToggle(m);
+  const doToggleActiva = async () => {
+    if (!confirmToggle) return;
+    setToggleLoading(true);
+    try {
+      const upd = await setMesaActiva(supabase, confirmToggle.id, !confirmToggle.activa);
+      setMesas((prev) => prev.map((x) => (x.id === confirmToggle.id ? upd : x)));
+      setFeedback({ visible: true, variant: 'success', title: confirmToggle.activa ? 'Mesa desactivada' : 'Mesa activada', message: upd.nombre });
+      setConfirmToggle(null);
+    } catch (e) {
+      const msg = getErrorMessage(e);
+      setErrorMsg(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
+    } finally { setToggleLoading(false); }
+  };
+
+  const submitCreate = async () => {
+    const errs = validateCreateMesa({ nombre: nombreNew });
+    if (Object.keys(errs).length) { setFormError(Object.values(errs).join(' · ')); return; }
+    setSaving(true); setFormError(null);
+    try {
+      const created = await createMesa(supabase, { nombre: nombreNew });
+      setCreateOpen(false); setNombreNew('');
+      setMesas((prev) => [created, ...prev]); setTotal((n) => n + 1);
+      setFeedback({ visible: true, variant: 'success', title: 'Mesa creada', message: created.nombre });
+    } catch (e) { const msg = getErrorMessage(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al crear mesa', message: msg }); } finally { setSaving(false); }
+  };
+
+  const openEdit = (m: Mesa) => { setEditMesa(m); setNombreEdit(m.nombre); setFormError(null); };
+  const submitEdit = async () => {
+    if (!editMesa) return;
+    const errs = validateUpdateMesa({ nombre: nombreEdit });
+    if (Object.keys(errs).length) { setFormError(Object.values(errs).join(' · ')); return; }
+    const trimmed = nombreEdit.trim();
+    if (trimmed === editMesa.nombre) { setEditMesa(null); return; }
+    setSaving(true); setFormError(null);
+    try {
+      const upd = await updateMesa(supabase, editMesa.id, { nombre: trimmed });
+      setMesas((prev) => prev.map((x) => (x.id === upd.id ? upd : x)));
+      setEditMesa(null);
+      setFeedback({ visible: true, variant: 'success', title: 'Mesa actualizada', message: upd.nombre });
+    } catch (e) { const msg = getErrorMessage(e); setFormError(msg); setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg }); } finally { setSaving(false); }
+  };
+
+  const renderItem = ({ item }: { item: Mesa }) => (
+    <Card style={s.card}>
+      <View style={s.cardTop}>
+        <Text style={s.cardId}>#{item.id}</Text>
+        <View style={[s.activaPill, item.activa ? s.activaOn : s.activaOff]}>
+          <Text style={[s.activaText, item.activa ? s.activaTextOn : s.activaTextOff]}>{item.activa ? 'Activa' : 'Inactiva'}</Text>
+        </View>
+      </View>
+      <Text style={s.name} numberOfLines={2}>{item.nombre}</Text>
+      <View style={s.actions}>
+        <Pressable onPress={() => openEdit(item)} style={s.btnGhost} accessibilityRole="button"><Text style={s.btnGhostText}>EDITAR</Text></Pressable>
+        <Pressable onPress={() => setEquipoMesa(item)} style={[s.btnGhost, s.btnGhostAccent]} accessibilityRole="button" accessibilityLabel={`Equipo de ${item.nombre}`}>
+          <Text style={[s.btnGhostText, { color: theme.colors.primary }]}>EQUIPO</Text>
+        </Pressable>
+        <Pressable onPress={() => toggleActiva(item)} style={[s.btnGhost, !item.activa && s.btnGhostAccent]} accessibilityRole="button">
+          <Text style={[s.btnGhostText, !item.activa && { color: theme.colors.primary }]}>{item.activa ? 'DESACTIVAR' : 'ACTIVAR'}</Text>
+        </Pressable>
+      </View>
+    </Card>
+  );
+
+  if (loading && mesas.length === 0) {
+    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>CARGANDO DEPENDENCIAS…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+  }
+
+  return (
+    <View style={s.wrap}>
+      <View style={s.header}>
+        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR</Text></View>
+        <View style={s.headerRow}>
+        <Text style={s.h1}>Dependencias</Text>
+        <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>
+        </View>
+        <Text style={s.subtitle}>Crea y gestiona dependencias.{secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}</Text>
+        {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
+      </View>
+
+      <View style={s.filterCard}>
+        <View style={s.searchWrap}>
+          <Text style={s.searchIcon}>⌕</Text>
+          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
+          {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
+        </View>
+        <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
+        <View style={s.filterFooter}>
+          <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''} · Pág. {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</Text>
+          {hasActiveFilters ? <Pressable onPress={clearFilters} style={s.linkBtn}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
+        </View>
+        <View style={s.paginationRow}>
+          <Pressable disabled={page === 0} onPress={() => fetchPage(page - 1, { reset: true })} style={[s.pageBtn, page === 0 && s.pageBtnDisabled]}><Text style={s.pageBtnText}>← Anterior</Text></Pressable>
+          <Text style={s.pageInfo}>Página {page + 1} de {Math.max(1, Math.ceil(total / PAGE_SIZE))} · {total} total</Text>
+          <Pressable disabled={!hasMore} onPress={() => fetchPage(page + 1)} style={[s.pageBtn, !hasMore && s.pageBtnDisabled]}><Text style={s.pageBtnText}>Siguiente →</Text></Pressable>
+        </View>
+      </View>
+
+      {/* Export row — mismo patrón Dashboard RF-18 */}
+      <View style={s.exportRow}>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
+        <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+      </View>
+      <View nativeID="admin-export-root" style={{ flex: 1 }}>
+      <FlatList
+        data={mesas}
+        keyExtractor={(m) => String(m.id)}
+        renderItem={renderItem}
+        numColumns={isWide ? 2 : 1}
+        key={isWide ? 'grid-2' : 'list-1'}
+        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.4}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
+        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>SIN DEPENDENCIAS</Text><Text style={s.mutedCenter}>AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA.</Text></View>}
+        ListFooterComponent={loadingMore ? <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+        contentContainerStyle={s.listContent}
+      />
+      </View>
+
+      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>NUEVA DEPENDENCIA</Text>
+            <Text style={s.modalHint}>NOMBRE ÚNICO, 3–60 CARACTERES. RLS: SOLO ADMINISTRADOR.</Text>
+            <TextInput value={nombreNew} onChangeText={setNombreNew} placeholder="Nombre (Ej: oficina TIC)" style={s.input} placeholderTextColor={theme.colors.mutedSoft} autoFocus />
+            {formError ? <Text style={s.error}>{formError}</Text> : null}
+            <View style={s.modalActions}>
+              <Pressable onPress={() => setCreateOpen(false)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>
+              <Pressable onPress={submitCreate} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'GUARDANDO…' : 'CREAR'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!editMesa} transparent animationType="fade" onRequestClose={() => setEditMesa(null)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>EDITAR · #{editMesa?.id}</Text>
+            <TextInput value={nombreEdit} onChangeText={setNombreEdit} placeholder="Nombre" style={s.input} placeholderTextColor={theme.colors.mutedSoft} />
+            {formError ? <Text style={s.error}>{formError}</Text> : null}
+            <View style={s.modalActions}>
+              <Pressable onPress={() => setEditMesa(null)} style={s.btnGhost}><Text style={s.btnGhostText}>CANCELAR</Text></Pressable>
+              <Pressable onPress={submitEdit} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'GUARDANDO…' : 'GUARDAR'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activa ? 'Desactivar mesa' : 'Activar mesa'} message={confirmToggle ? `¿${confirmToggle.activa ? 'Desactivar' : 'Activar'} "${confirmToggle.nombre}"?` : undefined} confirmText={confirmToggle?.activa ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActiva} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
+      <MesaEquipoModal mesa={equipoMesa} mesas={mesas} onClose={() => setEquipoMesa(null)} />
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
+  exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
+  exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+  exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
+  wrap: { flex: 1, backgroundColor: theme.colors.bg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
+  muted: { color: theme.colors.muted, fontSize: 12 },
+  mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
+  error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
+  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[3], gap: theme.space[2] - 2 },
+  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] },
+  kickerDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.primary },
+  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: theme.colors.muted, textTransform: 'uppercase' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
+  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, flex: 1 },
+  subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
+  btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
+  btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  filterCard: { marginHorizontal: theme.space[3], marginBottom: theme.space[3], gap: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40 },
+  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
+  search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
+  clearBtn: { padding: 6, marginLeft: 6 },
+  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
+  chipsBlock: { gap: 6 },
+  chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 14, paddingVertical: 6, height: 32, justifyContent: 'center', borderRadius: theme.radius.full, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border },
+  chipActive: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary },
+  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
+  filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.colors.border },
+  paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.colors.border, marginTop: 4 },
+  pageBtn: { paddingHorizontal: 12, height: 32, borderRadius: 999, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  pageBtnDisabled: { opacity: 0.45 },
+  pageBtnText: { fontSize: 11, fontWeight: '700', color: theme.colors.textSoft },
+  pageInfo: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
+  filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
+  linkBtn: { paddingVertical: 4, paddingHorizontal: 8 },
+  linkText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
+  listContent: { padding: theme.space[3], gap: 10, paddingBottom: theme.space[6] },
+  card: { gap: 8, flex: 1 },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardId: { fontSize: 10, fontWeight: '700', color: theme.colors.mutedSoft },
+  activaPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  activaOn: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+  activaOff: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
+  activaText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  activaTextOn: { color: '#15803D' },
+  activaTextOff: { color: '#991B1B' },
+  name: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  btnGhost: { flex: 1, height: 36, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  btnGhostAccent: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
+  btnGhostText: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
+  empty: { alignItems: 'center', padding: theme.space[8], gap: 10, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.space[2] },
+  emptyTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  modalCard: { width: '100%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], gap: 12, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.text },
+  modalHint: { fontSize: 11, color: theme.colors.muted, lineHeight: 14 },
+  input: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, paddingHorizontal: 12, height: 44, fontSize: 13, color: theme.colors.text },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 },
+});

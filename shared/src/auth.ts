@@ -75,17 +75,33 @@ export async function getSessionProfile(supabase: SupabaseClient): Promise<Profi
   return fetchProfile(supabase, session.user.id);
 }
 
-// RF-27 — actualización Mi Perfil (solo telefono + avatar_url editables por el propio usuario; RLS profiles_update_own lo limita)
+// RF-27 — actualización Mi Perfil (nombre/correo/teléfono + avatar_url editables por el propio usuario; RLS profiles_update_own lo limita)
 export async function updateProfile(
   supabase: SupabaseClient,
   userId: string,
-  patch: { telefono?: string | null; avatar_url?: string | null },
+  patch: { full_name?: string | null; email?: string | null; telefono?: string | null; avatar_url?: string | null },
 ): Promise<Profile | null> {
   const clean: Record<string, string | null> = {};
+  if ('full_name' in patch) {
+    const v = patch.full_name?.trim();
+    if (!v) throw new Error('Nombre requerido');
+    clean.full_name = v;
+  }
+  if ('email' in patch) {
+    const v = patch.email?.trim();
+    if (!v) throw new Error('Correo requerido');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw new Error('Formato de correo inválido');
+    clean.email = v;
+  }
   if ('telefono' in patch) clean.telefono = patch.telefono?.trim() ? patch.telefono.trim() : null;
   if ('avatar_url' in patch) clean.avatar_url = patch.avatar_url?.trim() ? patch.avatar_url.trim() : null;
+  if (Object.keys(clean).length === 0) return fetchProfile(supabase, userId);
   const { error } = await (supabase.from('profiles') as any).update(clean).eq('id', userId);
   if (error) throw error;
+  // Si se cambió el email, también intentar actualizar auth.users.email (best-effort, puede requerir confirmación)
+  if ('email' in patch && clean.email) {
+    try { await supabase.auth.updateUser({ email: clean.email }); } catch {}
+  }
   return fetchProfile(supabase, userId);
 }
 

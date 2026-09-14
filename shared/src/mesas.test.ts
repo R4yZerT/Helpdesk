@@ -25,3 +25,4 @@ describe('mesas RF-29', () => {
     expect(isCreateMesaValid({ nombre: 'a'.repeat(60) })).toBe(true);
   });
 });
+

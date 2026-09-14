@@ -12,6 +12,7 @@ import type { UsuarioStackParamList } from '../../navigation/types';
 import type { Profile } from '@helpdesk/shared';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { useAuth } from '../../context/AuthContext';
+import { HeaderBell } from '../../components/HeaderBell';
 
 const Stack = createNativeStackNavigator<UsuarioStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -27,7 +28,7 @@ const screenOpts = {
 // --- Stack interno para bandeja (lista + detalle)
 function MisStack() {
   return (
-    <Stack.Navigator screenOptions={screenOpts}>
+    <Stack.Navigator screenOptions={{ ...screenOpts, headerRight: () => <HeaderBell /> }}>
       <Stack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes' }} component={MisSolicitudesScreen} />
       <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
     </Stack.Navigator>
@@ -171,6 +172,7 @@ function UsuarioMobileTabs() {
           headerStyle: { backgroundColor: theme.colors.surface } as never,
           headerTintColor: theme.colors.primary,
           headerTitleStyle: { fontWeight: '800', fontSize: 14 } as never,
+          headerRight: () => <HeaderBell />,
         }}
         component={CreateTicketScreen}
       />
@@ -180,6 +182,8 @@ function UsuarioMobileTabs() {
           title: 'Mi perfil',
           tabBarLabel: 'Perfil',
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>,
+          headerShown: true,
+          headerRight: () => <HeaderBell />,
         }}
         component={PerfilScreen}
       />

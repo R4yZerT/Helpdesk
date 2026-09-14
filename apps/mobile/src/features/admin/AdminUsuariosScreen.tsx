@@ -1,10 +1,8 @@
-// RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
+// RF-27 — Admin móvil: tabla de usuarios + edición con cambio de contraseña (paridad web, CSV only)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
@@ -128,31 +126,8 @@ export function AdminUsuariosScreen() {
       if (!ok) window.alert(`CSV generado (${users.length} filas).`);
     } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
   }, [users, hasActiveFilters]);
-  const onExportPng = useCallback(async () => {
-    try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-usuarios', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminUsuarios] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
-  }, []);
-  const onExportPdf = useCallback(async () => {
-    try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      // jsPDF importado estático arriba
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('admin-usuarios', 'pdf'));
-    } catch (e: any) { console.warn('[AdminUsuarios] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
-  }, []);
+  const onExportPng = useCallback(async () => { alert('Exportar PNG solo disponible en web — en móvil usa CSV'); }, []);
+  const onExportPdf = useCallback(async () => { alert('Exportar PDF solo disponible en web — en móvil usa CSV'); }, []);
 
   const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
   const doToggleActivo = async () => {
