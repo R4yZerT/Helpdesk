@@ -61,41 +61,127 @@ function isCedula(v: string): boolean {
   return /^[0-9]{5,15}$/.test(v);
 }
 
+// Mensajes de validación: siempre indican campo + causa (vacío, longitud, caracteres, formato)
+function errNombre(v: string): string | null {
+  const n = v.trim();
+  if (!n) return 'Nombre requerido (vacío)';
+  if (n.length < 3) return `Nombre: mínimo 3 caracteres (recibido ${n.length})`;
+  if (n.length > 80) return `Nombre: máximo 80 caracteres (recibido ${n.length})`;
+  return null;
+}
+
+function errEmail(v: string): string | null {
+  const m = v.trim();
+  if (!m) return 'Correo requerido (vacío)';
+  if (!isEmail(m)) return `Correo inválido: usa formato nombre@dominio.com (recibido "${m.slice(0, 40)}")`;
+  return null;
+}
+
+function errCedula(v: string): string | null {
+  const c = v.trim();
+  if (!c) return 'Cédula requerida (vacía)';
+  if (!/^[0-9]+$/.test(c)) return 'Cédula: solo dígitos 0-9 (sin letras, espacios ni puntos)';
+  if (c.length < 5 || c.length > 15) return `Cédula: longitud 5-15 dígitos (recibido ${c.length})`;
+  return null;
+}
+
 export function validateCreateUser(input: CreateUserInput): CreateUserErrors {
   const e: CreateUserErrors = {};
-  const name = input.fullName.trim();
-  if (name.length < 3) e.fullName = 'Nombre mínimo 3 caracteres';
-  else if (name.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
-  if (!isEmail(input.email.trim())) e.email = 'Email inválido';
-  if (!isCedula(input.cedula.trim())) e.cedula = 'Cédula 5-15 dígitos';
-  if (!input.password) e.password = 'Contraseña requerida';
+  const n = errNombre(input.fullName);
+  if (n) e.fullName = n;
+  const m = errEmail(input.email);
+  if (m) e.email = m;
+  const c = errCedula(input.cedula);
+  if (c) e.cedula = c;
+  if (!input.password) e.password = 'Contraseña requerida (vacía)';
   else {
     const v = validatePasswordSync(input.password, { email: input.email, nombre: input.fullName, rol: input.rol });
     if (!v.ok) e.password = v.reasons.join(' · ');
-    else if (input.password.length > 64) e.password = 'Máximo 64 caracteres';
+    else if (input.password.length > 64) e.password = `Contraseña: máximo 64 caracteres (recibido ${input.password.length})`;
   }
-  if (!isRolUsuario(input.rol)) e.rol = 'Rol inválido';
-  if (input.mesaId !== null && (!Number.isInteger(input.mesaId) || input.mesaId <= 0)) e.mesaId = 'Mesa inválida';
+  if (!isRolUsuario(input.rol)) e.rol = `Rol inválido (recibido "${String(input.rol)}"; usa ${ROLES.join(', ')})`;
+  if (input.mesaId !== null && (!Number.isInteger(input.mesaId) || input.mesaId <= 0)) e.mesaId = 'Dependencia inválida (ID debe ser entero mayor a 0)';
   return e;
 }
 
 export function validateUpdateUser(input: UpdateUserInput): UpdateUserErrors {
   const e: UpdateUserErrors = {};
   if (input.fullName !== undefined) {
-    const n = input.fullName.trim();
-    if (n.length < 3) e.fullName = 'Nombre mínimo 3 caracteres';
-    else if (n.length > 80) e.fullName = 'Nombre máximo 80 caracteres';
+    const r = errNombre(input.fullName);
+    if (r) e.fullName = r;
   }
-  if (input.email !== undefined && !isEmail(input.email.trim())) e.email = 'Email inválido';
-  if (input.cedula !== undefined && !isCedula(input.cedula.trim())) e.cedula = 'Cédula 5-15 dígitos';
+  if (input.email !== undefined) {
+    const r = errEmail(input.email);
+    if (r) e.email = r;
+  }
+  if (input.cedula !== undefined) {
+    const r = errCedula(input.cedula);
+    if (r) e.cedula = r;
+  }
   if (input.password !== undefined) {
     const v = validatePasswordSync(input.password, { email: input.email, nombre: input.fullName, rol: input.rol });
     if (!v.ok) e.password = v.reasons[0] ?? 'Contraseña no cumple requisitos';
   }
-  if (input.rol !== undefined && !isRolUsuario(input.rol)) e.rol = 'Rol inválido';
+  if (input.rol !== undefined && !isRolUsuario(input.rol)) e.rol = `Rol inválido (recibido "${String(input.rol)}"; usa ${ROLES.join(', ')})`;
   if (input.mesaId !== undefined && input.mesaId !== null && (!Number.isInteger(input.mesaId) || input.mesaId <= 0))
-    e.mesaId = 'Mesa inválida';
+    e.mesaId = 'Dependencia inválida (ID debe ser entero mayor a 0)';
   return e;
+}
+
+// Explica cualquier error de operaciones de usuarios en español, siempre con la causa.
+// Traduce códigos técnicos (PostgREST, RLS, red, Edge) a motivo accionable.
+export function explainUserError(e: unknown): string {
+  const raw = (() => {
+    if (e instanceof Error && e.message?.trim()) return e.message.trim();
+    if (typeof e === 'string' && e.trim()) return e.trim();
+    if (e && typeof e === 'object') {
+      const o = e as Record<string, unknown>;
+      for (const k of ['message', 'error', 'msg', 'details']) {
+        if (typeof o[k] === 'string' && (o[k] as string).trim()) return (o[k] as string).trim();
+      }
+      if (typeof o['code'] === 'string' && (o['code'] as string).trim()) return `Código ${(o['code'] as string).trim()}`;
+    }
+    return '';
+  })();
+  if (!raw) return 'Error desconocido: el servidor respondió vacío. Reintenta; si persiste, revisa tu conexión.';
+  if (/c[eé]dula ya registrada/i.test(raw)) return 'Cédula ya registrada: otro usuario usa esa cédula. Verifica el número.';
+  if (/correo ya registrado/i.test(raw)) return 'Correo ya registrado: otro usuario usa ese correo. Usa uno distinto.';
+  if (/23505|duplicate key|unique constraint/i.test(raw)) {
+    if (/cedula/i.test(raw)) return 'Cédula duplicada: ya existe un usuario con esa cédula (restricción de unicidad).';
+    if (/email/i.test(raw)) return 'Correo duplicado: ya existe un usuario con ese correo (restricción de unicidad).';
+    return `Dato duplicado: ya existe un registro con ese valor (restricción de unicidad). Detalle: ${raw}`;
+  }
+  if (/row-level|RLS|policy|42501|permission denied|not allowed|no autorizado|unauthorized|admin/i.test(raw) && /edge|function|despliega|service_role/i.test(raw))
+    return raw; // mensajes propios ya explicativos (requiere Edge/despliegue)
+  if (/row-level|RLS|policy|42501|permission denied|JWT|token|expired|401|403|unauthorized|forbidden/i.test(raw))
+    return `Sin permiso o sesión vencida: tu rol no puede modificar este usuario o tu sesión expiró. Detalle: ${raw}`;
+  if (/failed to send|network|fetch failed|load failed|timeout|offline|conexi/i.test(raw))
+    return 'Sin conexión con el servidor: revisa tu red e intenta de nuevo.';
+  if (/functionshttperror[^]*404|not found.*function|failed to send a request to the edge function/i.test(raw))
+    return 'Función de administración no desplegada: despliega admin-create-user / admin-update-user con service_role.';
+  if (/invalid input|22P02|22P01/i.test(raw)) return `Dato con formato inválido para la base de datos. Detalle: ${raw}`;
+  return raw;
+}
+
+export type UserChangeLine = { campo: string; antes: string; despues: string };
+
+// Resume cambios usuario para el modal de confirmación (antes → después por campo)
+export function describeUserChanges(
+  oldU: { fullName: string; cedula: string | null; email: string; rol: string; mesaId: number | null; activo: boolean },
+  form: { fullName: string; cedula: string; email: string; rol: string; mesaId: number | null; activo: boolean; cambiarPass: boolean },
+  mesaNombre?: (id: number | null) => string,
+): UserChangeLine[] {
+  const lines: UserChangeLine[] = [];
+  const push = (campo: string, antes: string, despues: string) => { if (antes !== despues) lines.push({ campo, antes, despues }); };
+  push('Nombre', oldU.fullName, form.fullName.trim());
+  push('Cédula', oldU.cedula ?? '—', form.cedula.trim() || '—');
+  push('Correo', oldU.email || '—', form.email.trim().toLowerCase() || '—');
+  push('Rol', oldU.rol, form.rol);
+  const mesaLabel = (id: number | null) => (id === null ? 'Sin dependencia' : (mesaNombre?.(id) ?? `Mesa #${id}`));
+  push('Dependencia', mesaLabel(oldU.mesaId), mesaLabel(form.mesaId));
+  push('Estado', oldU.activo ? 'Activo' : 'Inactivo', form.activo ? 'Activo' : 'Inactivo');
+  if (form.cambiarPass) lines.push({ campo: 'Contraseña', antes: '••••••••', despues: 'Se actualizará' });
+  return lines;
 }
 
 export function isCreateUserValid(i: CreateUserInput): boolean {

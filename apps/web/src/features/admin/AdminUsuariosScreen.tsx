@@ -1,7 +1,7 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -9,19 +9,6 @@ import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
 const PAGE_SIZE = 20;
-
-function getErrorMessage(e: unknown): string {
-  if (e instanceof Error && e.message) return e.message;
-  if (typeof e === 'string') return e;
-  if (e && typeof e === 'object') {
-    const o = e as Record<string, unknown>;
-    if (typeof o.message === 'string' && o.message.trim()) return o.message;
-    if (typeof o.error === 'string' && o.error.trim()) return o.error;
-    if (typeof o.msg === 'string' && o.msg.trim()) return o.msg;
-    try { const j = JSON.stringify(o); if (j !== '{}' && j !== '[]') return j; } catch {}
-  }
-  return String(e ?? 'Error desconocido');
-}
 
 function pillRol(rol: string) {
   if (rol === 'administrador') return { bg: '#EFF6FF', border: '#BFDBFE', fg: '#1D4ED8', label: 'Admin' };
@@ -60,6 +47,9 @@ export function AdminUsuariosScreen() {
   const [showCreatePass, setShowCreatePass] = useState(false);
   const [showEditPass, setShowEditPass] = useState(false);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [confirmEdit, setConfirmEdit] = useState(false);
+  const [showCreateConfirm, setShowCreateConfirm] = useState(false);
+  const [pendingEdit, setPendingEdit] = useState<Record<string, unknown> | null>(null);
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<AdminUser | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
@@ -95,7 +85,7 @@ export function AdminUsuariosScreen() {
       setPage(targetPage);
       setUsers((prev) => (opts.reset || first ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      const msg = getErrorMessage(e);
+      const msg = explainUserError(e);
       setErrorMsg(msg);
       console.warn('[AdminUsuarios] listUsers', e);
     } finally {
@@ -126,24 +116,24 @@ export function AdminUsuariosScreen() {
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${users.length}`, `# Filtros: ${hasActiveFilters ? 'filtrado' : 'sin filtros'}`].join('\r\n') + '\r\n' + csv;
       const ok = downloadCsv(buildExportFilename('admin-usuarios', 'csv'), meta);
       if (!ok) window.alert(`CSV generado (${users.length} filas).`);
-    } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+    } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
   }, [users, hasActiveFilters]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PNG solo está disponible en web (motivo: plataforma no web).' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: 'No se encontró el contenedor de usuarios (motivo: tabla aún no renderizada).' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-usuarios', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminUsuarios] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+    } catch (e: any) { console.warn('[AdminUsuarios] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: explainUserError(e) }); }
   }, []);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PDF solo está disponible en web (motivo: plataforma no web).' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de usuarios'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: 'No se encontró el contenedor de usuarios (motivo: tabla aún no renderizada).' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       // jsPDF importado estático arriba
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
@@ -151,7 +141,7 @@ export function AdminUsuariosScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('admin-usuarios', 'pdf'));
-    } catch (e: any) { console.warn('[AdminUsuarios] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+    } catch (e: any) { console.warn('[AdminUsuarios] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: explainUserError(e) }); }
   }, []);
 
   const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
@@ -164,7 +154,7 @@ export function AdminUsuariosScreen() {
       setFeedback({ visible: true, variant: 'success', title: confirmToggle.activo ? 'Usuario desactivado' : 'Usuario activado', message: `${confirmToggle.fullName} ahora está ${!confirmToggle.activo ? 'activo' : 'inactivo'}` });
       setConfirmToggle(null);
     } catch (e) {
-      const msg = getErrorMessage(e);
+      const msg = explainUserError(e);
       setErrorMsg(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al cambiar estado', message: msg });
     } finally { setToggleLoading(false); }
@@ -176,63 +166,104 @@ export function AdminUsuariosScreen() {
     setFormError(null);
   };
 
-  const submitEdit = async () => {
+  // Paso 1 editar: valida y abre modal de confirmación con resumen antes → después
+  const requestEditConfirm = () => {
     if (!editUser) return;
-    // Validación base
-    const patch: Record<string, unknown> = {};
     const errs: string[] = [];
     const baseErrs = validateUpdateUser({ fullName: formEdit.fullName, cedula: formEdit.cedula || undefined, email: formEdit.email || undefined, rol: formEdit.rol as never, mesaId: formEdit.mesaId as never });
     if (Object.keys(baseErrs).length) errs.push(Object.values(baseErrs).join(' · '));
     if (formEdit.cambiarPass) {
-      if (!formEdit.password || !formEdit.passwordConfirm) errs.push('Contraseña y confirmación requeridas');
-      else if (formEdit.password !== formEdit.passwordConfirm) errs.push('Las contraseñas no coinciden');
+      if (!formEdit.password || !formEdit.passwordConfirm) errs.push('Contraseña y confirmación requeridas (vacías)');
+      else if (formEdit.password !== formEdit.passwordConfirm) errs.push('Las contraseñas no coinciden (nueva ≠ repetición)');
       else {
         const v = validatePasswordSync(formEdit.password, { email: formEdit.email, nombre: formEdit.fullName, rol: formEdit.rol });
         if (!v.ok) errs.push(v.reasons.join(' · '));
       }
     }
-    if (errs.length) { setFormError(errs.join(' · ')); return; }
+    if (errs.length) {
+      const msg = errs.join(' · ');
+      setFormError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Datos inválidos', message: msg });
+      return;
+    }
+    const payload: Record<string, unknown> = {};
+    if (formEdit.fullName.trim() !== editUser.fullName) payload.fullName = formEdit.fullName.trim();
+    if ((formEdit.cedula || '').trim() !== (editUser.cedula ?? '')) payload.cedula = formEdit.cedula.trim();
+    if ((formEdit.email || '').trim().toLowerCase() !== (editUser.email || '').toLowerCase()) payload.email = formEdit.email.trim().toLowerCase();
+    if (formEdit.rol !== editUser.rol) payload.rol = formEdit.rol as never;
+    if (formEdit.mesaId !== editUser.mesaId) payload.mesaId = formEdit.mesaId;
+    if (formEdit.activo !== editUser.activo) payload.activo = formEdit.activo;
+    if (formEdit.cambiarPass) payload.password = formEdit.password;
+    if (Object.keys(payload).length === 0) {
+      setFeedback({ visible: true, variant: 'info', title: 'Sin cambios', message: 'No modificaste ningún dato del usuario.' });
+      return;
+    }
+    setPendingEdit(payload);
+    setConfirmEdit(true);
+  };
+
+  // Paso 2 editar: se ejecuta solo al confirmar en el modal
+  const doSubmitEdit = async () => {
+    if (!editUser || !pendingEdit) return;
     setSaving(true);
     setFormError(null);
     try {
-      const payload: Record<string, unknown> = {};
-      if (formEdit.fullName.trim() !== editUser.fullName) payload.fullName = formEdit.fullName.trim();
-      if ((formEdit.cedula || '').trim() !== (editUser.cedula ?? '')) payload.cedula = formEdit.cedula.trim();
-      if ((formEdit.email || '').trim().toLowerCase() !== (editUser.email || '').toLowerCase()) payload.email = formEdit.email.trim().toLowerCase();
-      if (formEdit.rol !== editUser.rol) payload.rol = formEdit.rol as never;
-      if (formEdit.mesaId !== editUser.mesaId) payload.mesaId = formEdit.mesaId;
-      if (formEdit.activo !== editUser.activo) payload.activo = formEdit.activo;
-      if (formEdit.cambiarPass) payload.password = formEdit.password;
-      if (Object.keys(payload).length === 0) { setEditUser(null); setSaving(false); return; }
-      await updateUser(supabase, editUser.id, payload as never);
+      await updateUser(supabase, editUser.id, pendingEdit as never);
       setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, fullName: formEdit.fullName.trim(), cedula: formEdit.cedula.trim(), email: formEdit.email.trim().toLowerCase(), rol: formEdit.rol as never, mesaId: formEdit.mesaId, activo: formEdit.activo } : x)));
+      setConfirmEdit(false);
+      setPendingEdit(null);
       setEditUser(null);
       setFeedback({ visible: true, variant: 'success', title: 'Usuario actualizado', message: 'Los cambios se guardaron correctamente' });
     } catch (e) {
-      const msg = getErrorMessage(e);
+      const msg = explainUserError(e);
       setFormError(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al actualizar', message: msg });
     } finally { setSaving(false); }
   };
 
-  const submitCreate = async () => {
+  const editSummary = editUser
+    ? describeUserChanges(editUser, formEdit, (id) => mesas.find((m) => m.id === id)?.nombre ?? `Mesa #${id}`)
+        .map((l) => `• ${l.campo}: ${l.antes} → ${l.despues}`).join('\n')
+    : '';
+
+  // Paso 1 crear: valida y pide confirmación
+  const requestCreateConfirm = () => {
     const errs = validateCreateUser(form);
-    if (Object.keys(errs).length) { setFormError(Object.values(errs).join(' · ')); return; }
+    if (Object.keys(errs).length) {
+      const msg = Object.values(errs).join(' · ');
+      setFormError(msg);
+      setFeedback({ visible: true, variant: 'error', title: 'Datos inválidos', message: msg });
+      return;
+    }
+    setShowCreateConfirm(true);
+  };
+
+  // Paso 2 crear: se ejecuta solo al confirmar en el modal
+  const doSubmitCreate = async () => {
     setSaving(true);
     setFormError(null);
     try {
       const { createUser } = await import('@helpdesk/shared');
       await createUser(supabase, { ...form, email: form.email.trim().toLowerCase(), cedula: form.cedula.trim() });
+      setShowCreateConfirm(false);
       setCreateOpen(false);
       setForm({ fullName: '', cedula: '', email: '', password: '', rol: 'usuario', mesaId: null });
       fetchPage(0, { reset: true });
       setFeedback({ visible: true, variant: 'success', title: 'Usuario creado', message: 'El usuario fue creado correctamente' });
     } catch (e) {
-      const msg = getErrorMessage(e);
+      const msg = explainUserError(e);
       setFormError(msg);
       setFeedback({ visible: true, variant: 'error', title: 'Error al crear usuario', message: msg });
     } finally { setSaving(false); }
   };
+
+  const createSummary = [
+    `• Nombre: ${form.fullName.trim() || '—'}`,
+    `• Cédula: ${form.cedula.trim() || '—'}`,
+    `• Correo: ${form.email.trim().toLowerCase() || '—'}`,
+    `• Rol: ${form.rol}`,
+    `• Dependencia: ${form.mesaId === null ? 'Sin dependencia' : (mesas.find((m) => m.id === form.mesaId)?.nombre ?? `Mesa #${form.mesaId}`)}`,
+  ].join('\n');
 
   const renderRow = ({ item }: { item: AdminUser }) => {
     const pill = pillRol(item.rol);
@@ -353,7 +384,7 @@ export function AdminUsuariosScreen() {
             {formError ? <Text style={s.error}>{formError}</Text> : null}
             <View style={s.modalActions}>
               <Pressable onPress={() => setCreateOpen(false)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-              <Pressable onPress={submitCreate} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Crear'}</Text></Pressable>
+              <Pressable onPress={requestCreateConfirm} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Crear'}</Text></Pressable>
             </View>
           </View>
         </View>
@@ -416,13 +447,15 @@ export function AdminUsuariosScreen() {
               {formError ? <Text style={s.error}>{formError}</Text> : null}
               <View style={s.modalActions}>
                 <Pressable onPress={() => setEditUser(null)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-                <Pressable onPress={submitEdit} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text></Pressable>
+                <Pressable onPress={requestEditConfirm} style={[s.btnPrimary, saving && { opacity: 0.6 }]} disabled={saving}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text></Pressable>
               </View>
             </View>
           </ScrollView>
         </View>
       </Modal>
       {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <FeedbackModal visible={confirmEdit} variant="confirm" title={`Confirmar cambios · ${editUser?.fullName ?? ''}`} message={editSummary ? `Se aplicarán estos cambios:\n${editSummary}` : undefined} confirmText="Confirmar cambios" cancelText="Revisar" loading={saving} onConfirm={doSubmitEdit} onClose={() => { setConfirmEdit(false); setPendingEdit(null); }} onCancel={() => { setConfirmEdit(false); setPendingEdit(null); }} />
+      <FeedbackModal visible={showCreateConfirm} variant="confirm" title="Confirmar creación de usuario" message={`Se creará el usuario con estos datos:\n${createSummary}`} confirmText="Crear usuario" cancelText="Revisar" loading={saving} onConfirm={doSubmitCreate} onClose={() => setShowCreateConfirm(false)} onCancel={() => setShowCreateConfirm(false)} />
       <TecnicoAfinidadesModal tecnico={afinUser} onClose={() => setAfinUser(null)} />
       <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activo ? 'Desactivar usuario' : 'Activar usuario'} message={confirmToggle ? `¿${confirmToggle.activo ? 'Desactivar' : 'Activar'} a ${confirmToggle.fullName}?` : undefined} confirmText={confirmToggle?.activo ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActivo} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>

@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme.js';
+import { FeedbackModal } from '../FeedbackModal.js';
+import { explainUserError } from '../../admin.js';
 
 export type PerfilProps = {
   nombre: string;
@@ -27,6 +29,8 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
   const [tel, setTel] = React.useState(telefono ?? '');
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState<{ text: string; ok?: boolean } | null>(null);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [feedback, setFeedback] = React.useState<{ visible: boolean; variant: 'success' | 'error'; title: string; message?: string } | null>(null);
   const [touched, setTouched] = React.useState<{ nom?: boolean; mail?: boolean; tel?: boolean }>({});
   React.useEffect(()=>{ setNom(nombre ?? ''); }, [nombre]);
   React.useEffect(()=>{ setMail(email ?? ''); }, [email]);
@@ -35,18 +39,44 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
   const nomTrim = nom.trim();
   const mailTrim = mail.trim();
   const telTrim = tel.trim();
-  const nomErr = !nomTrim ? 'Nombre requerido (no puede ser vacío ni solo espacios)' : nomTrim.length < 2 ? 'Mínimo 2 caracteres' : null;
+  const nomErr = !nomTrim ? 'Nombre requerido (vacío o solo espacios)' : nomTrim.length < 2 ? `Nombre muy corto: mínimo 2 caracteres (recibido: ${nomTrim.length})` : null;
   const mailErr = !mailTrim ? 'Correo requerido' : !EMAIL_RE.test(mailTrim) ? 'Formato de correo inválido (ej: nombre@dominio.com)' : null;
   const telErr = !telTrim ? null : !/^[0-9 +()\-]{7,20}$/.test(telTrim) ? 'Formato: 7-20, solo dígitos, espacios, + ( ) -' : null;
   const dirty = nomTrim !== (nombre ?? '').trim() || mailTrim !== (email ?? '').trim() || telTrim !== (telefono ?? '').trim();
   const hasErr = !!(nomErr || mailErr || telErr);
 
-  const doSave = async () => {
+  // Resumen antes → después para el modal de confirmación
+  const changeSummary = [
+    nomTrim !== (nombre ?? '').trim() ? `• Nombre: ${nombre?.trim() || '—'} → ${nomTrim}` : null,
+    mailTrim !== (email ?? '').trim() ? `• Correo: ${email?.trim() || '—'} → ${mailTrim}` : null,
+    telTrim !== (telefono ?? '').trim() ? `• Teléfono: ${telefono?.trim() || '—'} → ${telTrim || '—'}` : null,
+  ].filter(Boolean).join('\n');
+
+  // Paso 1: valida y pide confirmación con resumen
+  const requestSave = () => {
     setTouched({ nom: true, mail: true, tel: true });
-    if (nomErr || mailErr || telErr) { setMsg({ text: nomErr ?? mailErr ?? telErr ?? 'Corrige los campos marcados' }); return; }
+    if (nomErr || mailErr || telErr) {
+      const msg = nomErr ?? mailErr ?? telErr ?? 'Corrige los campos marcados';
+      setMsg({ text: msg });
+      setFeedback({ visible: true, variant: 'error', title: 'Datos inválidos', message: msg });
+      return;
+    }
     if (!dirty) return;
+    setConfirmOpen(true);
+  };
+
+  // Paso 2: se ejecuta solo al confirmar en el modal
+  const doSave = async () => {
     setSaving(true); setMsg(null);
-    try { await onSave({ nombre: nomTrim, email: mailTrim, telefono: telTrim || null }); setMsg({ text: 'Cambios guardados ✓', ok: true }); setTimeout(()=>setMsg(null), 2500); } catch(e:any){ setMsg({ text: e?.message ?? 'Error al guardar' }); } finally { setSaving(false); }
+    try {
+      await onSave({ nombre: nomTrim, email: mailTrim, telefono: telTrim || null });
+      setConfirmOpen(false);
+      setMsg({ text: 'Cambios guardados ✓', ok: true }); setTimeout(()=>setMsg(null), 2500);
+    } catch(e:any){
+      const msg = explainUserError(e);
+      setMsg({ text: msg });
+      setFeedback({ visible: true, variant: 'error', title: 'Error al guardar perfil', message: msg });
+    } finally { setSaving(false); }
   };
 
   const isWeb = variant==='web';
@@ -93,7 +123,9 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
           {touched.tel && telErr ? <Text style={s.err}>{telErr}</Text> : null}
         </View>
         {msg ? <Text style={[s.msg, msg.ok && { color: theme.colors.success }]}>{msg.text}</Text> : null}
-        <Pressable onPress={doSave} disabled={!dirty || saving} style={[s.btnPrimary, (!dirty || saving) && { opacity:0.45 }]}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text></Pressable>
+        <Pressable onPress={requestSave} disabled={!dirty || saving} style={[s.btnPrimary, (!dirty || saving) && { opacity:0.45 }]}><Text style={s.btnPrimaryText}>{saving ? 'Guardando…' : 'Guardar cambios'}</Text></Pressable>
+        <FeedbackModal visible={confirmOpen} variant="confirm" title="Confirmar cambios de perfil" message={changeSummary ? `Se aplicarán estos cambios:\n${changeSummary}` : undefined} confirmText="Confirmar cambios" cancelText="Revisar" loading={saving} onConfirm={doSave} onClose={() => setConfirmOpen(false)} onCancel={() => setConfirmOpen(false)} />
+        {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
       </View>
 
       {/* Card 3 — Datos solo lectura (gris #F6F8FB) */}
