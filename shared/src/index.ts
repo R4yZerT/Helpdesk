@@ -39,3 +39,5 @@ export * from './admin.js';
 export * from './mesas.js';
 export * from './categorias.js';
 export * from './ui/perfil/PerfilCard.js';
+export * from './notificaciones.js';
+export * from './ui/notificaciones/NotificationBell.js';

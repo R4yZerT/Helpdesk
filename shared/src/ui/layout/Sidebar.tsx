@@ -1,12 +1,12 @@
 // Sidebar — Stitch nav vertical w-64
 import * as React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { formatRol } from '../../filters.js';
 
 export type SidebarItem = { id: string; label: string; active?: boolean; onPress?: () => void; icon?: React.ReactNode };
 
-export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string }; onLogout: () => void }) {
+export function Sidebar({ items, footer, user, onLogout, onUserPress }: { items: SidebarItem[]; footer?: React.ReactNode; user?: { name: string; role: string; avatarUrl?: string | null }; onLogout: () => void; onUserPress?: () => void }) {
   return (
     <View style={s.wrap}>
       <View style={s.head}>
@@ -27,15 +27,24 @@ export function Sidebar({ items, footer, user, onLogout }: { items: SidebarItem[
         ))}
       </View>
       {user ? (
-        <View style={s.userCard}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{user.name.slice(0, 2).toUpperCase()}</Text>
+        onUserPress ? (
+          <Pressable onPress={onUserPress} style={s.userCard} accessibilityRole="button" accessibilityLabel="Abrir mi perfil">
+            {user.avatarUrl ? <Image source={{ uri: user.avatarUrl }} style={s.avatarImg} /> : <View style={s.avatar}><Text style={s.avatarText}>{user.name.slice(0, 2).toUpperCase()}</Text></View>}
+            <View style={{ flex: 1 }}>
+              <Text style={s.userName}>{user.name}</Text>
+              <Text style={s.userRole}>{formatRol(user.role as never)}</Text>
+            </View>
+            <Text style={{ fontSize: 12, color: theme.colors.muted }}>›</Text>
+          </Pressable>
+        ) : (
+          <View style={s.userCard}>
+            {user.avatarUrl ? <Image source={{ uri: user.avatarUrl }} style={s.avatarImg} /> : <View style={s.avatar}><Text style={s.avatarText}>{user.name.slice(0, 2).toUpperCase()}</Text></View>}
+            <View>
+              <Text style={s.userName}>{user.name}</Text>
+              <Text style={s.userRole}>{formatRol(user.role as never)}</Text>
+            </View>
           </View>
-          <View>
-            <Text style={s.userName}>{user.name}</Text>
-            <Text style={s.userRole}>{formatRol(user.role as never)}</Text>
-          </View>
-        </View>
+        )
       ) : null}
       {footer}
       {/* Global: cerrar sesión siempre visible abajo — no opcional (estándar AppShell) */}
@@ -79,6 +88,7 @@ const s = StyleSheet.create({
     marginTop: 'auto',
   },
   avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.text, alignItems: 'center', justifyContent: 'center' },
+  avatarImg: { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.colors.border },
   avatarText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   userName: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
   userRole: { fontSize: 10, color: theme.colors.muted },

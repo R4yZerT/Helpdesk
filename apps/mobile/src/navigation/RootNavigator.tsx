@@ -1,7 +1,9 @@
 // Navegacion raiz — gatea por sesion y rol (RF-04/05) (Atributos: Seguridad + Usabilidad)
+// Admin (RF-27/28/29/30/31/32), Jefe Dashboard+Alertas IA (RF-16/17/18/24), campana RF-23 en headers.
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
@@ -9,55 +11,38 @@ import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
-import { Card, theme } from '@helpdesk/shared';
-import { DashboardScreen } from '../features/dashboard/DashboardScreen';
+import { theme } from '@helpdesk/shared';
 import { PerfilScreen } from '../features/perfil/PerfilScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
-import type { AdminStackParamList, AuthStackParamList, EmpleadoStackParamList, JefeStackParamList, TecnicoStackParamList } from './types';
+import { AdminNavigator } from '../features/admin/AdminNavigator';
+import { JefeNavigator } from '../features/jefe/JefeNavigator';
+import { HeaderBell } from '../components/HeaderBell';
+import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
+import type { AuthStackParamList, TecnicoStackParamList } from './types';
 
 const navTheme = {
   ...DefaultTheme,
   colors: { ...DefaultTheme.colors, background: theme.colors.bg, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, primary: theme.colors.primary },
 };
 
-function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
-  const { profile, signOut } = useAuth();
-  return (
-    <View style={p.wrap}>
-      <Card>
-        <View style={p.cardHead}><View style={p.hairline} /><Text style={p.kicker}>Módulo</Text></View>
-        <Text style={p.title}>{title}</Text>
-        {subtitle ? <Text style={p.subtitle}>{subtitle}</Text> : null}
-        {profile ? <Text style={p.meta}>Rol {profile.rol} · {profile.email}</Text> : null}
-        <Pressable onPress={signOut} style={p.btn}><Text style={p.btnText}>Cerrar sesión</Text></Pressable>
-      </Card>
-      <Text style={p.hint}>Diseño en progreso — la lógica y RLS ya están detrás.</Text>
-    </View>
-  );
-}
-const p = StyleSheet.create({
-  wrap: { flex: 1, padding: 16, gap: 12, backgroundColor: theme.colors.bg, justifyContent: 'center' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  hairline: { width: 18, height: 2, borderRadius: 999, backgroundColor: theme.colors.accent },
-  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: theme.colors.muted, textTransform: 'uppercase' },
-  title: { fontSize: 18, fontWeight: '800', color: theme.colors.primary, letterSpacing: -0.2 },
-  subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16, marginTop: 6 },
-  meta: { fontSize: 11, color: theme.colors.mutedSoft, marginTop: 10 },
-  btn: { marginTop: 14, backgroundColor: theme.colors.primary, paddingVertical: 11, borderRadius: 12, alignItems: 'center' },
-  btnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  hint: { fontSize: 11, color: theme.colors.mutedSoft, textAlign: 'center', marginTop: 4 },
-});
-
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
-const JefeStack = createNativeStackNavigator<JefeStackParamList>();
-const AdminStack = createNativeStackNavigator<AdminStackParamList>();
+const Tab = createBottomTabNavigator();
+
+const tabOpts = {
+  headerShown: false as const,
+  tabBarActiveTintColor: theme.colors.primary,
+  tabBarInactiveTintColor: theme.colors.muted,
+  tabBarStyle: { height: 62, paddingTop: 6, paddingBottom: 8, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
+};
 
 const screenOpts = {
   headerStyle: { backgroundColor: theme.colors.surface } as const,
   headerTintColor: theme.colors.primary,
   headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
   headerShadowVisible: false,
+  headerRight: () => <HeaderBell />,
   contentStyle: { backgroundColor: theme.colors.bg },
 };
 
@@ -73,7 +58,7 @@ function AuthNavigator() {
 function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
-function TecnicoNavigator() {
+function TecnicoBandejaStack() {
   return (
     <TecnicoStack.Navigator screenOptions={screenOpts}>
       <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
@@ -82,29 +67,20 @@ function TecnicoNavigator() {
     </TecnicoStack.Navigator>
   );
 }
-function JefeNavigator() {
+function TecnicoNavigator() {
   return (
-    <JefeStack.Navigator screenOptions={screenOpts}>
-      <JefeStack.Screen name="Dashboard" options={{ title: 'Dashboard', headerShown: false }} component={DashboardScreen} />
-      <JefeStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
-      <JefeStack.Screen name="Reportes" options={{ title: 'Reportes' }}>{() => <Placeholder title="Reportes" subtitle="RF-18 exportación PDF / CSV" />}</JefeStack.Screen>
-      <JefeStack.Screen name="Alertas" options={{ title: 'Alertas IA' }}>{() => <Placeholder title="Alertas IA" subtitle="RF-24 anomalías y picos inusuales" />}</JefeStack.Screen>
-    </JefeStack.Navigator>
-  );
-}
-function AdminNavigator() {
-  return (
-    <AdminStack.Navigator screenOptions={screenOpts}>
-      <AdminStack.Screen name="Usuarios" options={{ title: 'Usuarios' }}>{() => <Placeholder title="Usuarios" subtitle="RF-27 / RF-28  ·  crear, editar, desactivar, asignar rol y mesa" />}</AdminStack.Screen>
-      <AdminStack.Screen name="Mesas" options={{ title: 'Mesas' }}>{() => <Placeholder title="Mesas" subtitle="RF-29 / RF-31  ·  catálogo y respaldo" />}</AdminStack.Screen>
-      <AdminStack.Screen name="Categorias" options={{ title: 'Categorías' }}>{() => <Placeholder title="Categorías" subtitle="RF-32  ·  catálogo normalizado (19 categorías)" />}</AdminStack.Screen>
-      <AdminStack.Screen name="Import" options={{ title: 'Import' }}>{() => <Placeholder title="Import histórico" subtitle="RF-26  ·  latin-1 → UTF-8 NFD con cuarentena" />}</AdminStack.Screen>
-    </AdminStack.Navigator>
+    <Tab.Navigator screenOptions={tabOpts}>
+      <Tab.Screen name="TecnicoBandejaTab" options={{ tabBarLabel: 'Bandeja', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>☰</Text> }} component={TecnicoBandejaStack} />
+      <Tab.Screen name="TecnicoCrearTab" options={{ tabBarLabel: 'Nueva', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>＋</Text>, headerShown: true, headerStyle: { backgroundColor: theme.colors.surface } as never, headerTintColor: theme.colors.primary, headerRight: () => <HeaderBell /> }} component={CreateTicketScreen} />
+      <Tab.Screen name="TecnicoPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>, headerShown: true, headerTitle: 'Mi perfil', headerRight: () => <HeaderBell /> }} component={PerfilScreen} />
+    </Tab.Navigator>
   );
 }
 
 export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
+  // RF-23: suscripción realtime + refresh al volver a primer plano (no-op sin sesión)
+  usePushNotificaciones();
   if (loading) {
     return (
       <View style={s.loading}>
@@ -128,7 +104,7 @@ export function RootNavigator() {
         </View>
       ) : null}
       <NavigationContainer theme={navTheme}>
-        {!session || !profile ? <AuthNavigator /> : profile.rol === 'usuario' ? <UsuarioNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
+        {!session || !profile ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
       </NavigationContainer>
     </View>
   );

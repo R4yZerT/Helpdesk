@@ -26,6 +26,7 @@ export type JefeStackParamList = {
   CrearTicket: undefined;
   Reportes: undefined;
   Alertas: undefined;
+  Perfil: undefined;
 };
 
 export type AdminStackParamList = {
@@ -33,4 +34,5 @@ export type AdminStackParamList = {
   Mesas: undefined;
   Categorias: undefined;
   Import: undefined;
+  Perfil: undefined;
 };

@@ -16,6 +16,7 @@ export type UsuarioStackParamList = {
   MisSolicitudes: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
+  Perfil: undefined;
 };
 export type EmpleadoStackParamList = UsuarioStackParamList;
 
@@ -23,6 +24,7 @@ export type TecnicoStackParamList = {
   Bandeja: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
+  Perfil: undefined;
 };
 
 export type JefeStackParamList = {
@@ -30,6 +32,7 @@ export type JefeStackParamList = {
   CrearTicket: undefined;
   Reportes: undefined;
   Alertas: undefined;
+  Perfil: undefined;
 };
 
 export type AdminStackParamList = {
@@ -38,4 +41,5 @@ export type AdminStackParamList = {
   MesaTickets: undefined; // RF replanteo: tickets por dependencia del admin
   Categorias: undefined;
   Import: undefined;
+  Perfil: undefined;
 };

@@ -19,8 +19,8 @@ export function PerfilScreen() {
 
   if (!profile) return <View style={s.loading}><ActivityIndicator color={theme.colors.primary} /><Text style={{ color: theme.colors.muted, marginTop: 8 }}>Cargando perfil…</Text></View>;
 
-  const onTelefonoSave = async (tel: string | null) => {
-    await updateProfile(supabase as any, profile.id, { telefono: tel });
+  const onSave = async (patch: { nombre: string; email: string; telefono: string | null }) => {
+    await updateProfile(supabase as any, profile.id, { full_name: patch.nombre, email: patch.email, telefono: patch.telefono });
     await refreshProfile();
   };
   const onAvatarPick = async () => {
@@ -37,8 +37,8 @@ export function PerfilScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.bg }} contentContainerStyle={{ paddingVertical: 24 }}>
-      <View style={s.header}><Text style={s.title}>Mi perfil</Text><Text style={s.sub}>Foto y teléfono editables · resto solo lectura</Text></View>
-      <PerfilCard nombre={profile.full_name ?? profile.email ?? '—'} email={profile.email} cedula={profile.cedula} rol={profile.rol} mesaNombre={mesaNombre} telefono={profile.telefono} avatarUrl={profile.avatar_url} onTelefonoSave={onTelefonoSave} onAvatarPick={onAvatarPick} variant="web" />
+      <View style={s.header}><Text style={s.title}>Mi perfil</Text><Text style={s.sub}>Nombre, correo y teléfono editables · cédula/rol/dependencia solo lectura</Text></View>
+      <PerfilCard nombre={profile.full_name ?? profile.email ?? '—'} email={profile.email} cedula={profile.cedula} rol={profile.rol} mesaNombre={mesaNombre} telefono={profile.telefono} avatarUrl={profile.avatar_url} onSave={onSave} onAvatarPick={onAvatarPick} variant="web" />
     </ScrollView>
   );
 }

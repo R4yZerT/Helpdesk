@@ -36,14 +36,10 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
             <View style={s.brandRow}>
               <View style={s.mark}><Text style={s.markText}>◈</Text></View>
               <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={s.brandTitle}>HelpDesk</Text>
-                  <Text style={s.badge}>v4.8-PROD</Text>
-                </View>
+                <Text style={s.brandTitle}>HelpDesk</Text>
                 <Text style={s.brandSub}>Gestión de solicitudes</Text>
               </View>
             </View>
-            <View style={s.topRightPill}><Text style={s.topRightText}>● Sistemas Operativos</Text></View>
           </View>
         </View>
 
@@ -52,8 +48,6 @@ export function LoginScreen({ navigation }: { navigation?: { navigate: (r: strin
           <View style={[s.card, isDesktop ? { width: 440 } : { width: '100%' }]}>
             <View style={s.kickerRow}>
               <Text style={s.kicker}>ACCESO SEGURO</Text>
-              <Text style={s.kickerDot}>·</Text>
-              <Text style={s.kickerSoft}>v4.8</Text>
             </View>
             <Text style={s.h1}>Inicia sesión</Text>
             <Text style={s.sub}>Accede con tu cuenta corporativa</Text>

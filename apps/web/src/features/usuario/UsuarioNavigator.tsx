@@ -3,10 +3,13 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, Sidebar, IconInbox, IconPlus, Clock , IconTag } from '@helpdesk/shared';
+import { useNavigation } from '@react-navigation/native';
+import { theme, Sidebar, IconInbox, IconPlus, Clock, NotificationBell } from '@helpdesk/shared';
+import { supabase } from '../../lib/supabase';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
+import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { UsuarioStackParamList } from '../../navigation/types';
 import type { Profile } from '@helpdesk/shared';
 import { useAuth } from '../../context/AuthContext';
@@ -71,16 +74,19 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
     setDrawerOpen(false);
   };
   const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
-  const onPerfil = () => { try { (nav as any)?.getParent?.()?.navigate?.('Perfil'); } catch {} setDrawerOpen(false); };
+  const onPerfil = React.useCallback(() => {
+    // Perfil ahora vive dentro del Stack interno -> navega directo con layout sidebar+header preservado
+    navigateAndClose('Perfil');
+  }, [navigateAndClose]);
   const sidebarContent = (
     <Sidebar
       items={[
         { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigateAndClose('MisSolicitudes'), icon: <IconInbox size={14} color={iconColor(isActive('mis'))} /> },
         { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
-        { id: 'perfil', label: 'Mi perfil', active: false, onPress: onPerfil, icon: <IconTag size={14} color={iconColor(false)} /> },
       ]}
-      user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol } : undefined}
+      user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol, avatarUrl: profile.avatar_url } : undefined}
       onLogout={signOut}
+      onUserPress={onPerfil}
     />
   );
 
@@ -101,12 +107,13 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
           {sidebarContent}
         </View>
         <View style={w.main}>
-          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Mis solicitudes'}</Text><Clock /></View>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Mis solicitudes'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
             <Stack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MisSolicitudes'); } })} />
             <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
             <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+            <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
             </Stack.Navigator>
           </View>
         </View>
@@ -115,7 +122,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
   }
 
   // Móvil / tablet estrecho: header con burger + drawer overlay (no ocupa 60% fijo)
-  const mobileTitle = activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Mis solicitudes';
+  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Mis solicitudes';
   return (
     <View style={w.rootMobile}>
       <View style={w.mobileTopBar}>
@@ -123,7 +130,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
           <Text style={w.burgerText}>☰</Text>
         </Pressable>
         <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={w.clockMobile}><Clock size={13} /></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><View style={w.clockMobile}><Clock size={13} /></View></View>
       </View>
       <View style={w.mainMobile}>
         <View style={{ flex: 1 }}>
@@ -131,6 +138,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
           <Stack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MisSolicitudes'); } })} />
           <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
           <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+          <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
           </Stack.Navigator>
         </View>
         {drawerOpen ? (
