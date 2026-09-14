@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View }
 import {
   theme, type AdminUser, type TecnicoAfinidad, type TicketCategoria,
   fetchCategorias, listAfinidadesPorTecnico, setAfinidad, removeAfinidad,
-  FilterDropdown, FeedbackModal,
+  FilterDropdown, FeedbackModal, validateAfinidad
 } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
@@ -59,9 +59,15 @@ export function TecnicoAfinidadesModal({ tecnico, onClose }: {
 
   const onAdd = async () => {
     if (!tecnico || nuevaCategoria === '') return;
+    const catId = Number(nuevaCategoria);
+    const valErr = validateAfinidad(tecnico.id, catId, nuevoPeso);
+    if (valErr) {
+      setError(valErr);
+      return;
+    }
     setSaving(true);
     try {
-      const a = await setAfinidad(supabase, tecnico.id, Number(nuevaCategoria), nuevoPeso);
+      const a = await setAfinidad(supabase, tecnico.id, catId, nuevoPeso);
       setAfinidades((prev) => {
         const next = prev.filter((x) => x.categoriaId !== a.categoriaId);
         return [...next, a].sort((x, y) => x.categoriaId - y.categoriaId);
