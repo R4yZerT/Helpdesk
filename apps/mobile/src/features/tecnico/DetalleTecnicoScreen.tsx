@@ -1,6 +1,6 @@
 // RF-09/10/13/14/15 — Detalle Técnico (Stitch split 8+4, FSM naranja, SLA 35m)
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, canTransition, fetchMesas, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
@@ -132,8 +132,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
   );
 
   const left = (
-    <View style={{ gap: theme.space[3], flex: isWide ? 8 : undefined }}>>
-      <Card style={{ gap: theme.space[3] }}>>
+    <View style={{ gap: theme.space[3], flex: isWide ? 8 : undefined }}>
+      <Card style={{ gap: theme.space[3] }}>
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
         <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId?.slice(0,8) ?? '—'}</Text></View>
@@ -152,7 +152,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
             </Pressable>
           ))}
         </View>
-        <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}>>
+        <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}>
           {activeTab==='comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab==='historial' ? (estados.length===0? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e)=>(
             <View key={e.id} style={s.timelineRow}><View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View><View style={s.timelineBody}><Text style={s.rowTitle}>{e.tipoEvento==='estado'?`${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}`:`Asignación ${e.tecnicoDe?.slice(0,6) ?? '—'} → ${e.tecnicoPara?.slice(0,6) ?? '—'}`}</Text><Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>{e.comentario? <Text style={s.metaSmall}>{e.comentario}</Text> : null}</View></View>
           ))) : adjuntos.length === 0 ? (
@@ -180,15 +180,15 @@ export function DetalleTecnicoScreen({ route }: Props) {
   );
 
   const right = (
-    <View style={{ gap: theme.space[3], flex: isWide ? 4 : undefined }}>>
-      <Card style={{ gap: theme.space[3] - 2 }}>>
+    <View style={{ gap: theme.space[3], flex: isWide ? 4 : undefined }}>
+      <Card style={{ gap: theme.space[3] - 2 }}>
         <Text style={s.section}>Acciones de campo</Text>
         <Pressable onPress={()=>setShowTrans(v=>!v)} style={[s.btn, s.btnAccent]} accessibilityRole="button"><Text style={s.btnAccentText}>{showTrans?'Ocultar transición':'Solucionar incidente'}</Text></Pressable>
         {showTrans && nextEstados.length>0 ? (
           <View style={{ gap: 8 }}>
             <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución (requerida para solucionado)" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
-            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}>>
+            <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}>
               {nextEstados.map((e)=>(
                 <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
                   {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
@@ -210,7 +210,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           </View>
         ) : null}
       </Card>
-      <Card style={{ gap: theme.space[3] - 2 }}>>
+      <Card style={{ gap: theme.space[3] - 2 }}>
         <Text style={s.section}>Progreso del ticket</Text>
         <View style={s.progressWrap}>
           {[
@@ -224,7 +224,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           ))}
         </View>
       </Card>
-      <Card style={{ gap: theme.space[2] }}>>
+      <Card style={{ gap: theme.space[2] }}>
         <Text style={s.section}>Control SLA</Text>
         <Text style={s.slaBig}>{ticket.estado==='cerrado'||ticket.estado==='solucionado'?'Cumplido':'35 min restantes'}</Text>
         <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado==='solucionado'||ticket.estado==='cerrado'? theme.colors.success : ticket.prioridad==='critica'? theme.colors.danger : theme.colors.primary }]} /></View>
