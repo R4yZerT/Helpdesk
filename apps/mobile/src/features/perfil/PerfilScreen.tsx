@@ -50,7 +50,7 @@ export function PerfilScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.bg }} contentContainerStyle={{ paddingBottom: 24 }}>
-      <View style={s.header}><Text style={s.title}>Mi perfil</Text><Text style={s.sub}>Nombre, correo y teléfono editables</Text></View>
+      <View style={s.header}><Text style={s.title}>Mi perfil</Text></View>
       <PerfilCard nombre={profile.full_name ?? profile.email ?? '—'} email={profile.email} cedula={profile.cedula} rol={profile.rol} mesaNombre={mesaNombre} telefono={profile.telefono} avatarUrl={profile.avatar_url} onSave={onSave} onAvatarPick={onAvatarPick} variant="mobile" />
       <FeedbackModal visible={!!pendingAvatar} variant="confirm" title="Confirmar foto de perfil" message={pendingAvatar ? `¿Usar "${pendingAvatar.name}" como tu foto?` : undefined} confirmText="Subir foto" cancelText="Cancelar" loading={uploading} onConfirm={doAvatarUpload} onClose={() => setPendingAvatar(null)} onCancel={() => setPendingAvatar(null)} />
       {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}

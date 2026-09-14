@@ -7,6 +7,7 @@ import { theme } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminCategoriasScreen } from './AdminCategoriasScreen';
+import { DetalleTecnicoScreen } from '../tecnico/DetalleTecnicoScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { HeaderBell } from '../../components/HeaderBell';
 import type { AdminStackParamList } from '../../navigation/types';
@@ -37,6 +38,7 @@ function AdminMainStack() {
       <Stack.Screen name="Usuarios" options={{ title: 'Usuarios' }} component={AdminUsuariosScreen} />
       <Stack.Screen name="Mesas" options={{ title: 'Dependencias' }} component={AdminMesasScreen} />
       <Stack.Screen name="Categorias" options={{ title: 'Categorías' }} component={AdminCategoriasScreen} />
+      <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
     </Stack.Navigator>
   );
 }

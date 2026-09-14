@@ -30,6 +30,7 @@ export type TecnicoStackParamList = {
 export type JefeStackParamList = {
   Dashboard: undefined;
   CrearTicket: undefined;
+  DetalleTicket: { id: string };
   Reportes: undefined;
   Alertas: undefined;
   Perfil: undefined;
@@ -39,6 +40,7 @@ export type AdminStackParamList = {
   Usuarios: undefined;
   Mesas: undefined; // DEPENDENCIAS (RF-29/30)
   MesaTickets: undefined; // RF replanteo: tickets por dependencia del admin
+  DetalleTicket: { id: string }; // destino de la campana RF-23 (oculta del sidebar)
   Categorias: undefined;
   Import: undefined;
   Perfil: undefined;

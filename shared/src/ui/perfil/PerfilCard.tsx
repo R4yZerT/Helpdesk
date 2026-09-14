@@ -5,6 +5,7 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { theme } from '../theme.js';
 import { FeedbackModal } from '../FeedbackModal.js';
 import { explainUserError } from '../../admin.js';
+import { formatRol } from '../../filters.js';
 
 export type PerfilProps = {
   nombre: string;
@@ -35,7 +36,6 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
   React.useEffect(()=>{ setNom(nombre ?? ''); }, [nombre]);
   React.useEffect(()=>{ setMail(email ?? ''); }, [email]);
   React.useEffect(()=>{ setTel(telefono ?? ''); }, [telefono]);
-  const initials = (nombre||'?').split(' ').map(s=>s[0]).slice(0,2).join('').toUpperCase();
   const nomTrim = nom.trim();
   const mailTrim = mail.trim();
   const telTrim = tel.trim();
@@ -85,12 +85,14 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
       {/* Card 1 — Avatar */}
       <View style={s.card}>
         <View style={s.avatarRow}>
+          {avatarUrl ? (
           <View style={s.avatarWrap}>
-            {avatarUrl ? <Image source={{ uri: avatarUrl }} style={s.avatarImg} /> : <View style={[s.avatarImg, s.avatarFallback]}><Text style={s.avatarInitials}>{initials}</Text></View>}
+            <Image source={{ uri: avatarUrl }} style={s.avatarImg} />
           </View>
+          ) : null}
           <View style={{ flex:1, gap:4 }}>
             <Text style={s.nombre}>{nombre}</Text>
-            <Text style={s.rol}>{rol}{mesaNombre ? ` · ${mesaNombre}` : ''}</Text>
+            <Text style={s.rol}>{formatRol(rol as never)}{mesaNombre ? ` · ${mesaNombre}` : ''}</Text>
           </View>
         </View>
         <Pressable onPress={onAvatarPick} style={s.btnGhost}><Text style={s.btnGhostText}>Cambiar foto</Text></Pressable>
@@ -134,7 +136,7 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
         <Text style={s.cardSub}>Cédula, rol y dependencia no son editables.</Text>
         <View style={s.readGrid}>
           <ReadRow label="Cédula" value={cedula ?? '—'} />
-          <ReadRow label="Rol" value={rol} />
+          <ReadRow label="Rol" value={formatRol(rol as never)} />
           <ReadRow label="Dependencia" value={mesaNombre ?? '—'} />
         </View>
       </View>
@@ -161,8 +163,6 @@ const s = StyleSheet.create({
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatarWrap: { width: 72, height: 72, borderRadius: 36, overflow: 'hidden', borderWidth: 2, borderColor: theme.colors.border },
   avatarImg: { width: 72, height: 72, borderRadius: 36 },
-  avatarFallback: { backgroundColor: theme.colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 22, fontWeight: '800', color: theme.colors.primaryDark },
   nombre: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
   rol: { fontSize: 12, color: theme.colors.muted, fontWeight: '600' },
   hint: { fontSize: 11, color: theme.colors.mutedSoft },

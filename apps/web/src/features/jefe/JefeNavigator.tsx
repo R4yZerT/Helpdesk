@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import { theme, Sidebar, Clock, NotificationBell, IconLayers, IconPlus, IconTag, IconUpload } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
+import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { JefeStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
@@ -73,7 +74,7 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
-          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'Reportes' ? 'Reportes' : activeName === 'Alertas' ? 'Alertas IA' : 'Dashboard'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'Reportes' ? 'Reportes' : activeName === 'Alertas' ? 'Alertas IA' : 'Dashboard'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="Dashboard">
               <Stack.Screen name="Dashboard" component={DashboardScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
@@ -81,13 +82,14 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
               <Stack.Screen name="Reportes" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })}>{() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}</Stack.Screen>
               <Stack.Screen name="Alertas" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })}>{() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}</Stack.Screen>
               <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+              <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
             </Stack.Navigator>
           </View>
         </View>
       </View>
     );
   }
-  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'Reportes' ? 'Reportes' : activeName === 'Alertas' ? 'Alertas IA' : 'Dashboard';
+  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'Reportes' ? 'Reportes' : activeName === 'Alertas' ? 'Alertas IA' : 'Dashboard';
   return (
     <View style={w.rootMobile}>
       <View style={w.mobileTopBar}>
@@ -103,6 +105,7 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
             <Stack.Screen name="Reportes" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })}>{() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}</Stack.Screen>
             <Stack.Screen name="Alertas" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })}>{() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}</Stack.Screen>
             <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+            <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
           </Stack.Navigator>
         </View>
         {drawerOpen ? <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)}><View style={w.drawer}>{sidebarContent}</View></Pressable> : null}

@@ -98,6 +98,12 @@ export async function updateProfile(
   if (Object.keys(clean).length === 0) return fetchProfile(supabase, userId);
   const { error } = await (supabase.from('profiles') as any).update(clean).eq('id', userId);
   if (error) throw error;
+  // Sincronizar espejo en auth.users (lo que muestra el dashboard de Supabase):
+  // el propio usuario sí puede actualizar su metadata (best-effort, no bloquea si falla)
+  // Causa conocida: sin esto, Authentication → Users conserva el nombre/correo anterior
+  if ('full_name' in patch && clean.full_name) {
+    try { await supabase.auth.updateUser({ data: { full_name: clean.full_name } }); } catch {}
+  }
   // Si se cambió el email, también intentar actualizar auth.users.email (best-effort, puede requerir confirmación)
   if ('email' in patch && clean.email) {
     try { await supabase.auth.updateUser({ email: clean.email }); } catch {}

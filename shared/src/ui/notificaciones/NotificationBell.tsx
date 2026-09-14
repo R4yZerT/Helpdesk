@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { countNoLeidas, listNotificaciones, marcarLeida, marcarTodasLeidas, subscribeNotificaciones, type Notificacion } from '../../notificaciones.js';
+import { cerrarDropdownsAbiertos } from '../dropdown-bus.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export function NotificationBell({ client, onOpenTicket }: { client: SupabaseClient; onOpenTicket?: (ticketId: string) => void }) {
@@ -75,7 +76,17 @@ export function NotificationBell({ client, onOpenTicket }: { client: SupabaseCli
                   key={n.id}
                   onPress={() => {
                     if (!n.leida) onMarkOne(n.id);
-                    if (n.ticket_id && onOpenTicket) onOpenTicket(n.ticket_id);
+                    // Cerrar el dropdown antes de navegar (si no, queda abierto sobre el detalle)
+                    setOpen(false);
+                    // Cierre determinista de filtros abiertos: su Modal es un portal
+                    // por encima de todo y tapaba el detalle ("abre detrás del filtro")
+                    cerrarDropdownsAbiertos();
+                    if (n.ticket_id && onOpenTicket) {
+                      // Diferir la navegación un frame: le da un ciclo de render
+                      // a los Modales para desmontarse antes del cambio de ruta
+                      const ticketId = n.ticket_id;
+                      requestAnimationFrame(() => onOpenTicket(ticketId));
+                    }
                   }}
                   style={[s.item, !n.leida && s.itemUnread]}
                 >
