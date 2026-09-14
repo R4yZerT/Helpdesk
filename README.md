@@ -20,9 +20,9 @@ pnpm typecheck && pnpm test
 pnpm mobile   # Expo
 pnpm web      # Expo web
 ```
-Backend local: `supabase start` (requiere Docker + Supabase CLI).
+Backend: Supabase Cloud (proyecto linkeado via `supabase link`).
 
-Env: `cp .env.example .env` → `EXPO_PUBLIC_SUPABASE_URL` / `ANON_KEY`.
+Env: `cp .env.example .env` → `EXPO_PUBLIC_SUPABASE_URL` / `ANON_KEY` (https://*.supabase.co).
 
 ## Docker (WIP)
 ```bash

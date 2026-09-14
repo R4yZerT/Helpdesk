@@ -1,7 +1,5 @@
-# HelpDesk — stack revisable (web + supabase local opcional)
-# Uso:
-#   1) Solo web contra Supabase Cloud:  docker compose up --build  (usa .env)
-#   2) Con Supabase local:  supabase start  ->  EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 docker compose up --build
+# HelpDesk — web contra Supabase Cloud
+# Uso: docker compose up --build  (usa .env con https://*.supabase.co)
 # Variables: EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY (ver .env.example)
 services:
   web:
