@@ -22,6 +22,7 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@react-navigation/native": "^7.3.17",
     "@supabase/supabase-js": "^2.112.3"
   }
 }

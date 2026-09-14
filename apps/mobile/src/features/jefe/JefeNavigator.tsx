@@ -7,6 +7,7 @@ import { theme } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
 import { AlertasIAScreen } from './AlertasIAScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
+import { DetalleTecnicoScreen } from '../tecnico/DetalleTecnicoScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { HeaderBell } from '../../components/HeaderBell';
 import type { JefeStackParamList } from '../../navigation/types';
@@ -37,6 +38,7 @@ function JefeMainStack() {
       <Stack.Screen name="Dashboard" options={{ title: 'Dashboard', headerShown: false }} component={DashboardScreen} />
       <Stack.Screen name="Alertas" options={{ title: 'Alertas IA' }} component={AlertasIAScreen} />
       <Stack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
+      <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
     </Stack.Navigator>
   );
 }

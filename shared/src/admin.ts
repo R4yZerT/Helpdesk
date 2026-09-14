@@ -392,15 +392,18 @@ export async function updateUser(
     const msg = Object.entries(errs).map(([k, v]) => `${k}: ${v}`).join(' · ');
     throw new Error(msg);
   }
-  // Si cambia email, cedula o password, intentar vía Edge Function admin-update-user / auth.admin
-  if (patch.email !== undefined || patch.cedula !== undefined || patch.password !== undefined) {
+  // Si cambia email, cedula, password o nombre, intentar vía Edge Function admin-update-user / auth.admin
+  // (el nombre además se espeja en auth.users.user_metadata, que es lo que muestra Authentication → Users)
+  if (patch.email !== undefined || patch.cedula !== undefined || patch.password !== undefined || patch.fullName !== undefined) {
     const authPatch: Record<string, string> = {};
     if (patch.email !== undefined) authPatch.email = patch.email.trim().toLowerCase();
     if (patch.cedula !== undefined) authPatch.cedula = patch.cedula.trim();
     if (patch.password !== undefined) authPatch.password = patch.password;
+    const edgeBody: Record<string, string> = { id, ...authPatch };
+    if (patch.fullName !== undefined) edgeBody.fullName = patch.fullName.trim();
     // Intento Edge Function (service_role)
     try {
-      const { data, error } = await supabase.functions.invoke('admin-update-user', { body: { id, ...authPatch } });
+      const { data, error } = await supabase.functions.invoke('admin-update-user', { body: edgeBody });
       const d = (data ?? null) as { error?: string; details?: unknown } | null;
       if (d?.error) {
         const detailsStr = (d as unknown as { details?: unknown }).details ? `: ${typeof (d as unknown as { details?: unknown }).details === 'object' ? JSON.stringify((d as unknown as { details: unknown }).details) : String((d as unknown as { details: unknown }).details)}` : '';
@@ -464,6 +467,25 @@ export async function updateUser(
     if (/duplicate|unique/i.test(m) && /cedula/i.test(m)) throw new Error('Cédula ya registrada');
     if (/duplicate|unique/i.test(m) && /email/i.test(m)) throw new Error('Correo ya registrado');
     throw error;
+  }
+  // Verificación de lectura: PostgREST no falla si RLS deja 0 filas afectadas.
+  // Releer evita el falso "guardado correcto" (UI bien, BD sin cambio).
+  const { data: check, error: checkErr } = await supabase
+    .from('profiles')
+    .select('full_name, email, cedula, rol, mesa_id, activo')
+    .eq('id', id)
+    .single();
+  if (checkErr) throw checkErr;
+  const c = check as unknown as { full_name: string; email: string | null; cedula: string | null; rol: string; mesa_id: number | null; activo: boolean };
+  const noPersistidos: string[] = [];
+  if (payload.full_name !== undefined && c.full_name !== payload.full_name) noPersistidos.push('nombre');
+  if (payload.email !== undefined && (c.email ?? '').toLowerCase() !== String(payload.email).toLowerCase()) noPersistidos.push('correo');
+  if (payload.cedula !== undefined && (c.cedula ?? '') !== payload.cedula) noPersistidos.push('cédula');
+  if (payload.rol !== undefined && c.rol !== payload.rol) noPersistidos.push('rol');
+  if (payload.mesa_id !== undefined && c.mesa_id !== payload.mesa_id) noPersistidos.push('dependencia');
+  if (payload.activo !== undefined && c.activo !== payload.activo) noPersistidos.push('estado');
+  if (noPersistidos.length) {
+    throw new Error(`El cambio no quedó guardado en la base de datos (sin persistir: ${noPersistidos.join(', ')}). Causa probable: sin permiso de escritura (RLS) o sesión sin rol administrador.`);
   }
 }
 

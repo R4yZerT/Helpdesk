@@ -24,6 +24,7 @@ export type TecnicoStackParamList = {
 export type JefeStackParamList = {
   Dashboard: undefined;
   CrearTicket: undefined;
+  DetalleTicket: { id: string };
   Reportes: undefined;
   Alertas: undefined;
   Perfil: undefined;
@@ -32,6 +33,7 @@ export type JefeStackParamList = {
 export type AdminStackParamList = {
   Usuarios: undefined;
   Mesas: undefined;
+  DetalleTicket: { id: string };
   Categorias: undefined;
   Import: undefined;
   Perfil: undefined;

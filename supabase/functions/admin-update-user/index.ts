@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
     return Response.json({ error: 'Solo administrador puede actualizar usuarios' }, { status: 403, headers });
   }
 
-  let body: { id?: string; email?: string; cedula?: string; password?: string };
+  let body: { id?: string; email?: string; cedula?: string; password?: string; fullName?: string };
   try { body = await req.json(); } catch { return Response.json({ error: 'JSON inválido' }, { status: 400, headers }); }
 
   const id = (body.id ?? '').trim();
@@ -92,6 +92,7 @@ Deno.serve(async (req: Request) => {
   const authPatch: Record<string, string> = {};
   let newCedula: string | undefined;
   let newEmail: string | undefined;
+  let newFullName: string | undefined;
 
   if (body.email !== undefined) {
     const email = body.email.trim().toLowerCase();
@@ -103,6 +104,14 @@ Deno.serve(async (req: Request) => {
     const ced = body.cedula.trim();
     if (!isCedula(ced)) return Response.json({ error: 'Cédula 5-15 dígitos' }, { status: 400, headers });
     newCedula = ced;
+  }
+  if (body.fullName !== undefined) {
+    // Espejo de profiles.full_name en auth.users.user_metadata (lo que muestra Authentication → Users).
+    // Sin esto, renombrar desde Admin solo cambia profiles y el dashboard conserva el nombre anterior.
+    const nm = body.fullName.trim();
+    if (nm.length < 2) return Response.json({ error: 'Nombre inválido (mínimo 2 caracteres)' }, { status: 400, headers });
+    if (nm.length > 120) return Response.json({ error: `Nombre inválido (máximo 120 caracteres, recibido ${nm.length})` }, { status: 400, headers });
+    newFullName = nm;
   }
   if (body.password !== undefined) {
     const pwd = body.password;
@@ -121,7 +130,7 @@ Deno.serve(async (req: Request) => {
     authPatch.password = pwd;
   }
 
-  if (Object.keys(authPatch).length === 0 && newCedula === undefined) return Response.json({ error: 'Nada que actualizar' }, { status: 400, headers });
+  if (Object.keys(authPatch).length === 0 && newCedula === undefined && newFullName === undefined) return Response.json({ error: 'Nada que actualizar' }, { status: 400, headers });
 
   // Si cambia cédula, verificar duplicado y actualizar profile
   if (newCedula !== undefined) {
@@ -150,6 +159,18 @@ Deno.serve(async (req: Request) => {
       if (/duplicate|unique/i.test(upErr.message) && /email/i.test(upErr.message)) return Response.json({ error: 'Correo ya registrado' }, { status: 409, headers });
       return Response.json({ error: upErr.message }, { status: 400, headers });
     }
+  }
+
+  // Sincronizar nombre en auth metadata (solo metadata, profiles lo actualiza el cliente)
+  if (newFullName !== undefined) {
+    const { data: cur } = await adminClient.auth.admin.getUserById(id);
+    const prevMeta = ((cur?.user?.user_metadata ?? {}) as Record<string, unknown>);
+    const { error: metaErr } = await adminClient.auth.admin.updateUserById(id, {
+      user_metadata: { ...prevMeta, full_name: newFullName },
+    });
+    if (metaErr) return Response.json({ error: metaErr.message }, { status: 400, headers });
+    // Si solo era nombre (sin email/password/cedula), ya terminamos
+    if (Object.keys(authPatch).length === 0 && newCedula === undefined) return Response.json({ ok: true }, { headers });
   }
 
   // Actualizar auth (email/password)

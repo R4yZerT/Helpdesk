@@ -1,7 +1,9 @@
 // Lista desplegable discreta — anclada debajo del trigger, angosta
 import * as React from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { theme } from './theme.js';
+import { suscribirCerrarDropdowns } from './dropdown-bus.js';
 
 export type DropdownOption<T extends string | number | boolean> = {
   value: T;
@@ -32,6 +34,36 @@ export function FilterDropdown<T extends string | number | boolean>({
   const [anchor, setAnchor] = React.useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const triggerRef = React.useRef<View>(null);
   const selected = options.find((o) => String(o.value) === String(value));
+
+  // Las opciones viven en un Modal (portal por encima de todo). Si se navega
+  // a otra pantalla con el filtro abierto (ej. tocar una notificación),
+  // el modal quedaría pintado ENCIMA del destino. Cerrar al perder foco.
+  // Causa reportada: "el detalle se abre detrás del cuadro de filtros".
+  type NavLike = { addListener?: (ev: string, cb: () => void) => () => void };
+  let navigation: NavLike | null = null;
+  try {
+    navigation = useNavigation() as unknown as NavLike;
+  } catch {
+    navigation = null;
+  }
+  React.useEffect(() => {
+    if (!navigation?.addListener) return;
+    const unsub = navigation.addListener('blur', () => setOpen(false));
+    return unsub;
+  }, [navigation]);
+
+  // Cierre determinista al tocar una notificación (no depende del blur,
+  // que a runtime en web no cerraba el Modal y el detalle abría detrás).
+  React.useEffect(() => suscribirCerrarDropdowns(() => setOpen(false)), []);
+
+  // Cierre al cambiar la URL (navegación web: React Navigation usa History API).
+  // Red de seguridad independiente del blur y del bus.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => setOpen(false);
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
 
   const handleOpen = React.useCallback(() => {
     if (disabled) return;

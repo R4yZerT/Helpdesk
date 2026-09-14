@@ -8,6 +8,7 @@ import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
 import { AdminCategoriasScreen } from './AdminCategoriasScreen';
+import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { AdminStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
@@ -91,7 +92,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
       <View style={w.root}>
         <View style={w.sidebar}>{sidebarContent}</View>
         <View style={w.main}>
-          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'Mesas' ? 'Dependencias' : activeName === 'Usuarios' ? 'Usuarios' : activeName === 'Categorias' ? 'Categorías' : activeName === 'Import' ? 'Import' : 'Mesas'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
+          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'Mesas' ? 'Dependencias' : activeName === 'Usuarios' ? 'Usuarios' : activeName === 'Categorias' ? 'Categorías' : activeName === 'Import' ? 'Import' : 'Mesas'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
           <View style={{ flex: 1 }}>
             <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
               <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
@@ -100,6 +101,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
               <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
               <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
               <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+              <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
             </Stack.Navigator>
           </View>
         </View>
@@ -107,7 +109,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
     );
   }
 
-  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'Mesas' ? 'DEPENDENCIAS' : activeName === 'MesaTickets' ? 'MESAS' : activeName === 'Categorias' ? 'CATEGORÍAS' : activeName === 'Import' ? 'IMPORT' : 'USUARIOS';
+  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'Mesas' ? 'DEPENDENCIAS' : activeName === 'MesaTickets' ? 'MESAS' : activeName === 'Categorias' ? 'CATEGORÍAS' : activeName === 'Import' ? 'IMPORT' : 'USUARIOS';
   return (
     <View style={w.rootMobile}>
       <View style={w.mobileTopBar}>
@@ -126,6 +128,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
             <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
             <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
             <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+            <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
           </Stack.Navigator>
         </View>
         {drawerOpen ? (
