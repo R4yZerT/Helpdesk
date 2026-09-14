@@ -18,6 +18,7 @@ import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { HeaderBell } from '../components/HeaderBell';
 import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
+import { navigationRef } from './navigationRef';
 import type { AuthStackParamList, TecnicoStackParamList } from './types';
 
 const navTheme = {
@@ -103,7 +104,7 @@ export function RootNavigator() {
           <Text style={s.errorText}>{error}</Text>
         </View>
       ) : null}
-      <NavigationContainer theme={navTheme}>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
         {!session || !profile ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
       </NavigationContainer>
     </View>

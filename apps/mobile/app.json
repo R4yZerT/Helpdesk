@@ -25,6 +25,10 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-notifications",
+        { "color": "#0f172a" }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#0f172a",

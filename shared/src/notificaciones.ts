@@ -10,6 +10,7 @@ export type Notificacion = {
   ticket_id: string | null;
   leida: boolean;
   creado_en: string;
+  enviada_en?: string | null;
 };
 
 export async function listNotificaciones(client: SupabaseClient, opts:{ limit?:number; soloNoLeidas?:boolean }={}):Promise<Notificacion[]>{
