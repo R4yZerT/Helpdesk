@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, Sidebar, IconInbox, IconPlus, Clock } from '@helpdesk/shared';
+import { theme, Sidebar, IconInbox, IconPlus, Clock , IconTag } from '@helpdesk/shared';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
@@ -71,11 +71,13 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
     setDrawerOpen(false);
   };
   const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
+  const onPerfil = () => { try { (nav as any)?.getParent?.()?.navigate?.('Perfil'); } catch {} setDrawerOpen(false); };
   const sidebarContent = (
     <Sidebar
       items={[
         { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigateAndClose('MisSolicitudes'), icon: <IconInbox size={14} color={iconColor(isActive('mis'))} /> },
         { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
+        { id: 'perfil', label: 'Mi perfil', active: false, onPress: onPerfil, icon: <IconTag size={14} color={iconColor(false)} /> },
       ]}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol } : undefined}
       onLogout={signOut}

@@ -59,7 +59,9 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
     { id: 'reportes', label: 'Reportes', active: isActive('reportes'), onPress: () => navigateAndClose('Reportes'), icon: <IconUpload size={14} color={ic(isActive('reportes'))} /> },
     { id: 'alertas', label: 'Alertas IA', active: isActive('alertas'), onPress: () => navigateAndClose('Alertas'), icon: <IconTag size={14} color={ic(isActive('alertas'))} /> },
   ];
-  const sidebarContent = <Sidebar items={items as never} user={profile ? { name: (profile.full_name ?? profile.email ?? 'Jefe') as string, role: profile.rol } : undefined} onLogout={signOut} />;
+  const perfilItem = { id: 'perfil', label: 'Mi perfil', active: activeName==='Perfil', onPress: () => { try { (nav as any)?.getParent?.()?.navigate?.('Perfil'); } catch {} setDrawerOpen(false); }, icon: <IconTag size={14} color={ic(activeName==='Perfil')} /> } as any;
+  const _sidebarItems = [...items, perfilItem];
+  const sidebarContent = <Sidebar items={_sidebarItems as never} user={profile ? { name: (profile.full_name ?? profile.email ?? 'Jefe') as string, role: profile.rol } : undefined} onLogout={signOut} />;
   React.useEffect(() => { if (isDesktop) setDrawerOpen(false); }, [isDesktop]);
   React.useEffect(() => { setDrawerOpen(false); }, [activeName]);
   if (isDesktop) {

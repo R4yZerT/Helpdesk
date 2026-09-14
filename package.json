@@ -14,17 +14,12 @@
     "lint": "pnpm -r lint",
     "gen:types": "supabase gen types typescript --linked --schema public > shared/src/supabase.types.ts",
     "test": "pnpm -r test",
-    "supa:start": "npx supabase start",
-    "supa:stop": "npx supabase stop",
-    "supa:reset": "npx supabase db reset",
-    "supa:status": "npx supabase status",
-    "supa:env": "bash scripts/supa-env.sh",
-    "dev:local": "npx supabase start && bash scripts/supa-env.sh && docker compose -f docker-compose.dev.yml up --build",
-    "dev:local:watch": "npx supabase start && bash scripts/supa-env.sh && docker compose -f docker-compose.dev.yml up --build --watch",
     "docker:dev": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:watch": "docker compose -f docker-compose.dev.yml up --build --watch",
     "docker:prod": "docker compose up --build",
-    "docker:down": "docker compose -f docker-compose.dev.yml down && docker compose down"
+    "docker:down": "docker compose -f docker-compose.dev.yml down && docker compose down",
+    "import:historico": "tsx scripts/import-historico.ts",
+    "import:historico:push": "tsx scripts/import-historico.ts -- --push"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.18.0",

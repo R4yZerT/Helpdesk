@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
+import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function DashboardScreen() {
@@ -26,6 +26,9 @@ export function DashboardScreen() {
   const [porPrioridad, setPorPrioridad] = React.useState<any[]>([]);
   const [evolucion, setEvolucion] = React.useState<any[]>([]);
   const [carga, setCarga] = React.useState<any[]>([]);
+  const [picos, setPicos] = React.useState<any[]>([]);
+  const [picosResumen, setPicosResumen] = React.useState<any[]>([]);
+  const [patrones, setPatrones] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
   const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
 
@@ -49,16 +52,19 @@ export function DashboardScreen() {
 
   const load = React.useCallback(async () => {
     try {
-      const [k, e, p, ev, c, a, ms] = await Promise.all([
+      const [k, e, p, ev, c, pp, pr, pat, a, ms] = await Promise.all([
         getKPIs(supabase, filters),
         getStatsPorEstado(supabase, filters),
         getStatsPorPrioridad(supabase, filters),
         getEvolucionPorMesa(supabase, { ...filters, dias: 30 }),
         getCargaHoraria(supabase, filters),
+        getPicosPrediccion(supabase, { ...filters, dias: 30 }),
+        getPicosResumen(supabase, { ...filters, dias: 30 }),
+        getPatronesCategoria(supabase, { ...filters, dias: 30 }),
         listAlertasIA(supabase, { estado: 'nueva' }),
         mesas.length ? Promise.resolve(mesas) : fetchMesas(supabase),
       ]);
-      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setAlertas(a);
+      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a);
       if (!mesas.length) setMesas(ms as any);
     } catch (err) {
       console.warn('[Dashboard] load', err);
@@ -154,6 +160,8 @@ export function DashboardScreen() {
         <View style={{ flex: 5 }}><BarsPrioridad data={porPrioridad} /></View>
       </View>
       <AreaEvolucion data={evolucion} mesas={mesas} />
+      <PrediccionPicos picos={picos} resumen={picosResumen} />
+      <PatronesCategoria data={patrones} />
       <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
         <View style={{ flex: 7 }}><HeatmapCarga data={carga} /></View>
         <View style={{ flex: 5 }}><Pressable onPress={onGenerarAlertas} disabled={generandoAlertas} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 8, alignItems: 'center', marginBottom: 8, opacity: generandoAlertas?0.6:1 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{generandoAlertas ? 'Generando…' : 'Generar alertas (IA)'}</Text></Pressable><TimelineAlertas alertas={alertas} onVista={(id)=>onMarcarAlerta(id,'vista')} onResuelta={(id)=>onMarcarAlerta(id,'resuelta')} /></View>

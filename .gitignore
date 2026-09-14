@@ -12,9 +12,8 @@ apps/*/web-build/
 .env
 .env.*
 !.env.example
-!.env.local.example
 
-# Supabase local
+# Supabase CLI (link a Cloud + temporales)
 supabase/.temp/
 supabase/.branches/
 
