@@ -14,6 +14,8 @@ pipeline {
   }
 
   environment {
+    // Jenkins (brew, PATH mínimo) no hereda el PATH del shell: se añade explícito
+    PATH = "/Users/yeipezz/.nvm/versions/node/v24.14.1/bin:/Users/yeipezz/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
     COREPACK_ENABLE_DOWNLOAD_PROMPT = '0'
     // Se inyectan vía credenciales Jenkins (ver Jenkinsfile README en Jenkins > credenciales):
     // EXPO_PUBLIC_SUPABASE_URL (secret text: supabase-url)
