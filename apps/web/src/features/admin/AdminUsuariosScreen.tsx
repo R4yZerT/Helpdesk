@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
+import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
 const PAGE_SIZE = 20;
 
@@ -62,6 +63,7 @@ export function AdminUsuariosScreen() {
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<AdminUser | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [afinUser, setAfinUser] = useState<AdminUser | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -251,6 +253,9 @@ export function AdminUsuariosScreen() {
         <View style={s.tdEstado}><View style={[s.estadoPill, item.activo ? s.activoOn : s.activoOff]}><Text style={[s.estadoText, item.activo ? s.estadoTextOn : s.estadoTextOff]}>{item.activo ? 'Activo' : 'Inactivo'}</Text></View></View>
         <View style={s.tdActs}>
           <Pressable onPress={() => openEdit(item)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Editar ${item.fullName}`}><Text style={s.iconBtnText}>✎</Text></Pressable>
+          {item.rol === 'tecnico' ? (
+            <Pressable onPress={() => setAfinUser(item)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Afinidades de ${item.fullName}`}><Text style={s.iconBtnText}>★</Text></Pressable>
+          ) : null}
           <Pressable onPress={() => toggleActivo(item)} style={[s.iconBtn, item.activo ? s.iconBtnOff : s.iconBtnOn]} accessibilityRole="button" accessibilityLabel={item.activo ? 'Desactivar' : 'Activar'}><Text style={[s.iconBtnText, item.activo ? { color: '#991B1B' } : { color: '#15803D' }]}>{item.activo ? '◯' : '●'}</Text></Pressable>
         </View>
       </View>
@@ -418,6 +423,7 @@ export function AdminUsuariosScreen() {
         </View>
       </Modal>
       {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <TecnicoAfinidadesModal tecnico={afinUser} onClose={() => setAfinUser(null)} />
       <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activo ? 'Desactivar usuario' : 'Activar usuario'} message={confirmToggle ? `¿${confirmToggle.activo ? 'Desactivar' : 'Activar'} a ${confirmToggle.fullName}?` : undefined} confirmText={confirmToggle?.activo ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActivo} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );

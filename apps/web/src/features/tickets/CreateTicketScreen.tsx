@@ -11,10 +11,14 @@ import {
   getPrioridadPorCategoria,
   getMesaIdPorDominio,
   classifyLocal,
+  sugerirAsignacion,
+  listTecnicosPorMesa,
   type CreateTicketInput,
   type Clasificacion,
   type Mesa,
   type TicketCategoria,
+  type SugerenciaAsignacion,
+  type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { Card, Badge, Divider, FeedbackModal, FilterDropdown } from '@helpdesk/shared';
@@ -34,12 +38,18 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     descripcion: '',
     prioridad: 'media',
     mesaId: null,
+    tecnicoAsignadoId: null,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateTicketInput, string>>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [sugerencia, setSugerencia] = useState<Clasificacion | null>(null);
   const [iaLoading, setIaLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Auto-asignación sugerida (mesa + técnico) con confirmación humana
+  const [asignacion, setAsignacion] = useState<SugerenciaAsignacion | null>(null);
+  const [asignLoading, setAsignLoading] = useState(false);
+  const [asignEstado, setAsignEstado] = useState<'sugerida' | 'confirmada' | 'manual'>('manual');
+  const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
   const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
@@ -63,13 +73,45 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
 
   useEffect(() => { load(); }, [load]);
 
+  // Técnicos disponibles de la dependencia seleccionada (para confirmar/cambiar)
+  useEffect(() => {
+    if (form.mesaId == null) { setTecnicosMesa([]); return; }
+    let alive = true;
+    listTecnicosPorMesa(supabase, form.mesaId)
+      .then((t) => { if (alive) setTecnicosMesa(t.filter((x) => x.activo)); })
+      .catch(() => { if (alive) setTecnicosMesa([]); });
+    return () => { alive = false; };
+  }, [form.mesaId]);
+
+  const resetAsignacion = () => {
+    setAsignacion(null);
+    setAsignLoading(false);
+    setAsignEstado('manual');
+  };
+
+  // Corre la sugerencia de asignación tras el classify: preselecciona mesa + técnico
+  const correrSugerencia = useCallback(async (mesaId: number, categoriaId: number) => {
+    setAsignLoading(true);
+    try {
+      const sug = await sugerirAsignacion(supabase, { mesaId, categoriaId });
+      setAsignacion(sug);
+      setAsignEstado('sugerida');
+      setForm(f => ({ ...f, mesaId: sug.mesaId, tecnicoAsignadoId: sug.tecnicoId }));
+    } catch {
+      setAsignacion(null);
+      setAsignEstado('manual');
+    } finally {
+      setAsignLoading(false);
+    }
+  }, []);
+
   // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars
   useEffect(() => {
     if (!categorias.length) return;
     const texto = `${form.asunto} ${form.descripcion}`.trim();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (texto.length < 20) {
-      setSugerencia(null);
+      setSugerencia(null); resetAsignacion();
       setIaLoading(false);
       return;
     }
@@ -81,12 +123,15 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       // auto-preseleccionar categoría + dependencia en cada predicción
       if (res) {
         const cat = categorias.find(c => c.id === res.categoriaId);
+        const mesaId = cat ? getMesaIdPorDominio(cat.dominio) : res.mesaId;
         setForm(f => ({
           ...f,
           categoriaId: res.categoriaId,
           prioridad: res.prioridad,
-          mesaId: cat ? getMesaIdPorDominio(cat.dominio) : res.mesaId,
+          mesaId,
         }));
+        // sugerencia de asignación (mesa + técnico) con confirmación humana
+        if (mesaId != null) void correrSugerencia(mesaId, res.categoriaId);
       }
     }, 800);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -118,11 +163,13 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   };
 
   const onSelectCategoria = (c: TicketCategoria) => {
+    setAsignEstado('manual');
     setForm(f => ({
       ...f,
       categoriaId: c.id,
       prioridad: getPrioridadPorCategoria(c.id),
       mesaId: getMesaIdPorDominio(c.dominio),
+      tecnicoAsignadoId: null,
     }));
   };
 
@@ -130,12 +177,14 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     if (!sugerencia) return;
     const cat = categorias.find(c => c.id === sugerencia.categoriaId);
     if (!cat) return;
+    const mesaId = getMesaIdPorDominio(cat.dominio);
     setForm(f => ({
       ...f,
       categoriaId: sugerencia.categoriaId,
       prioridad: sugerencia.prioridad,
-      mesaId: getMesaIdPorDominio(cat.dominio),
+      mesaId,
     }));
+    if (mesaId != null) void correrSugerencia(mesaId, sugerencia.categoriaId);
   };
 
   const onSubmit = async () => {
@@ -178,11 +227,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           message: msg,
         });
         // limpiar formulario pero dejar visible el error de adjuntos
-        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
+        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
         setAdjuntos([]);
         setErrors({});
         setTouched({});
-        setSugerencia(null);
+        setSugerencia(null); resetAsignacion();
         return;
       }
       setFeedback({
@@ -191,11 +240,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
         title: 'Solicitud creada',
         message: `Ticket #${res.numero} creado correctamente · Prioridad ${form.prioridad} · Mesa ${mesas.find(m => m.id === form.mesaId)?.nombre ?? form.mesaId}`,
         onOk: () => {
-          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
+          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
           setAdjuntos([]);
           setErrors({});
           setTouched({});
-          setSugerencia(null);
+          setSugerencia(null); resetAsignacion();
           setFeedback((f) => ({ ...f, visible: false }));
           navigation?.goBack?.();
         },
@@ -246,6 +295,14 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     ? categorias.filter(c => getMesaIdPorDominio(c.dominio) === form.mesaId)
     : []
   ).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
+  const mesaSugeridaNombre = asignacion ? (mesas.find(m => m.id === asignacion.mesaId)?.nombre ?? `Mesa #${asignacion.mesaId}`) : '';
+  const tecnicoSugeridoNombre = asignacion?.tecnicoId
+    ? (asignacion.tecnicoNombre ?? tecnicosMesa.find(t => t.id === asignacion.tecnicoId)?.fullName ?? 'Técnico sugerido')
+    : null;
+  const tecnicoOptions = [
+    { value: '', label: 'Sin asignar (cola de mesa)' },
+    ...tecnicosMesa.map(t => ({ value: t.id, label: t.fullName })),
+  ];
 
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
@@ -316,6 +373,36 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             )}
           </View>
 
+          {/* Asignación sugerida con confirmación humana */}
+          {asignLoading ? (
+            <View style={s.iaLoading}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={s.iaLoadingText}>Calculando asignación sugerida...</Text>
+            </View>
+          ) : asignacion && asignEstado === 'sugerida' ? (
+            <View style={s.asigCard}>
+              <Text style={s.asigTitle}>
+                Asignación sugerida: {mesaSugeridaNombre} · {tecnicoSugeridoNombre ?? 'Sin técnico disponible'}
+              </Text>
+              <Text style={s.asigMotivo}>motivo: {asignacion.motivo}</Text>
+              <View style={s.aiRow}>
+                <Pressable onPress={() => setAsignEstado('confirmada')} accessibilityRole="button" accessibilityLabel="Confirmar asignación sugerida" style={s.aiBtn}>
+                  <Text style={s.aiBtnText}>Confirmar</Text>
+                </Pressable>
+                <Pressable onPress={() => setAsignEstado('manual')} accessibilityRole="button" accessibilityLabel="Cambiar asignación sugerida" style={s.asigGhost}>
+                  <Text style={s.asigGhostText}>Cambiar</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : asignacion && asignEstado === 'confirmada' ? (
+            <View style={s.asigConfirmed}>
+              <Text style={s.aiApplied}>✓ Asignación confirmada: {mesaSugeridaNombre} · {tecnicoSugeridoNombre ?? 'cola de mesa'}</Text>
+              <Pressable onPress={() => setAsignEstado('manual')} accessibilityRole="button" accessibilityLabel="Cambiar asignación confirmada">
+                <Text style={s.asigChange}>Cambiar</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           <Divider />
 
           {/* Dependencia y Categoría — mismos desplegables que en mesas/dependencias */}
@@ -327,11 +414,12 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               placeholder="Seleccionar dependencia"
               onSelect={(v) => {
                 const id = v === '' ? null : Number(v);
+                setAsignEstado('manual');
                 setForm(f => {
                   // si cambia dependencia, limpia categoría que no pertenece a esa mesa
                   const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
                   const keep = keepCat && getMesaIdPorDominio(keepCat.dominio) === id ? f.categoriaId : 0;
-                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep) : f.prioridad };
+                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep) : f.prioridad, tecnicoAsignadoId: null };
                 });
                 setTouched(t => ({ ...t, mesaId: true }));
               }}
@@ -342,6 +430,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               options={categoriaOptions}
               placeholder={form.mesaId ? 'Seleccionar categoría' : 'Elige dependencia primero'}
               onSelect={(v) => {
+                setAsignEstado('manual');
                 if (v === '') { setForm(f => ({ ...f, categoriaId: 0 })); return; }
                 const cat = categorias.find(c => c.id === Number(v));
                 if (cat) onSelectCategoria(cat);
@@ -351,6 +440,17 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             />
           </View>
           <Text style={s.sectionHint}>IA preselecciona ambas — puedes cambiar cualquiera. Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
+          <FilterDropdown<string>
+            label="Técnico *"
+            value={form.tecnicoAsignadoId ?? ''}
+            options={tecnicoOptions}
+            placeholder={form.mesaId ? 'Seleccionar técnico' : 'Elige dependencia primero'}
+            onSelect={(v) => {
+              setAsignEstado('manual');
+              setForm(f => ({ ...f, tecnicoAsignadoId: v === '' ? null : String(v) }));
+            }}
+          />
+          <Text style={s.sectionHint}>Sugerido por carga + afinidad — Confirmar lo mantiene, Cambiar te deja elegir. Vacío = cola de la dependencia.</Text>
           {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 
@@ -461,6 +561,13 @@ const s = StyleSheet.create({
   aiBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   aiApplied: { fontSize:11, color:theme.colors.success, fontWeight:'700' },
   aiHint: { fontSize:11, color:theme.colors.muted, fontWeight:'600' },
+  asigCard: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12, gap: 6 },
+  asigTitle: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '700', lineHeight: 17 },
+  asigMotivo: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
+  asigGhost: { borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.surface },
+  asigGhostText: { color: theme.colors.textSoft, fontWeight: '800', fontSize: 11 },
+  asigConfirmed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12 },
+  asigChange: { fontSize: 11, color: theme.colors.primary, fontWeight: '800', textDecorationLine: 'underline' },
   dropdownRow: { flexDirection:'row', gap: 10, flexWrap:'wrap' as const },
   title: { fontSize: 14, fontWeight: '800', color: theme.colors.primary },
   sectionTitle: { fontSize: 12, fontWeight: '800', color: theme.colors.text },

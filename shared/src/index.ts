@@ -37,6 +37,7 @@ export * from './sla.js';
 export * from './ia.js';
 export * from './admin.js';
 export * from './mesas.js';
+export * from './autoasignar.js';
 export * from './categorias.js';
 export * from './ui/perfil/PerfilCard.js';
 export * from './notificaciones.js';

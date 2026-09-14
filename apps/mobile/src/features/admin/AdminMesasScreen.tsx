@@ -1,4 +1,4 @@
-// RF-29 / RF-30 / RF-31 — Admin móvil: dependencias + técnicos y respaldo (paridad web, CSV only)
+// RF-29 / RF-30 — Admin móvil: dependencias + técnicos (paridad web, CSV only)
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -161,7 +161,7 @@ export function AdminMesasScreen() {
       <Text style={s.name} numberOfLines={2}>{item.nombre}</Text>
       <View style={s.actions}>
         <Pressable onPress={() => openEdit(item)} style={s.btnGhost} accessibilityRole="button"><Text style={s.btnGhostText}>EDITAR</Text></Pressable>
-        <Pressable onPress={() => setEquipoMesa(item)} style={[s.btnGhost, s.btnGhostAccent]} accessibilityRole="button" accessibilityLabel={`Equipo y respaldo de ${item.nombre}`}>
+        <Pressable onPress={() => setEquipoMesa(item)} style={[s.btnGhost, s.btnGhostAccent]} accessibilityRole="button" accessibilityLabel={`Equipo de ${item.nombre}`}>
           <Text style={[s.btnGhostText, { color: theme.colors.primary }]}>EQUIPO</Text>
         </Pressable>
         <Pressable onPress={() => toggleActiva(item)} style={[s.btnGhost, !item.activa && s.btnGhostAccent]} accessibilityRole="button">

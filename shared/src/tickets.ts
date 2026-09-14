@@ -27,6 +27,8 @@ export type CreateTicketInput = {
   descripcion: string;
   prioridad: PrioridadTicket;
   mesaId: number | null;
+  /** Sugerencia de auto-asignación confirmada por el usuario (opcional) */
+  tecnicoAsignadoId?: string | null;
 };
 
 export type CreateTicketErrors = Partial<Record<keyof CreateTicketInput, string>>;
@@ -45,6 +47,9 @@ export function validateCreateTicket(input: CreateTicketInput): CreateTicketErro
   if (!isPrioridadTicket(input.prioridad)) errors.prioridad = 'Prioridad inválida';
   if (input.mesaId === null || !Number.isInteger(input.mesaId) || input.mesaId <= 0) {
     errors.mesaId = 'Selecciona una dependencia';
+  }
+  if (input.tecnicoAsignadoId !== undefined && input.tecnicoAsignadoId !== null && !String(input.tecnicoAsignadoId).trim()) {
+    (errors as Record<string, string>).tecnicoAsignadoId = 'Técnico inválido';
   }
   return errors;
 }
@@ -211,6 +216,8 @@ export async function createTicket(
     mesa_id: input.mesaId,
     ...(usuario_id ? { usuario_id } : {}),
     ...(opts?.id ? { id: opts.id } : {}),
+    // Auto-asignación sugerida y confirmada por el usuario (RLS insert no la restringe)
+    ...(input.tecnicoAsignadoId ? { tecnico_asignado_id: input.tecnicoAsignadoId } : {}),
   };
   const { data, error } = await client.from('tickets').insert(payload).select('id,numero').single();
   if (error) throw new Error(error.message);

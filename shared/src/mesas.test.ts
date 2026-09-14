@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCreateMesa, validateUpdateMesa, isCreateMesaValid, isUpdateMesaValid, validateRespaldo } from './mesas.js';
+import { validateCreateMesa, validateUpdateMesa, isCreateMesaValid, isUpdateMesaValid } from './mesas.js';
 
 describe('mesas RF-29', () => {
   it('rechaza nombre corto', () => {
@@ -26,15 +26,3 @@ describe('mesas RF-29', () => {
   });
 });
 
-describe('mesas RF-31 respaldo', () => {
-  it('rechaza auto-respaldo', () => {
-    expect(validateRespaldo(1, 1)).toBe('Una mesa no puede respaldarse a sí misma');
-  });
-  it('rechaza ids inválidos', () => {
-    expect(validateRespaldo(0, 2)).toBe('Mesa inválida');
-    expect(validateRespaldo(1, -3)).toBe('Mesa de respaldo inválida');
-  });
-  it('acepta par válido', () => {
-    expect(validateRespaldo(1, 2)).toBeNull();
-  });
-});
