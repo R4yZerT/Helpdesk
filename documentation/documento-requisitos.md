@@ -54,7 +54,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | ID | Requisito | Prio |
 |---|---|---|
 | RF-12 | Bandeja de tickets asignados al técnico con orden por prioridad/antigüedad | M |
-| RF-13 | Transiciones de estado: Abierto → En Proceso → Solucionado / Cerrado / Devuelto / Programado | M |
+| RF-13 | Transiciones de estado con FSM validada (ver §9: matriz permitida, solución obligatoria, historial) | M |
 | RF-14 | Reasignar ticket a otro técnico o mesa | M |
 | RF-15 | Comentarios internos (técnico ↔ usuario) visibles en el detalle | M |
 
@@ -272,3 +272,39 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-16.3 | Detalle de ticket muestra semáforo SLA (color/tone por estado), progreso % y `Vence … / 35 min restantes / Vencido hace…` usando `slaVenceEn ?? getSlaVencimiento` | M | Implementado |
 | RF-16.4 | `generar_alertas_ia` extendida: bloque C inserta alerta `ticket_estancado` con mensaje `SLA vencido — Ticket #…` (dedup 12h) para tickets con `now() > vence` | S | Implementado |
 | RF-16.5 | Tests `shared/src/sla.test.ts` cubren duraciones, vencimiento, estados vigente/por_vencer/vencido/cumplido/vencido_tarde, `formatSlaRestante` y `getSlaProgreso`; migración `20260911000000_sla_compromiso.sql` | M | Implementado |
+
+---
+
+## 9. Pulido RF-13 — Transiciones de estado con FSM (implementado 2026-09)
+
+> El ciclo de vida del ticket es una **máquina de estados finita** validada en cliente (`shared/src/tickets.ts`: `ESTADOS_TRANSICION`, `canTransition`, `transitionTicket`) y reforzada por RLS en BD. Cada cambio queda registrado en `ticket_estados` (historial visible en el detalle, RF-09).
+
+### RF-13.1 — Estados y matriz de transiciones permitidas
+
+Estados: `abierto`, `en_proceso`, `programado`, `solucionado`, `devuelto`, `cerrado` (`cerrado` es terminal: sin salidas).
+
+| Desde \ Hacia | abierto | en_proceso | programado | solucionado | devuelto | cerrado |
+|---|---|---|---|---|---|---|
+| **abierto** | — | ✅ | ✅ | ❌ | ❌ | ✅ |
+| **en_proceso** | ❌ | — | ✅ | ✅ | ✅ | ✅ |
+| **programado** | ❌ | ✅ | — | ✅ | ❌ | ✅ |
+| **solucionado** | ❌ | ❌ | ❌ | — | ✅ | ✅ |
+| **devuelto** | ❌ | ✅ | ✅ | ❌ | — | ✅ |
+| **cerrado** | ❌ | ❌ | ❌ | ❌ | ❌ | — |
+
+### RF-13.2 — Reglas de negocio
+
+| ID | Regla | Prio | Estado |
+|---|---|---|---|
+| RF-13.2 | Toda transición fuera de la matriz se rechaza fail-fast con error `Transición no permitida: {origen} → {destino}` antes de tocar la BD | M | Implementado |
+| RF-13.3 | `solucionado` y `cerrado` exigen **solución aplicada** de 5–5000 caracteres (dato clave para IA, RF-11); en el resto es opcional pero si se envía respeta los mismos límites | M | Implementado |
+| RF-13.4 | Roles: **técnico** (sus asignados), **jefe** y **administrador** pueden transicionar; el **usuario** solo puede cancelar solicitud propia no asignada (RF-10) | M | Implementado |
+| RF-13.5 | Cada transición puede llevar un **comentario** opcional; si su guardado falla, la transición **no** se revierte (no bloquea) | S | Implementado |
+| RF-13.6 | Cada cambio inserta fila en `ticket_estados` (quién, cuándo, origen → destino); el detalle muestra el historial completo (RF-09) | M | Implementado |
+
+### RF-13.3 — Criterios de aceptación
+
+1. Intentar `cerrado → en_proceso` (o cualquier ❌ de la matriz) devuelve error y el ticket conserva su estado.
+2. Pasar a `solucionado` sin solución, o con menos de 5 caracteres, es rechazado con mensaje claro.
+3. Pasar a `solucionado` con solución válida actualiza `estado` + `solucion_aplicada` y crea la entrada de historial.
+4. La UI solo ofrece como destino los estados permitidos desde el estado actual (`canTransition`).
