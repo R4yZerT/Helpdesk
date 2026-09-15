@@ -85,7 +85,7 @@ export function NotificationBell({ client, onOpenTicket }: { client: SupabaseCli
                       // Diferir la navegación un frame: le da un ciclo de render
                       // a los Modales para desmontarse antes del cambio de ruta
                       const ticketId = n.ticket_id;
-                      requestAnimationFrame(() => onOpenTicket(ticketId));
+                      setTimeout(() => onOpenTicket(ticketId), 0);
                     }
                   }}
                   style={[s.item, !n.leida && s.itemUnread]}
