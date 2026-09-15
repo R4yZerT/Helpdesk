@@ -1,9 +1,8 @@
-// TecnicoNavigator — web AppShell + sidebar global + footer legal (Stitch)
+// TecnicoNavigator — AppShell unificado + sidebar global + footer legal
 import * as React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
-import { theme, Sidebar, IconInbox, IconPlus, Clock, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconInbox, IconPlus, NotificationBell } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -22,16 +21,16 @@ const screenOpts = {
   contentStyle: { backgroundColor: theme.colors.bg },
 };
 
+function titleFor(name: string) {
+  if (name === 'Perfil') return 'Mi perfil';
+  if (name === 'CrearTicket') return 'Nueva solicitud';
+  if (name === 'DetalleTicket') return 'Detalle';
+  return 'Bandeja';
+}
+
 function TecnicoWeb() {
   const [activeName, setActiveName] = React.useState('Bandeja');
   const { profile, signOut } = useAuth();
-  return <TecnicoWebInner activeName={activeName} setActiveName={setActiveName} profile={profile} signOut={signOut} />;
-}
-
-function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { activeName: string; setActiveName: (n: string) => void; profile: { full_name?: string | null; email?: string | null; rol: string } | null; signOut: () => void }) {
-  const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [nav, setNav] = React.useState<import('@react-navigation/native').NavigationProp<TecnicoStackParamList> | null>(null);
 
   const isActive = (id: string) => {
@@ -39,9 +38,9 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
     if (id === 'crear') return activeName === 'CrearTicket';
     return false;
   };
-  // Fix pantalla blanca: si ya está en la ruta no navegar; si el target ya está en el stack (ej volver a Bandeja desde Crear) hacer popToTop antes de navegar
-  const navigateAndClose = (name: string) => {
-    if (activeName === name) { setDrawerOpen(false); return; }
+  // Fix pantalla blanca: si ya está en la ruta no navegar; si el target ya está en el stack hacer popToTop
+  const navigate = (name: string) => {
+    if (activeName === name) return;
     try {
       const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[]; index: number }; popToTop?: () => void };
       const st = anyNav?.getState?.();
@@ -51,97 +50,38 @@ function TecnicoWebInner({ activeName, setActiveName, profile, signOut }: { acti
         anyNav.popToTop();
         const st2 = anyNav.getState?.();
         if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
-        setDrawerOpen(false);
         return;
       }
     } catch {}
     nav?.navigate(name as never);
-    setDrawerOpen(false);
   };
   const iconColor = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
   const onPerfil = React.useCallback(() => {
-    navigateAndClose('Perfil');
-  }, [navigateAndClose]);
-  const sidebarContent = (
-    <Sidebar
-      items={[
-        { id: 'bandeja', label: 'Bandeja Asignada', active: isActive('bandeja'), onPress: () => navigateAndClose('Bandeja'), icon: <IconInbox size={14} color={iconColor(isActive('bandeja'))} /> },
-        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
-      ]}
+    navigate('Perfil');
+  }, [navigate]);
+  const items = [
+    { id: 'bandeja', label: 'Bandeja Asignada', active: isActive('bandeja'), onPress: () => navigate('Bandeja'), icon: <IconInbox size={14} color={iconColor(isActive('bandeja'))} /> },
+    { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigate('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
+  ];
+
+  return (
+    <AppShell
+      items={items}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Técnico') as string, role: profile.rol, avatarUrl: (profile as any).avatar_url } : undefined}
       onLogout={signOut}
       onUserPress={onPerfil}
-    />
-  );
-
-  React.useEffect(() => { if (isDesktop) setDrawerOpen(false); }, [isDesktop]);
-  React.useEffect(() => { setDrawerOpen(false); }, [activeName]);
-
-  if (isDesktop) {
-    return (
-      <View style={w.root}>
-        <View style={w.sidebar}>{sidebarContent}</View>
-        <View style={w.main}>
-          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Bandeja'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
-          <View style={{ flex: 1 }}>
-            <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
-              <Stack.Screen name="Bandeja" component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
-              <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-              <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
-              <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-            </Stack.Navigator>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Bandeja';
-  return (
-    <View style={w.rootMobile}>
-      <View style={w.mobileTopBar}>
-        <Pressable onPress={() => setDrawerOpen((v) => !v)} style={w.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
-          <Text style={w.burgerText}>☰</Text>
-        </Pressable>
-        <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><View style={w.clockMobile}><Clock size={13} /></View></View>
-      </View>
-      <View style={w.mainMobile}>
-        <View style={{ flex: 1 }}>
-          <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
-            <Stack.Screen name="Bandeja" component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
-            <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-            <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
-            <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-          </Stack.Navigator>
-        </View>
-        {drawerOpen ? (
-          <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
-            <View style={w.drawer}>{sidebarContent}</View>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
+      topTitle={titleFor(activeName)}
+      headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
+    >
+      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
+        <Stack.Screen name="Bandeja" component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
+        <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
+        <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+      </Stack.Navigator>
+    </AppShell>
   );
 }
-
-const w = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: theme.colors.bg },
-  rootMobile: { flex: 1, flexDirection: 'column', backgroundColor: theme.colors.bg },
-  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 0 },
-  main: { flex: 1, minWidth: 0 as unknown as number, flexDirection: 'column' as const },
-  mainMobile: { flex: 1, minWidth: 0 as unknown as number, position: 'relative', flexDirection: 'column' as const },
-  mobileTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56, zIndex: 100, elevation: 10 },
-  burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  burgerText: { fontSize: 18, color: theme.colors.text },
-  burgerSpacer: { width: 44 },
-  clockMobile: { minWidth: 80, alignItems: 'flex-end' },
-  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, zIndex: 100, elevation: 10 },
-  topTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
-  mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
-  drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
-});
 
 export function TecnicoNavigator() {
   if (Platform.OS === 'web') return <TecnicoWeb />;
