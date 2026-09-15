@@ -1,8 +1,8 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
+import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -50,6 +50,8 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const { profile } = useAuth();
   const canComment = !!profile && ['usuario', 'tecnico', 'jefe'].includes(profile.rol);
   const canInternal = !!profile && ['tecnico', 'jefe', 'administrador'].includes(profile.rol);
+  // El solicitante nunca soluciona: solo confirma cierre o devuelve desde solucionado
+  const isSolicitante = profile?.rol === 'usuario';
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +75,8 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
+  const [mesas, setMesas] = useState<Record<number, string>>({});
+  const [categorias, setCategorias] = useState<Record<number, string>>({});
   const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'warning' | 'info' | 'confirm'; title: string; message?: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -84,11 +88,20 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     try {
       const d = await getTicketDetail(supabase, id);
       setDetail(d);
-      // resolver mesa nombre
-      try { const ms = await fetchMesas(supabase); const m = ms.find((x) => x.id === d.ticket.mesaId); if (m) setMesaNombre(m.nombre); } catch {}
-      // resolver nombres de técnicos vía RPC segura (respeta RLS de profiles)
+      // resolver mesa nombre + mapas para el historial
       try {
-        const ids = [d.ticket.tecnicoAsignadoId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara])].filter((x): x is string => !!x);
+        const ms = await fetchMesas(supabase);
+        const m = ms.find((x) => x.id === d.ticket.mesaId);
+        if (m) setMesaNombre(m.nombre);
+        setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
+      } catch {}
+      try {
+        const cats = await fetchCategorias(supabase);
+        setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
+      } catch {}
+      // resolver nombres de técnicos y actores vía RPC segura (respeta RLS de profiles)
+      try {
+        const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length > 0) {
           const map = await fetchTecnicoNombres(supabase, ids);
           if (Object.keys(map).length > 0) setTecnicoNombres(map);
@@ -173,18 +186,20 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     } finally { setCancelLoading(false); }
   };
   const onTransition = async (estado: string) => {
-    if ((estado === 'solucionado' || estado === 'cerrado') && solucion.trim().length < 5) {
-      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + estado);
+    // El solicitante confirma con la solución ya registrada por el técnico (no la escribe)
+    const sol = isSolicitante ? (detail?.ticket.solucionAplicada ?? solucion) : solucion;
+    if ((estado === 'solucionado' || estado === 'cerrado') && sol.trim().length < 5) {
+      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + formatEstado(estado as never));
       return;
     }
     setTransLoading(estado);
     setTransError(null);
     try {
-      await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined });
+      await transitionTicket(supabase, id, estado as any, { solucionAplicada: sol || undefined });
       setShowTrans(false);
       setSolucion('');
       await load();
-      setFeedback({ visible: true, variant: 'success', title: 'Estado actualizado', message: `Ticket pasó a ${estado}` });
+      setFeedback({ visible: true, variant: 'success', title: 'Estado actualizado', message: `Ticket pasó a ${formatEstado(estado as never)}` });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setTransError(msg);
@@ -221,6 +236,18 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   if (!detail) return <View style={s.center}><Text style={s.muted}>Sin datos</Text></View>;
 
   const { ticket, estados, comentarios, adjuntos = [] } = detail;
+  // Tiempos reales por etapa desde el historial (con el actor que ejecutó cada cambio)
+  const nombreActor = (id?: string | null) => (id ? (tecnicoNombres[id] ?? 'Usuario') : null);
+  const evAsignacion = estados.find((e) => e.tipoEvento === 'asignacion' && e.tecnicoPara != null);
+  const evDiagnostico = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'en_proceso');
+  const evSolucion = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'solucionado');
+  const evCierre = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'cerrado');
+  const conActor = (iso: string | null | undefined, actorId?: string | null) =>
+    iso ? `${formatFechaHora(iso)}${actorId && nombreActor(actorId) ? ` · por ${nombreActor(actorId)}` : ''}` : undefined;
+  const tiempoAsignacion = conActor(evAsignacion?.creadoEn, evAsignacion?.usuarioId);
+  const tiempoDiagnostico = conActor(evDiagnostico?.creadoEn, evDiagnostico?.usuarioId);
+  const tiempoSolucion = conActor(ticket.fechaResolucion ?? evSolucion?.creadoEn, evSolucion?.usuarioId);
+  const tiempoCierre = conActor(evCierre?.creadoEn, evCierre?.usuarioId);
   const onOpenAdjunto = async (a: { storagePath: string }) => {
     try {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
@@ -234,7 +261,8 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
-  const nextEstados = ESTADOS.filter((e) => canTransition(ticket.estado as any, e as any));
+  // Ciclo de vida visible según rol: el solicitante solo confirma/deuelve desde solucionado
+  const nextEstados = nextEstadosParaRol(profile?.rol, ticket.estado as any, ESTADOS);
   const slaVence = (ticket as any).slaVenceEn ? new Date((ticket as any).slaVenceEn) : getSlaVencimiento(ticket.creadoEn, ticket.prioridad as any);
   const slaEstado = getSlaEstado({ creadoEn: ticket.creadoEn, prioridad: ticket.prioridad as any, estado: ticket.estado, venceEn: slaVence.toISOString(), fechaResolucion: ticket.fechaResolucion });
   const slaPct = Math.round(Math.min(100, getSlaProgreso(ticket.creadoEn, slaVence.toISOString())));
@@ -246,8 +274,8 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     <View style={s.header}>
       <View style={s.kickerRow}><Pressable onPress={handleBack} accessibilityRole="button" accessibilityLabel="Volver a bandeja" hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}><Text style={s.backLink}>← Volver a bandeja</Text></Pressable><View style={s.kickerDot} /><Text style={s.kicker}>Expediente · #{String(ticket.numero).padStart(4, '0')}</Text></View>
       <View style={s.pillsRow}>
-        <Badge label={ticket.prioridad} tone={tonoPrioridad(ticket.prioridad)} />
-        <Badge label={ticket.estado} tone={tonoEstado(ticket.estado)} />
+        <Badge label={formatPrioridad(ticket.prioridad as never)} tone={tonoPrioridad(ticket.prioridad)} />
+        <Badge label={formatEstado(ticket.estado as never)} tone={tonoEstado(ticket.estado)} />
         <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
       </View>
       {editing ? (
@@ -293,22 +321,19 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         <View style={s.tabs}>
           {(['comentarios', 'historial', 'archivos'] as const).map((t) => (
             <Pressable key={t} onPress={() => setActiveTab(t)} style={[s.tab, activeTab === t && s.tabActive]}>
-              <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>{t === 'comentarios' ? `Comentarios (${comentarios.length})` : t === 'historial' ? `Historial (${estados.length})` : `Archivos (${adjuntos.length})`}</Text>
+              <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>{t === 'comentarios' ? `Comentarios (${comentarios.length})` : t === 'historial' ? `Historial (${estados.length + 1})` : `Archivos (${adjuntos.length})`}</Text>
             </Pressable>
           ))}
         </View>
         <View style={{ padding: 14, gap: 10 }}>
           {activeTab === 'comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab === 'historial' ? (
-            estados.length === 0 ? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e) => (
-              <View key={e.id} style={s.timelineRow}>
-                <View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View>
-                <View style={s.timelineBody}>
-                  <Text style={s.rowTitle}>{e.tipoEvento === 'estado' ? `${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}` : `Asignación ${e.tecnicoDe ? (tecnicoNombres[e.tecnicoDe] ?? 'Técnico') : '—'} → ${e.tecnicoPara ? (tecnicoNombres[e.tecnicoPara] ?? 'Técnico') : '—'}`}</Text>
-                  <Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>
-                  {e.comentario ? <Text style={s.metaSmall}>{e.comentario}</Text> : null}
-                </View>
-              </View>
-            ))
+            <TicketHistoryList
+              creadoEn={ticket.creadoEn}
+              creadorId={ticket.usuarioId}
+              estados={estados}
+              nombres={{ usuarios: tecnicoNombres, mesas, categorias }}
+              currentUserId={profile?.id}
+            />
           ) : adjuntos.length === 0 ? (
             <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
           ) : (
@@ -338,6 +363,24 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     <View style={{ gap: 12, flex: isWide ? 4 : undefined }}>
       <Card style={{ gap: 10 }}>
         <Text style={s.section}>Acciones de Ciclo de Vida</Text>
+        {isSolicitante ? (
+          // Solicitante: solo confirma el cierre o devuelve al técnico cuando está solucionado
+          nextEstados.length > 0 ? (
+            <View style={{ gap: 8 }}>
+              {transError ? <Text style={s.error}>{transError}</Text> : null}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {nextEstados.map((e) => (
+                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                    {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : 'Devolver al técnico'}</Text>}
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : (
+            <Text style={s.mutedSmall}>{ticket.estado === 'solucionado' ? 'Cargando acciones…' : 'Sin acciones disponibles — el equipo técnico gestiona este ticket'}</Text>
+          )
+        ) : (
+        <>
         <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnAccent]}><Text style={s.btnAccentText}>{showTrans ? 'Ocultar' : 'Solucionar Incidente'}</Text></Pressable>
         {showTrans && nextEstados.length > 0 ? (
           <View style={{ gap: 8 }}>
@@ -346,7 +389,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {nextEstados.map((e) => (
                 <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
-                  {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
+                  {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
                 </Pressable>
               ))}
             </View>
@@ -356,6 +399,8 @@ export function TicketDetailScreen({ route, navigation }: Props) {
           <Pressable onPress={() => setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir Información</Text></Pressable>
           {(canReassign) ? <Pressable onPress={() => setShowReassign((v) => !v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
         </View>
+        </>
+        )}
         {showReassign ? (
           <View style={{ gap: 8 }}>
             <TextInput value={reassignTecnico} onChangeText={setReassignTecnico} placeholder="UUID técnico (o 'null')" style={s.input} autoCapitalize="none" />
@@ -371,11 +416,11 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         <Text style={s.section}>Progreso del Ticket</Text>
         <View style={s.progressWrap}>
           {[
-            { label: 'Ticket Creado', done: true, time: new Date(ticket.creadoEn).toLocaleString('es-ES') },
-            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado'}` : 'Asignado', done: !!ticket.tecnicoAsignadoId },
-            { label: 'En Diagnóstico', done: ticket.estado === 'en_proceso', pulse: ticket.estado === 'en_proceso' },
-            { label: 'Solución Propuesta', done: ticket.estado === 'solucionado' },
-            { label: 'Cierre CSAT', done: ticket.estado === 'cerrado' },
+            { label: 'Ticket Creado', done: true, time: formatFechaHora(ticket.creadoEn) },
+            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado'}` : 'Asignado', done: !!ticket.tecnicoAsignadoId || !!evAsignacion, time: tiempoAsignacion },
+            { label: 'En Diagnóstico', done: !!evDiagnostico || ['en_proceso', 'solucionado', 'cerrado'].includes(ticket.estado), pulse: ticket.estado === 'en_proceso', time: tiempoDiagnostico },
+            { label: 'Solución Propuesta', done: !!evSolucion || !!ticket.fechaResolucion || ['solucionado', 'cerrado'].includes(ticket.estado), time: tiempoSolucion },
+            { label: 'Cierre CSAT', done: ticket.estado === 'cerrado', time: tiempoCierre },
           ].map((n, i) => (
             <View key={n.label} style={s.progressRow}>
               <View style={s.progressDotCol}><View style={[s.progressDot, n.done ? s.progressDotDone : s.progressDotTodo, n.pulse && s.progressDotPulse]} /><View style={s.progressLine} /></View>
