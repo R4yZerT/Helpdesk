@@ -1,15 +1,10 @@
 // RF-06/08/09 — Tipos, validación, listado paginado y detalle paralelo (Calidad: Performance/Seguridad/Usabilidad)
 import type { EstadoTicket, PrioridadTicket } from './types.js';
+import { getPrioridadPorSubcategoria } from './types.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-// RF-06: prioridad bloqueada por categoría — mapa espejo de ia.ts para evitar ciclo tickets<->ia
-const PRIORIDAD_POR_CATEGORIA_TICKETS: Record<number, PrioridadTicket> = {
-  1: 'media', 2: 'alta', 3: 'alta', 4: 'media', 5: 'critica', 6: 'alta', 7: 'baja', 8: 'media', 9: 'critica', 10: 'alta',
-  11: 'baja', 12: 'media', 13: 'media', 14: 'baja', 15: 'critica', 16: 'alta', 17: 'baja', 18: 'media', 19: 'media',
-};
-function getPrioridadPorCategoriaLocal(categoriaId: number): PrioridadTicket {
-  return PRIORIDAD_POR_CATEGORIA_TICKETS[categoriaId] ?? 'media';
-}
+// RF-06: prioridad bloqueada por categoría — se resuelve por NOMBRE de subcategoría
+// (los IDs son seriales y cambian con seeds/migraciones; ver PRIORIDAD_POR_SUBCATEGORIA en types.ts).
 
 export const PRIORIDADES: readonly PrioridadTicket[] = ['baja', 'media', 'alta', 'critica'] as const;
 export const ESTADOS: readonly EstadoTicket[] = ['abierto', 'en_proceso', 'solucionado', 'cerrado', 'devuelto', 'programado'] as const;
@@ -214,8 +209,14 @@ export async function createTicket(
     const { data } = await client.auth.getUser();
     usuario_id = data.user?.id ?? null;
   } catch { /* trigger suple */ }
-  // RF-06: prioridad bloqueada por categoría — no se confía en el input del cliente
-  const prioridadFinal = getPrioridadPorCategoriaLocal(input.categoriaId);
+  // RF-06: prioridad bloqueada por categoría — no se confía en el input del cliente.
+  // Se lee la subcategoría viva por ID y se mapea por nombre (estable ante seeds/migraciones).
+  let prioridadFinal: PrioridadTicket = 'media';
+  try {
+    const { data: catRow } = await client.from('ticket_categories').select('subcategoria').eq('id', input.categoriaId).single();
+    const sub = (catRow as { subcategoria?: unknown } | null)?.subcategoria;
+    if (typeof sub === 'string' && sub.trim()) prioridadFinal = getPrioridadPorSubcategoria(sub);
+  } catch { /* sin catálogo: fallback 'media' */ }
   const payload: Record<string, unknown> = {
     categoria_id: input.categoriaId,
     asunto: input.asunto.trim(),

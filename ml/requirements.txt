@@ -8,7 +8,8 @@ transformers>=4.40
 torch>=2.2
 accelerate>=0.28
 datasets>=2.18
-# opcional para métricas y tracking
-# mlflow>=2.11
+# --- inferencia: micro-API ml/src/serve.py ---
+fastapi>=0.115
+uvicorn[standard]>=0.30
 # jupyter
 ipykernel>=6.29
