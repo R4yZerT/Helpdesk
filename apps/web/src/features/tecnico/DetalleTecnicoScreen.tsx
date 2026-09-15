@@ -1,8 +1,8 @@
 // RF-09/10/13/14/15 — Detalle Técnico (Stitch split 8+4, FSM naranja, SLA 35m)
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, fetchMesas, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
+import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail } from '@helpdesk/shared';
+import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -48,6 +48,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState('');
+  const [mesas, setMesas] = useState<Record<number, string>>({});
+  const [categorias, setCategorias] = useState<Record<number, string>>({});
   const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -57,10 +59,19 @@ export function DetalleTecnicoScreen({ route }: Props) {
       const d = await getTicketDetail(supabase, id);
       setDetail(d);
       try {
-        const ids = [d.ticket.tecnicoAsignadoId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara])].filter((x): x is string => !!x);
+        const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length) setTecnicoNombres(await fetchTecnicoNombres(supabase, ids));
       } catch {}
-      try { const ms = await fetchMesas(supabase); const m = ms.find((x) => x.id === d.ticket.mesaId); if (m) setMesaNombre(m.nombre); } catch {}
+      try {
+        const ms = await fetchMesas(supabase);
+        const m = ms.find((x) => x.id === d.ticket.mesaId);
+        if (m) setMesaNombre(m.nombre);
+        setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
+      } catch {}
+      try {
+        const cats = await fetchCategorias(supabase);
+        setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
+      } catch {}
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }, [id]);
 
@@ -87,7 +98,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const onTransition = async (estado: string) => {
     // RF-11: solución requerida para solucionado/cerrado
     if ((estado === 'solucionado' || estado === 'cerrado') && solucion.trim().length < 5) {
-      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + estado);
+      setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + formatEstado(estado as never));
       return;
     }
     setTransLoading(estado); setTransError(null);
@@ -110,6 +121,18 @@ export function DetalleTecnicoScreen({ route }: Props) {
   if (!detail) return <View style={s.center}><Text style={s.muted}>Sin datos</Text></View>;
 
   const { ticket, estados, comentarios, adjuntos = [] } = detail;
+  // Tiempos reales por etapa desde el historial (con el actor que ejecutó cada cambio)
+  const nombreActor = (id?: string | null) => (id ? (tecnicoNombres[id] ?? 'Usuario') : null);
+  const evAsignacion = estados.find((e) => e.tipoEvento === 'asignacion' && e.tecnicoPara != null);
+  const evDiagnostico = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'en_proceso');
+  const evSolucion = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'solucionado');
+  const evCierre = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'cerrado');
+  const conActor = (iso: string | null | undefined, actorId?: string | null) =>
+    iso ? `${formatFechaHora(iso)}${actorId && nombreActor(actorId) ? ` · por ${nombreActor(actorId)}` : ''}` : undefined;
+  const tiempoAsignacion = conActor(evAsignacion?.creadoEn, evAsignacion?.usuarioId);
+  const tiempoDiagnostico = conActor(evDiagnostico?.creadoEn, evDiagnostico?.usuarioId);
+  const tiempoSolucion = conActor(ticket.fechaResolucion ?? evSolucion?.creadoEn, evSolucion?.usuarioId);
+  const tiempoCierre = conActor(evCierre?.creadoEn, evCierre?.usuarioId);
   const onOpenAdjunto = async (a: { storagePath: string }) => {
     try {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
@@ -120,7 +143,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
-  const nextEstados = ESTADOS.filter((e) => canTransition(ticket.estado as any, e as any));
+  const nextEstados = nextEstadosParaRol(profile?.rol, ticket.estado as any, ESTADOS);
   const slaPct = ticket.estado === 'cerrado' || ticket.estado === 'solucionado' ? 100 : ticket.prioridad === 'critica' ? 25 : ticket.prioridad === 'alta' ? 55 : 75;
 
   const header = (
@@ -128,8 +151,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
       <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Expediente técnico · #{String(ticket.numero).padStart(4, '0')}</Text></View>
       <View style={s.pillsRow}>
         <View style={s.codePill}><Text style={s.codePillText}>#{String(ticket.numero).padStart(4, '0')}</Text></View>
-        <Badge label={ticket.prioridad} tone={tonoPrioridad(ticket.prioridad)} />
-        <Badge label={ticket.estado} tone={tonoEstado(ticket.estado)} />
+        <Badge label={formatPrioridad(ticket.prioridad as never)} tone={tonoPrioridad(ticket.prioridad)} />
+        <Badge label={formatEstado(ticket.estado as never)} tone={tonoEstado(ticket.estado)} />
         <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
       </View>
       <Text style={s.asunto}>{ticket.asunto}</Text>
@@ -143,7 +166,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
       <Card style={{ gap: theme.space[3] }}>
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
-        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'asignado') : '—'}</Text></View>
+        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {formatEstado(ticket.estado as never)} · Prioridad {formatPrioridad(ticket.prioridad as never)} · Técnico {ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'asignado') : '—'}</Text></View>
         {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
           <View style={s.solBox}>
             <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
@@ -155,14 +178,20 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <View style={s.tabs}>
           {(['comentarios','historial','archivos'] as const).map((t) => (
             <Pressable key={t} onPress={() => setActiveTab(t)} style={[s.tab, activeTab===t && s.tabActive]} accessibilityRole="button" accessibilityState={{ selected: activeTab===t }}>
-              <Text style={[s.tabText, activeTab===t && s.tabTextActive]}>{t==='comentarios'?`Comentarios (${comentarios.length})`:t==='historial'?`Historial (${estados.length})`:`Archivos (${adjuntos.length})`}</Text>
+              <Text style={[s.tabText, activeTab===t && s.tabTextActive]}>{t==='comentarios'?`Comentarios (${comentarios.length})`:t==='historial'?`Historial (${estados.length + 1})`:`Archivos (${adjuntos.length})`}</Text>
             </Pressable>
           ))}
         </View>
         <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}>
-          {activeTab==='comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab==='historial' ? (estados.length===0? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e)=>(
-            <View key={e.id} style={s.timelineRow}><View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View><View style={s.timelineBody}><Text style={s.rowTitle}>{e.tipoEvento==='estado'?`${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}`:`Asignación ${e.tecnicoDe ? (tecnicoNombres[e.tecnicoDe] ?? '—') : '—'} → ${e.tecnicoPara ? (tecnicoNombres[e.tecnicoPara] ?? '—') : '—'}`}</Text><Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>{e.comentario? <Text style={s.metaSmall}>{e.comentario}</Text> : null}</View></View>
-          ))) : adjuntos.length === 0 ? (
+          {activeTab==='comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab==='historial' ? (
+            <TicketHistoryList
+              creadoEn={ticket.creadoEn}
+              creadorId={ticket.usuarioId}
+              estados={estados}
+              nombres={{ usuarios: tecnicoNombres, mesas, categorias }}
+              currentUserId={profile?.id}
+            />
+          ) : adjuntos.length === 0 ? (
             <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
           ) : (
             <View style={{ gap: 8 }}>
@@ -198,7 +227,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
             <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}>
               {nextEstados.map((e)=>(
                 <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
-                  {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{e}</Text>}
+                  {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
                 </Pressable>
               ))}
             </View>
@@ -221,13 +250,13 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <Text style={s.section}>Progreso del ticket</Text>
         <View style={s.progressWrap}>
           {[
-            { label: 'Ticket creado', done: true },
-            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'técnico'}` : 'Asignado a técnico', done: !!ticket.tecnicoAsignadoId },
-            { label: 'En diagnóstico', done: ticket.estado==='en_proceso', pulse: ticket.estado==='en_proceso' },
-            { label: 'Solución propuesta', done: ticket.estado==='solucionado' },
-            { label: 'Cierre CSAT', done: ticket.estado==='cerrado' },
+            { label: 'Ticket creado', done: true, time: formatFechaHora(ticket.creadoEn) },
+            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'técnico'}` : 'Asignado a técnico', done: !!ticket.tecnicoAsignadoId || !!evAsignacion, time: tiempoAsignacion },
+            { label: 'En diagnóstico', done: !!evDiagnostico || ['en_proceso', 'solucionado', 'cerrado'].includes(ticket.estado), pulse: ticket.estado==='en_proceso', time: tiempoDiagnostico },
+            { label: 'Solución propuesta', done: !!evSolucion || !!ticket.fechaResolucion || ['solucionado', 'cerrado'].includes(ticket.estado), time: tiempoSolucion },
+            { label: 'Cierre CSAT', done: ticket.estado==='cerrado', time: tiempoCierre },
           ].map((n)=>(
-            <View key={n.label} style={s.progressRow}><View style={s.progressDotCol}><View style={[s.progressDot, n.done? s.progressDotDone : s.progressDotTodo, (n as any).pulse && s.progressDotPulse]} /><View style={s.progressLine} /></View><View style={{flex:1}}><Text style={[s.progressLabel, !n.done && {color: theme.colors.mutedSoft} as any]}>{n.label}</Text></View></View>
+            <View key={n.label} style={s.progressRow}><View style={s.progressDotCol}><View style={[s.progressDot, n.done? s.progressDotDone : s.progressDotTodo, (n as any).pulse && s.progressDotPulse]} /><View style={s.progressLine} /></View><View style={{flex:1}}><Text style={[s.progressLabel, !n.done && {color: theme.colors.mutedSoft} as any]}>{n.label}</Text>{n.done && (n as any).time ? <Text style={s.mutedSmall}>{(n as any).time}</Text> : null}</View></View>
           ))}
         </View>
       </Card>
@@ -237,8 +266,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado==='solucionado'||ticket.estado==='cerrado'? theme.colors.success : ticket.prioridad==='critica'? theme.colors.danger : theme.colors.primary }]} /></View>
         <View style={s.slaAlert}><Text style={s.slaAlertText}>{ticket.prioridad==='critica'?'Crítico <60 min · Riesgo alto': ticket.prioridad==='alta'?'Alta <4h · vigilar':'Dentro de compromiso'}</Text></View>
         <View style={s.attrGrid}>
-          <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{ticket.prioridad}</Text>
-          <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{ticket.estado}</Text>
+          <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{formatPrioridad(ticket.prioridad as never)}</Text>
+          <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{formatEstado(ticket.estado as never)}</Text>
           <Text style={s.attrLabel}>Dependencia</Text><Text style={s.attrValue}>{mesaNombre || String(ticket.mesaId)}</Text>
           <Text style={s.attrLabel}>Asignado</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
         </View>

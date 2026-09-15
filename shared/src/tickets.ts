@@ -100,6 +100,11 @@ export type TicketEstado = {
   estadoNuevo: EstadoTicket | null;
   tecnicoDe: string | null;
   tecnicoPara: string | null;
+  // Cambios de dependencia/categoría (migración historial_mesa_categoria)
+  mesaDe: number | null;
+  mesaPara: number | null;
+  categoriaDe: number | null;
+  categoriaPara: number | null;
   usuarioId: string;
   comentario: string | null;
   creadoEn: string;
@@ -158,6 +163,10 @@ function mapEstado(row: Record<string, unknown>): TicketEstado {
     estadoNuevo: (row.estado_nuevo as EstadoTicket | null) ?? null,
     tecnicoDe: (row.tecnico_de as string | null) ?? null,
     tecnicoPara: (row.tecnico_para as string | null) ?? null,
+    mesaDe: (row.mesa_de as number | null) ?? null,
+    mesaPara: (row.mesa_para as number | null) ?? null,
+    categoriaDe: (row.categoria_de as number | null) ?? null,
+    categoriaPara: (row.categoria_para as number | null) ?? null,
     usuarioId: row.usuario_id as string,
     comentario: (row.comentario as string | null) ?? null,
     creadoEn: row.creado_en as string,
@@ -587,7 +596,7 @@ export async function getTicketDetail(
     .single();
   const estadosPromise = client
     .from('ticket_estados')
-    .select('id,ticket_id,tipo_evento,estado_anterior,estado_nuevo,tecnico_de,tecnico_para,usuario_id,comentario,creado_en')
+    .select('*')
     .eq('ticket_id', ticketId)
     .order('creado_en', { ascending: true });
   const comentariosPromise = client
