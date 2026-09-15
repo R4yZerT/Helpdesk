@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
+import { IconBell } from '../icons.js';
 import { countNoLeidas, listNotificaciones, marcarLeida, marcarTodasLeidas, subscribeNotificaciones, type Notificacion } from '../../notificaciones.js';
 import { cerrarDropdownsAbiertos } from '../dropdown-bus.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -54,7 +55,7 @@ export function NotificationBell({ client, onOpenTicket }: { client: SupabaseCli
   return (
     <View style={s.wrap}>
       <Pressable onPress={onToggle} style={s.bell} accessibilityLabel={`Notificaciones ${count ? count + ' nuevas' : 'sin nuevas'}`} accessibilityRole="button">
-        <Text style={s.icon}>🔔</Text>
+        <IconBell size={17} color={count > 0 ? theme.colors.primary : theme.colors.textSoft} />
         {count > 0 ? (
           <View style={s.badge}>
             <Text style={s.badgeText}>{count > 99 ? '99+' : String(count)}</Text>
@@ -109,7 +110,6 @@ const s = StyleSheet.create({
   // el dropdown pinte por encima del contenido (filtros, cards con sombra).
   wrap: { position: 'relative', zIndex: 1000, elevation: 30 },
   bell: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
-  icon: { fontSize: 16 },
   badge: { position: 'absolute', top: -4, right: -4, backgroundColor: theme.colors.danger ?? '#ef4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 1, borderColor: '#fff' },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: '800' },
   dropdown: { position: 'absolute', top: 44, right: 0, width: 340, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, padding: 12, gap: 8, zIndex: 1000, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 } as any, elevation: 30 },
