@@ -1,7 +1,7 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { addComentario, canTransition, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -53,6 +53,7 @@ export function TicketDetailScreen({ route }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
+  const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'warning' | 'info' | 'confirm'; title: string; message?: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -65,6 +66,14 @@ export function TicketDetailScreen({ route }: Props) {
       setDetail(d);
       // resolver mesa nombre
       try { const ms = await fetchMesas(supabase); const m = ms.find((x) => x.id === d.ticket.mesaId); if (m) setMesaNombre(m.nombre); } catch {}
+      // resolver nombres de técnicos vía RPC segura (respeta RLS de profiles)
+      try {
+        const ids = [d.ticket.tecnicoAsignadoId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara])].filter((x): x is string => !!x);
+        if (ids.length > 0) {
+          const map = await fetchTecnicoNombres(supabase, ids);
+          if (Object.keys(map).length > 0) setTecnicoNombres(map);
+        }
+      } catch {}
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -277,7 +286,7 @@ export function TicketDetailScreen({ route }: Props) {
               <View key={e.id} style={s.timelineRow}>
                 <View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View>
                 <View style={s.timelineBody}>
-                  <Text style={s.rowTitle}>{e.tipoEvento === 'estado' ? `${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}` : `Asignación ${e.tecnicoDe?.slice(0, 6) ?? '—'} → ${e.tecnicoPara?.slice(0, 6) ?? '—'}`}</Text>
+                  <Text style={s.rowTitle}>{e.tipoEvento === 'estado' ? `${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}` : `Asignación ${e.tecnicoDe ? (tecnicoNombres[e.tecnicoDe] ?? 'Técnico') : '—'} → ${e.tecnicoPara ? (tecnicoNombres[e.tecnicoPara] ?? 'Técnico') : '—'}`}</Text>
                   <Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>
                   {e.comentario ? <Text style={s.metaSmall}>{e.comentario}</Text> : null}
                 </View>
@@ -346,7 +355,7 @@ export function TicketDetailScreen({ route }: Props) {
         <View style={s.progressWrap}>
           {[
             { label: 'Ticket Creado', done: true, time: new Date(ticket.creadoEn).toLocaleString('es-ES') },
-            { label: 'Asignado', done: !!ticket.tecnicoAsignadoId },
+            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado'}` : 'Asignado', done: !!ticket.tecnicoAsignadoId },
             { label: 'En Diagnóstico', done: ticket.estado === 'en_proceso', pulse: ticket.estado === 'en_proceso' },
             { label: 'Solución Propuesta', done: ticket.estado === 'solucionado' },
             { label: 'Cierre CSAT', done: ticket.estado === 'cerrado' },
@@ -372,6 +381,7 @@ export function TicketDetailScreen({ route }: Props) {
           <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{ticket.prioridad}</Text>
           <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{ticket.estado}</Text>
           <Text style={s.attrLabel}>Dependencia</Text><Text style={s.attrValue}>{mesaNombre || ticket.mesaId}</Text>
+          <Text style={s.attrLabel}>Técnico</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
         </View>
       </Card>
     </View>

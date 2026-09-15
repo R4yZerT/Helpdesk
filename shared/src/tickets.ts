@@ -611,3 +611,35 @@ export async function getTicketDetail(
     adjuntos: adjuntosRes.error ? [] : ((adjuntosRes.data ?? []) as Record<string, unknown>[]).map(mapAdjunto),
   };
 }
+
+// Nombre del técnico asignado vía RPC segura (respeta RLS de profiles).
+// Solo expone full_name de técnicos asignados a tickets visibles por el llamante.
+// Con fallback a profiles directo (admin) si el RPC aún no existe. Nunca lanza.
+export async function fetchTecnicoNombres(
+  client: SupabaseClient,
+  ids: (string | null | undefined)[],
+): Promise<Record<string, string>> {
+  const uniq = [...new Set(ids.filter((x): x is string => !!x))];
+  if (uniq.length === 0) return {};
+  try {
+    const { data, error } = await client.rpc('resolve_tecnico_nombres', { p_ids: uniq });
+    if (!error && Array.isArray(data)) {
+      const map: Record<string, string> = {};
+      for (const r of data as { id: string; full_name: string }[]) {
+        if (r?.id && r?.full_name) map[r.id] = r.full_name;
+      }
+      if (Object.keys(map).length > 0 || uniq.length > 0) return map;
+    }
+  } catch { /* fallback abajo */ }
+  try {
+    const { data, error } = await client.from('profiles').select('id,full_name').in('id', uniq);
+    if (error || !data) return {};
+    const map: Record<string, string> = {};
+    for (const r of data as { id: string; full_name: string }[]) {
+      if (r?.id && r?.full_name) map[r.id] = r.full_name;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
