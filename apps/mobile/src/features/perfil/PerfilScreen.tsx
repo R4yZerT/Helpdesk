@@ -1,4 +1,4 @@
-// RF-27 Mi Perfil — mobile (mismo 3 cards que web)
+// RF-27 Mi Perfil — mobile (contenedor único)
 import * as React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';

@@ -1,4 +1,4 @@
-// RF-27 Mi Perfil — web (desktop max-w 680px centrado, mismo 3 cards que móvil)
+// RF-27 Mi Perfil — web (desktop max-w 680px centrado, contenedor único)
 import * as React from 'react';
 import { ActivityIndicator, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { PerfilCard } from '@helpdesk/shared';
