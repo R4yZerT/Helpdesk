@@ -12,8 +12,9 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { abrirTicketDesdePush } from '../navigation/navigationRef';
-import { ensureAndroidChannel, initPushHandler, obtenerExpoPushToken } from '../lib/push';
+import { ensureAndroidChannel, esExpoGo, initPushHandler, obtenerExpoPushToken } from '../lib/push';
 
+// Handler seguro: en Expo Go no lanza (ver push.ts).
 initPushHandler();
 
 export function usePushNotificaciones() {
@@ -37,8 +38,10 @@ export function usePushNotificaciones() {
   }, [session]);
 
   // Registra el token Expo una vez por sesión (solo device físico).
+  // En Expo Go SDK 53+ retorna sin hacer nada (push remoto no disponible).
   const registrarTokenNativo = useCallback(async () => {
     if (Platform.OS === 'web') return;
+    if (esExpoGo()) return;
     try {
       await ensureAndroidChannel();
       const reg = await obtenerExpoPushToken();
@@ -71,7 +74,9 @@ export function usePushNotificaciones() {
     const sub = AppState.addEventListener('change', onAppState);
 
     // Foreground: refresca y antepone el aviso.
-    const recv = Platform.OS === 'web' ? null : Notifications.addNotificationReceivedListener((ev) => {
+    // En web o Expo Go no hay listeners nativos (solo in-app realtime).
+    const sinListenersNativos = Platform.OS === 'web' || esExpoGo();
+    const recv = sinListenersNativos ? null : Notifications.addNotificationReceivedListener((ev) => {
       const data = (ev.request.content.data ?? {}) as { notificacion_id?: number; ticket_id?: string | null; tipo?: string };
       refresh();
       if (data.notificacion_id) {
@@ -89,7 +94,7 @@ export function usePushNotificaciones() {
       }
     });
     // Tap: abre el ticket asociado.
-    const resp = Platform.OS === 'web' ? null : Notifications.addNotificationResponseReceivedListener((ev) => {
+    const resp = sinListenersNativos ? null : Notifications.addNotificationResponseReceivedListener((ev) => {
       const data = (ev.notification.request.content.data ?? {}) as { ticket_id?: string | null };
       if (data.ticket_id) abrirTicketDesdePush(data.ticket_id);
       refresh();

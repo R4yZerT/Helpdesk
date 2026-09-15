@@ -125,7 +125,7 @@ export function FilterDropdown<T extends string | number | boolean>({
         <Text style={s.chevron}>{open ? '▴' : '▾'}</Text>
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+      <Modal visible={open} transparent onRequestClose={() => setOpen(false)}>
         <Pressable style={s.backdrop} onPress={() => setOpen(false)} />
         <View style={dropdownStyle} pointerEvents="box-none">
           <View style={[s.dropdownInner, innerStyle]}>
