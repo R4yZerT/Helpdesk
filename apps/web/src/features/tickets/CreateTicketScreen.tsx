@@ -1,4 +1,5 @@
-// RF-06 — Crear solicitud: descripción primero → IA sugiere categoría → prioridad bloqueada por categoría
+// RF-06 — Crear solicitud: descripción primero → IA sugiere dependencia + categoría → prioridad bloqueada
+// La IA no sugiere técnico: el ticket entra a la cola de la dependencia.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
@@ -9,15 +10,13 @@ import {
   validateAdjunto,
   ADJUNTO_MAX_COUNT,
   getPrioridadPorCategoria,
-  getMesaIdPorDominio,
-  classifyLocal,
-  sugerirAsignacion,
+  resolverMesaId,
+  predecirCategoria,
   listTecnicosPorMesa,
   type CreateTicketInput,
-  type Clasificacion,
+  type PrediccionCategoria,
   type Mesa,
   type TicketCategoria,
-  type SugerenciaAsignacion,
   type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
@@ -42,13 +41,11 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateTicketInput, string>>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [sugerencia, setSugerencia] = useState<Clasificacion | null>(null);
+  const [sugerencia, setSugerencia] = useState<PrediccionCategoria | null>(null);
   const [iaLoading, setIaLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Auto-asignación sugerida (mesa + técnico) con confirmación humana
-  const [asignacion, setAsignacion] = useState<SugerenciaAsignacion | null>(null);
-  const [asignLoading, setAsignLoading] = useState(false);
-  const [asignEstado, setAsignEstado] = useState<'sugerida' | 'confirmada' | 'manual'>('manual');
+  // Si el usuario elige dependencia/categoría manualmente, la IA no debe sobrescribir.
+  const eleccionManualRef = useRef(false);
   const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
@@ -83,60 +80,37 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     return () => { alive = false; };
   }, [form.mesaId]);
 
-  const resetAsignacion = () => {
-    setAsignacion(null);
-    setAsignLoading(false);
-    setAsignEstado('manual');
-  };
-
-  // Corre la sugerencia de asignación tras el classify: preselecciona mesa + técnico
-  const correrSugerencia = useCallback(async (mesaId: number, categoriaId: number) => {
-    setAsignLoading(true);
-    try {
-      const sug = await sugerirAsignacion(supabase, { mesaId, categoriaId });
-      setAsignacion(sug);
-      setAsignEstado('sugerida');
-      setForm(f => ({ ...f, mesaId: sug.mesaId, tecnicoAsignadoId: sug.tecnicoId }));
-    } catch {
-      setAsignacion(null);
-      setAsignEstado('manual');
-    } finally {
-      setAsignLoading(false);
-    }
-  }, []);
-
-  // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars
+  // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars.
+  // BETO primero (micro-API), reglas locales como fallback. Solo auto-aplica si el
+  // usuario aún no eligió dependencia/categoría; nunca sugiere técnico.
   useEffect(() => {
-    if (!categorias.length) return;
+    if (!categorias.length || !mesas.length) return;
     const texto = `${form.asunto} ${form.descripcion}`.trim();
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (texto.length < 20) {
-      setSugerencia(null); resetAsignacion();
+      setSugerencia(null);
+      eleccionManualRef.current = false;
       setIaLoading(false);
       return;
     }
     setIaLoading(true);
+    let cancelado = false;
     debounceRef.current = setTimeout(() => {
-      const res = classifyLocal(texto, categorias);
-      setSugerencia(res);
-      setIaLoading(false);
-      // auto-preseleccionar categoría + dependencia en cada predicción
-      if (res) {
-        const cat = categorias.find(c => c.id === res.categoriaId);
-        const mesaId = cat ? getMesaIdPorDominio(cat.dominio) : res.mesaId;
-        setForm(f => ({
-          ...f,
-          categoriaId: res.categoriaId,
-          prioridad: res.prioridad,
-          mesaId,
-        }));
-        // sugerencia de asignación (mesa + técnico) con confirmación humana
-        if (mesaId != null) void correrSugerencia(mesaId, res.categoriaId);
-      }
+      void (async () => {
+        const res = await predecirCategoria(texto, { categorias, mesas });
+        if (cancelado) return;
+        setSugerencia(res);
+        setIaLoading(false);
+        if (res && !eleccionManualRef.current) {
+          setForm(f => (f.categoriaId || f.mesaId != null)
+            ? f
+            : { ...f, categoriaId: res.categoriaId, prioridad: res.prioridad, mesaId: res.mesaId });
+        }
+      })();
     }, 800);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => { cancelado = true; if (debounceRef.current) clearTimeout(debounceRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.asunto, form.descripcion, categorias]);
+  }, [form.asunto, form.descripcion, categorias, mesas]);
 
   const humanizeError = (msg: string) => {
     if (/row-level security|violates.*policy|not.*authorized/i.test(msg)) return 'No autorizado — verifica tu sesión y permisos';
@@ -163,28 +137,25 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   };
 
   const onSelectCategoria = (c: TicketCategoria) => {
-    setAsignEstado('manual');
+    eleccionManualRef.current = true;
     setForm(f => ({
       ...f,
       categoriaId: c.id,
-      prioridad: getPrioridadPorCategoria(c.id),
-      mesaId: getMesaIdPorDominio(c.dominio),
+      prioridad: getPrioridadPorCategoria(c.id, categorias),
+      mesaId: resolverMesaId(c.dominio, mesas),
       tecnicoAsignadoId: null,
     }));
   };
 
   const aplicarSugerencia = () => {
     if (!sugerencia) return;
-    const cat = categorias.find(c => c.id === sugerencia.categoriaId);
-    if (!cat) return;
-    const mesaId = getMesaIdPorDominio(cat.dominio);
+    eleccionManualRef.current = true;
     setForm(f => ({
       ...f,
       categoriaId: sugerencia.categoriaId,
       prioridad: sugerencia.prioridad,
-      mesaId,
+      mesaId: sugerencia.mesaId,
     }));
-    if (mesaId != null) void correrSugerencia(mesaId, sugerencia.categoriaId);
   };
 
   const onSubmit = async () => {
@@ -231,7 +202,8 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
         setAdjuntos([]);
         setErrors({});
         setTouched({});
-        setSugerencia(null); resetAsignacion();
+        setSugerencia(null);
+        eleccionManualRef.current = false;
         return;
       }
       setFeedback({
@@ -244,7 +216,8 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           setAdjuntos([]);
           setErrors({});
           setTouched({});
-          setSugerencia(null); resetAsignacion();
+          setSugerencia(null);
+          eleccionManualRef.current = false;
           setFeedback((f) => ({ ...f, visible: false }));
           navigation?.goBack?.();
         },
@@ -292,13 +265,10 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   // opciones para desplegables — mismo componente que en mesas/dependencias; categoría depende de dependencia
   const mesaOptions = mesas.map(m => ({ value: m.id, label: m.nombre }));
   const categoriaOptions = (form.mesaId
-    ? categorias.filter(c => getMesaIdPorDominio(c.dominio) === form.mesaId)
+    ? categorias.filter(c => resolverMesaId(c.dominio, mesas) === form.mesaId)
     : []
   ).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
-  const mesaSugeridaNombre = asignacion ? (mesas.find(m => m.id === asignacion.mesaId)?.nombre ?? `Mesa #${asignacion.mesaId}`) : '';
-  const tecnicoSugeridoNombre = asignacion?.tecnicoId
-    ? (asignacion.tecnicoNombre ?? tecnicosMesa.find(t => t.id === asignacion.tecnicoId)?.fullName ?? 'Técnico sugerido')
-    : null;
+  const iaFuente = sugerencia?.fuente === 'beto' ? 'modelo BETO' : 'reglas locales';
   const tecnicoOptions = [
     { value: '', label: 'Sin asignar (cola de mesa)' },
     ...tecnicosMesa.map(t => ({ value: t.id, label: t.fullName })),
@@ -354,7 +324,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
                   <Text style={s.aiPct}>{Math.round(sugerencia.confianza * 100)}%</Text>
                   {isSugerenciaAplicada ? <Badge label="aplicada" tone="success" /> : null}
                 </View>
-                <Text style={s.aiText}>{sugerenciaCat.subcategoria} · Prioridad {sugerencia.prioridad} · {sugerenciaCat.dominio}</Text>
+                <Text style={s.aiText}>{sugerenciaCat.subcategoria} · {sugerenciaCat.dominio} · Prioridad {sugerencia.prioridad} · {iaFuente}</Text>
                 <View style={s.aiRow}>
                   {isSugerenciaAplicada ? (
                     <Text style={s.aiApplied}>✓ Categoría y prioridad aplicadas</Text>
@@ -368,40 +338,12 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               </View>
             ) : (
               <View style={s.iaIdle}>
-                <Text style={s.iaIdleText}>✦ Escribe al menos 20 caracteres: la IA sugerirá la categoría y bloqueará la prioridad.</Text>
+                <Text style={s.iaIdleText}>✦ Escribe al menos 20 caracteres: la IA sugerirá dependencia y categoría (sin técnico).</Text>
               </View>
             )}
           </View>
 
-          {/* Asignación sugerida con confirmación humana */}
-          {asignLoading ? (
-            <View style={s.iaLoading}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={s.iaLoadingText}>Calculando asignación sugerida...</Text>
-            </View>
-          ) : asignacion && asignEstado === 'sugerida' ? (
-            <View style={s.asigCard}>
-              <Text style={s.asigTitle}>
-                Asignación sugerida: {mesaSugeridaNombre} · {tecnicoSugeridoNombre ?? 'Sin técnico disponible'}
-              </Text>
-              <Text style={s.asigMotivo}>motivo: {asignacion.motivo}</Text>
-              <View style={s.aiRow}>
-                <Pressable onPress={() => setAsignEstado('confirmada')} accessibilityRole="button" accessibilityLabel="Confirmar asignación sugerida" style={s.aiBtn}>
-                  <Text style={s.aiBtnText}>Confirmar</Text>
-                </Pressable>
-                <Pressable onPress={() => setAsignEstado('manual')} accessibilityRole="button" accessibilityLabel="Cambiar asignación sugerida" style={s.asigGhost}>
-                  <Text style={s.asigGhostText}>Cambiar</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : asignacion && asignEstado === 'confirmada' ? (
-            <View style={s.asigConfirmed}>
-              <Text style={s.aiApplied}>✓ Asignación confirmada: {mesaSugeridaNombre} · {tecnicoSugeridoNombre ?? 'cola de mesa'}</Text>
-              <Pressable onPress={() => setAsignEstado('manual')} accessibilityRole="button" accessibilityLabel="Cambiar asignación confirmada">
-                <Text style={s.asigChange}>Cambiar</Text>
-              </Pressable>
-            </View>
-          ) : null}
+          {/* Sin sugerencia de técnico: el ticket entra a la cola de la dependencia */}
 
           <Divider />
 
@@ -414,12 +356,12 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               placeholder="Seleccionar dependencia"
               onSelect={(v) => {
                 const id = v === '' ? null : Number(v);
-                setAsignEstado('manual');
+                eleccionManualRef.current = true;
                 setForm(f => {
                   // si cambia dependencia, limpia categoría que no pertenece a esa mesa
                   const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
-                  const keep = keepCat && getMesaIdPorDominio(keepCat.dominio) === id ? f.categoriaId : 0;
-                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep) : f.prioridad, tecnicoAsignadoId: null };
+                  const keep = keepCat && resolverMesaId(keepCat.dominio, mesas) === id ? f.categoriaId : 0;
+                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep, categorias) : f.prioridad, tecnicoAsignadoId: null };
                 });
                 setTouched(t => ({ ...t, mesaId: true }));
               }}
@@ -430,7 +372,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               options={categoriaOptions}
               placeholder={form.mesaId ? 'Seleccionar categoría' : 'Elige dependencia primero'}
               onSelect={(v) => {
-                setAsignEstado('manual');
+                eleccionManualRef.current = true;
                 if (v === '') { setForm(f => ({ ...f, categoriaId: 0 })); return; }
                 const cat = categorias.find(c => c.id === Number(v));
                 if (cat) onSelectCategoria(cat);
@@ -439,18 +381,17 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               }}
             />
           </View>
-          <Text style={s.sectionHint}>IA preselecciona ambas — puedes cambiar cualquiera. Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
+          <Text style={s.sectionHint}>La IA sugiere dependencia y categoría al escribir (auto-aplica solo si aún no elegiste). Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
           <FilterDropdown<string>
-            label="Técnico *"
+            label="Técnico (opcional)"
             value={form.tecnicoAsignadoId ?? ''}
             options={tecnicoOptions}
             placeholder={form.mesaId ? 'Seleccionar técnico' : 'Elige dependencia primero'}
             onSelect={(v) => {
-              setAsignEstado('manual');
               setForm(f => ({ ...f, tecnicoAsignadoId: v === '' ? null : String(v) }));
             }}
           />
-          <Text style={s.sectionHint}>Sugerido por carga + afinidad — Confirmar lo mantiene, Cambiar te deja elegir. Vacío = cola de la dependencia.</Text>
+          <Text style={s.sectionHint}>Vacío = cola de la dependencia. La IA no sugiere técnico: lo asigna el jefe de mesa.</Text>
           {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 
