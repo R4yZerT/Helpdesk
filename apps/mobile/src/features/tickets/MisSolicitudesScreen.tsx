@@ -1,8 +1,8 @@
 // RF-08 — Mis solicitudes: server paginado + Realtime + pull-to-refresh (Stitch: grid 2cols, FAB naranja)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { fetchMesas, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
-import { Badge, Card, Divider } from '@helpdesk/shared';
+import { fetchMesas, fetchTecnicoNombres, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
+import { Badge, Card, Divider, TecnicoChip } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { FilterDropdown, ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
@@ -28,6 +28,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
   const [prioridad, setPrioridad] = useState<PrioridadTicket | ''>('');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
+  const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -67,6 +68,17 @@ export function MisSolicitudesScreen({ navigation }: Props) {
 
   useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
 
+  // Resolver nombres de técnicos vía RPC segura (respeta RLS de profiles)
+  useEffect(() => {
+    const ids = tickets.map((t) => t.tecnicoAsignadoId).filter((x): x is string => !!x && !tecnicoNombres[x]);
+    if (ids.length === 0) return;
+    let alive = true;
+    fetchTecnicoNombres(supabase, ids).then((map) => {
+      if (alive && Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [tickets]);
+
   useEffect(() => {
     const channel = supabase
       .channel('mis-solicitudes')
@@ -102,7 +114,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         <Divider />
         <View style={s.metaRow}>
           <Text style={s.meta}>{mesaName(item.mesaId)} · {relativeTime(item.creadoEn)}</Text>
-          {item.tecnicoAsignadoId ? <Text style={s.metaStrong}>Técnico asignado</Text> : null}
+          <TecnicoChip nombre={item.tecnicoAsignadoId ? (tecnicoNombres[item.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
         </View>
       </Card>
     </Pressable>

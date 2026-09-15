@@ -119,6 +119,22 @@ export function IconClock({ size = 16, color = '#64748b' }: P) {
   );
 }
 
+// Campana notificaciones — domo + base + badajo
+export function IconBell({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* anilla superior */}
+      <View style={{ width: size * 0.16, height: size * 0.16, borderRadius: size * 0.08, backgroundColor: color }} />
+      {/* domo */}
+      <View style={{ width: size * 0.62, height: size * 0.5, borderWidth: 1.6, borderColor: color, borderTopLeftRadius: size * 0.31, borderTopRightRadius: size * 0.31, borderBottomWidth: 0, marginTop: -1 }} />
+      {/* base */}
+      <View style={{ width: size * 0.8, height: 1.8, borderRadius: 1, backgroundColor: color }} />
+      {/* badajo */}
+      <View style={{ width: size * 0.18, height: size * 0.18, borderRadius: size * 0.09, backgroundColor: color, marginTop: 1 }} />
+    </View>
+  );
+}
+
 // Mesa / Dependencia — tablero con 4 patas (ícono de mesa)
 export function IconTable({ size = 16, color = '#64748b' }: P) {
   return (

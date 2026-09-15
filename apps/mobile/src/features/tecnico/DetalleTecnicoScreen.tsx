@@ -1,8 +1,8 @@
 // RF-09/10/13/14/15 — Detalle Técnico (Stitch split 8+4, FSM naranja, SLA 35m)
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, fetchMesas, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
+import { addComentario, canTransition, fetchMesas, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, type TicketDetail } from '@helpdesk/shared';
+import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -48,6 +48,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState('');
+  const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +56,10 @@ export function DetalleTecnicoScreen({ route }: Props) {
     try {
       const d = await getTicketDetail(supabase, id);
       setDetail(d);
+      try {
+        const ids = [d.ticket.tecnicoAsignadoId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara])].filter((x): x is string => !!x);
+        if (ids.length) setTecnicoNombres(await fetchTecnicoNombres(supabase, ids));
+      } catch {}
       try { const ms = await fetchMesas(supabase); const m = ms.find((x) => x.id === d.ticket.mesaId); if (m) setMesaNombre(m.nombre); } catch {}
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }, [id]);
@@ -127,7 +132,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
       </View>
       <Text style={s.asunto}>{ticket.asunto}</Text>
-      <Text style={s.meta}>{mesaNombre || `Mesa ${ticket.mesaId ?? '—'}`} · Cat {ticket.categoriaId} · Reportado {new Date(ticket.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · Asignado a mí</Text>
+      <Text style={s.meta}>{mesaNombre || `Mesa ${ticket.mesaId ?? '—'}`} · Cat {ticket.categoriaId} · Reportado {new Date(ticket.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+      <TecnicoChip nombre={ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
     </View>
   );
 
@@ -136,7 +142,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
       <Card style={{ gap: theme.space[3] }}>
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
-        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId?.slice(0,8) ?? '—'}</Text></View>
+        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad} · Técnico {ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'asignado') : '—'}</Text></View>
         {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
           <View style={s.solBox}>
             <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
@@ -154,7 +160,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
         </View>
         <View style={{ padding: theme.space[4] - 2, gap: theme.space[3] - 2 }}>
           {activeTab==='comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab==='historial' ? (estados.length===0? <Text style={s.muted}>Sin cambios de estado aún</Text> : estados.map((e)=>(
-            <View key={e.id} style={s.timelineRow}><View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View><View style={s.timelineBody}><Text style={s.rowTitle}>{e.tipoEvento==='estado'?`${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}`:`Asignación ${e.tecnicoDe?.slice(0,6) ?? '—'} → ${e.tecnicoPara?.slice(0,6) ?? '—'}`}</Text><Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>{e.comentario? <Text style={s.metaSmall}>{e.comentario}</Text> : null}</View></View>
+            <View key={e.id} style={s.timelineRow}><View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View><View style={s.timelineBody}><Text style={s.rowTitle}>{e.tipoEvento==='estado'?`${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}`:`Asignación ${e.tecnicoDe ? (tecnicoNombres[e.tecnicoDe] ?? '—') : '—'} → ${e.tecnicoPara ? (tecnicoNombres[e.tecnicoPara] ?? '—') : '—'}`}</Text><Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>{e.comentario? <Text style={s.metaSmall}>{e.comentario}</Text> : null}</View></View>
           ))) : adjuntos.length === 0 ? (
             <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
           ) : (
@@ -215,7 +221,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
         <View style={s.progressWrap}>
           {[
             { label: 'Ticket creado', done: true },
-            { label: 'Asignado a técnico', done: !!ticket.tecnicoAsignadoId },
+            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'técnico'}` : 'Asignado a técnico', done: !!ticket.tecnicoAsignadoId },
             { label: 'En diagnóstico', done: ticket.estado==='en_proceso', pulse: ticket.estado==='en_proceso' },
             { label: 'Solución propuesta', done: ticket.estado==='solucionado' },
             { label: 'Cierre CSAT', done: ticket.estado==='cerrado' },
@@ -233,7 +239,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
           <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{ticket.prioridad}</Text>
           <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{ticket.estado}</Text>
           <Text style={s.attrLabel}>Dependencia</Text><Text style={s.attrValue}>{mesaNombre || String(ticket.mesaId)}</Text>
-          <Text style={s.attrLabel}>Asignado</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId? ticket.tecnicoAsignadoId.slice(0,8)+'…' : 'Sin asignar'}</Text>
+          <Text style={s.attrLabel}>Asignado</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
         </View>
       </Card>
     </View>

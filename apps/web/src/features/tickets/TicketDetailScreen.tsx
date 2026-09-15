@@ -1,12 +1,19 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, canTransition, cancelTicket, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { addComentario, canTransition, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
-type Props = { route: { params: { id: string } } };
+type Props = {
+  route: { params: { id: string } };
+  navigation?: {
+    goBack?: () => void;
+    canGoBack?: () => boolean;
+    navigate?: (name: string, params?: object) => void;
+  };
+};
 
 const tonoEstado = (e: string) => {
   if (e === 'abierto') return 'muted' as const;
@@ -23,8 +30,21 @@ const tonoPrioridad = (p: string) => {
   return 'muted' as const;
 };
 
-export function TicketDetailScreen({ route }: Props) {
+export function TicketDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
+  // Volver a bandeja: pop del stack; fallback a MisSolicitudes si no hay historial
+  const handleBack = () => {
+    const nav = navigation as { canGoBack?: () => boolean; goBack?: () => void; navigate?: (name: string) => void } | undefined;
+    if (nav?.canGoBack?.()) {
+      nav.goBack?.();
+      return;
+    }
+    if (nav?.goBack) {
+      nav.goBack();
+      return;
+    }
+    nav?.navigate?.('MisSolicitudes');
+  };
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
   const { profile } = useAuth();
@@ -53,6 +73,7 @@ export function TicketDetailScreen({ route }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
+  const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'warning' | 'info' | 'confirm'; title: string; message?: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -65,6 +86,14 @@ export function TicketDetailScreen({ route }: Props) {
       setDetail(d);
       // resolver mesa nombre
       try { const ms = await fetchMesas(supabase); const m = ms.find((x) => x.id === d.ticket.mesaId); if (m) setMesaNombre(m.nombre); } catch {}
+      // resolver nombres de técnicos vía RPC segura (respeta RLS de profiles)
+      try {
+        const ids = [d.ticket.tecnicoAsignadoId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara])].filter((x): x is string => !!x);
+        if (ids.length > 0) {
+          const map = await fetchTecnicoNombres(supabase, ids);
+          if (Object.keys(map).length > 0) setTecnicoNombres(map);
+        }
+      } catch {}
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -215,9 +244,8 @@ export function TicketDetailScreen({ route }: Props) {
 
   const header = (
     <View style={s.header}>
-      <View style={s.kickerRow}><Pressable><Text style={s.backLink}>← Volver a bandeja</Text></Pressable><View style={s.kickerDot} /><Text style={s.kicker}>Expediente · #{String(ticket.numero).padStart(4, '0')}</Text></View>
+      <View style={s.kickerRow}><Pressable onPress={handleBack} accessibilityRole="button" accessibilityLabel="Volver a bandeja" hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}><Text style={s.backLink}>← Volver a bandeja</Text></Pressable><View style={s.kickerDot} /><Text style={s.kicker}>Expediente · #{String(ticket.numero).padStart(4, '0')}</Text></View>
       <View style={s.pillsRow}>
-        <View style={s.codePill}><Text style={s.codePillText}>#{String(ticket.numero).padStart(4, '0')}</Text></View>
         <Badge label={ticket.prioridad} tone={tonoPrioridad(ticket.prioridad)} />
         <Badge label={ticket.estado} tone={tonoEstado(ticket.estado)} />
         <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
@@ -246,8 +274,6 @@ export function TicketDetailScreen({ route }: Props) {
       <Card style={{ gap: 12 }}>
         <Text style={s.section}>Descripción</Text>
         {!editing ? <Text style={s.desc}>{ticket.descripcion}</Text> : null}
-        {/* Terminal demo (Stitch) si descripción contiene código/bloque — placeholder */}
-        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {ticket.estado} · Prioridad {ticket.prioridad}</Text></View>
         {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
           <View style={s.solBox}>
             <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
@@ -277,7 +303,7 @@ export function TicketDetailScreen({ route }: Props) {
               <View key={e.id} style={s.timelineRow}>
                 <View style={s.dotCol}><View style={s.dot} /><View style={s.line} /></View>
                 <View style={s.timelineBody}>
-                  <Text style={s.rowTitle}>{e.tipoEvento === 'estado' ? `${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}` : `Asignación ${e.tecnicoDe?.slice(0, 6) ?? '—'} → ${e.tecnicoPara?.slice(0, 6) ?? '—'}`}</Text>
+                  <Text style={s.rowTitle}>{e.tipoEvento === 'estado' ? `${e.estadoAnterior ?? '—'} → ${e.estadoNuevo ?? '—'}` : `Asignación ${e.tecnicoDe ? (tecnicoNombres[e.tecnicoDe] ?? 'Técnico') : '—'} → ${e.tecnicoPara ? (tecnicoNombres[e.tecnicoPara] ?? 'Técnico') : '—'}`}</Text>
                   <Text style={s.mutedSmall}>{new Date(e.creadoEn).toLocaleString('es-ES')}</Text>
                   {e.comentario ? <Text style={s.metaSmall}>{e.comentario}</Text> : null}
                 </View>
@@ -346,7 +372,7 @@ export function TicketDetailScreen({ route }: Props) {
         <View style={s.progressWrap}>
           {[
             { label: 'Ticket Creado', done: true, time: new Date(ticket.creadoEn).toLocaleString('es-ES') },
-            { label: 'Asignado', done: !!ticket.tecnicoAsignadoId },
+            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado'}` : 'Asignado', done: !!ticket.tecnicoAsignadoId },
             { label: 'En Diagnóstico', done: ticket.estado === 'en_proceso', pulse: ticket.estado === 'en_proceso' },
             { label: 'Solución Propuesta', done: ticket.estado === 'solucionado' },
             { label: 'Cierre CSAT', done: ticket.estado === 'cerrado' },
@@ -369,9 +395,8 @@ export function TicketDetailScreen({ route }: Props) {
         <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: slaFillColor }]} /></View>
         <View style={[s.slaAlert, slaEstado === 'vencido' ? { backgroundColor: '#FEF2F2', borderColor: '#FECACA' } : slaEstado === 'por_vencer' ? { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' } : slaEstado === 'vigente' || slaEstado === 'cumplido' ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' } : {}]}><Text style={s.slaAlertText}>{slaEstado === 'vencido' ? 'Fuera de compromiso — requiere acción inmediata' : slaEstado === 'por_vencer' ? `Por vencer — quedan ~${getSlaMinutosRestantes(slaVence)} min` : slaEstado === 'cumplido' ? 'Cerrado dentro de compromiso ✓' : slaEstado === 'vencido_tarde' ? 'Cerrado fuera de compromiso' : 'Dentro de compromiso'}</Text></View>
         <View style={s.attrGrid}>
-          <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{ticket.prioridad}</Text>
-          <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{ticket.estado}</Text>
-          <Text style={s.attrLabel}>Dependencia</Text><Text style={s.attrValue}>{mesaNombre || ticket.mesaId}</Text>
+          <Text style={s.attrLabel}>Vence</Text><Text style={s.attrValue}>{slaVence.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+          <Text style={s.attrLabel}>Técnico</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
         </View>
       </Card>
     </View>
