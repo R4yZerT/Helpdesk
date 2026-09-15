@@ -2,6 +2,7 @@
 import * as React from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle, type TextStyle } from 'react-native';
 import { theme } from './theme.js';
+import { IconUsers } from './icons.js';
 
 export function Card({
   children,
@@ -79,6 +80,18 @@ export function Divider({ style }: { style?: ViewStyle }) {
   return <View style={[{ height: 1, backgroundColor: theme.colors.border }, style]} />;
 }
 
+// Chip estándar de técnico asignado — ícono de paleta + nombre (headers y cards)
+// nombre null/undefined = "Sin asignar"
+export function TecnicoChip({ nombre, size = 12 }: { nombre?: string | null; size?: number }) {
+  const asignado = !!nombre;
+  return (
+    <View style={styles.tecnicoChip} accessibilityRole="text" accessibilityLabel={asignado ? `Técnico asignado ${nombre}` : 'Sin asignar'}>
+      <IconUsers size={size} color={asignado ? theme.colors.primary : theme.colors.mutedSoft} />
+      <Text style={[styles.tecnicoChipText, !asignado && styles.tecnicoChipTextEmpty]}>{nombre ?? 'Sin asignar'}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: theme.colors.surface,
@@ -117,4 +130,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: theme.colors.primary } as TextStyle,
   sectionTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4 } as TextStyle,
   sectionSubtitle: { fontSize: 13, color: theme.colors.muted, lineHeight: 18 } as TextStyle,
+  tecnicoChip: { flexDirection: 'row', alignItems: 'center', gap: 4 } as ViewStyle,
+  tecnicoChipText: { fontSize: 11, fontWeight: '700', color: theme.colors.textSoft } as TextStyle,
+  tecnicoChipTextEmpty: { fontWeight: '600', color: theme.colors.mutedSoft } as TextStyle,
 });
