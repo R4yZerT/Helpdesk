@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { fetchMesas, fetchTecnicoNombres, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
-import { Badge, Card, Divider } from '@helpdesk/shared';
+import { Badge, Card, Divider, TecnicoChip } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { FilterDropdown, ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
@@ -114,9 +114,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         <Divider />
         <View style={s.metaRow}>
           <Text style={s.meta}>{mesaName(item.mesaId)} · {relativeTime(item.creadoEn)}</Text>
-          {item.tecnicoAsignadoId
-            ? <Text style={s.metaStrong}>👨‍🔧 {tecnicoNombres[item.tecnicoAsignadoId] ?? 'Técnico asignado'}</Text>
-            : <Text style={s.meta}>Sin asignar</Text>}
+          <TecnicoChip nombre={item.tecnicoAsignadoId ? (tecnicoNombres[item.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
         </View>
       </Card>
     </Pressable>
