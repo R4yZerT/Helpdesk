@@ -3,8 +3,7 @@
 // - Nativo: obtiene token Expo en device físico, lo registra en push_tokens,
 //   muestra foreground y abre el ticket al tocar la notificación.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Platform, type AppStateStatus } from 'react-native';
-import * as Notifications from 'expo-notifications';
+import { AppState, type AppStateStatus } from 'react-native';
 import {
   countNoLeidas, listNotificaciones, registerPushToken,
   subscribeNotificaciones, type Notificacion,
@@ -12,7 +11,10 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { abrirTicketDesdePush } from '../navigation/navigationRef';
-import { ensureAndroidChannel, esExpoGo, initPushHandler, obtenerExpoPushToken } from '../lib/push';
+import {
+  addPushRecibidoListener, addPushRespuestaListener, ensureAndroidChannel,
+  initPushHandler, obtenerExpoPushToken,
+} from '../lib/push';
 
 // Handler seguro: en Expo Go no lanza (ver push.ts).
 initPushHandler();
@@ -40,8 +42,6 @@ export function usePushNotificaciones() {
   // Registra el token Expo una vez por sesión (solo device físico).
   // En Expo Go SDK 53+ retorna sin hacer nada (push remoto no disponible).
   const registrarTokenNativo = useCallback(async () => {
-    if (Platform.OS === 'web') return;
-    if (esExpoGo()) return;
     try {
       await ensureAndroidChannel();
       const reg = await obtenerExpoPushToken();
@@ -74,9 +74,8 @@ export function usePushNotificaciones() {
     const sub = AppState.addEventListener('change', onAppState);
 
     // Foreground: refresca y antepone el aviso.
-    // En web o Expo Go no hay listeners nativos (solo in-app realtime).
-    const sinListenersNativos = Platform.OS === 'web' || esExpoGo();
-    const recv = sinListenersNativos ? null : Notifications.addNotificationReceivedListener((ev) => {
+    // Carga perezosa: en web o Expo Go retorna null (solo in-app realtime).
+    const recv = addPushRecibidoListener((ev) => {
       const data = (ev.request.content.data ?? {}) as { notificacion_id?: number; ticket_id?: string | null; tipo?: string };
       refresh();
       if (data.notificacion_id) {
@@ -94,7 +93,7 @@ export function usePushNotificaciones() {
       }
     });
     // Tap: abre el ticket asociado.
-    const resp = sinListenersNativos ? null : Notifications.addNotificationResponseReceivedListener((ev) => {
+    const resp = addPushRespuestaListener((ev) => {
       const data = (ev.notification.request.content.data ?? {}) as { ticket_id?: string | null };
       if (data.ticket_id) abrirTicketDesdePush(data.ticket_id);
       refresh();
