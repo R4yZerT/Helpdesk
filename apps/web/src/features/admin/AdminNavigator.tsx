@@ -1,9 +1,8 @@
-// AdminNavigator — web AppShell + sidebar global + footer legal (Stitch)
+// AdminNavigator — AppShell unificado + sidebar global + footer legal
 import * as React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
-import { theme, Sidebar, IconUsers, IconLayers, IconTable, IconTag, IconUpload, Clock, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
@@ -24,6 +23,16 @@ const screenOpts = {
   contentStyle: { backgroundColor: theme.colors.bg },
 };
 
+function titleFor(name: string) {
+  if (name === 'Perfil') return 'Mi perfil';
+  if (name === 'DetalleTicket') return 'Detalle';
+  if (name === 'Mesas') return 'Dependencias';
+  if (name === 'Usuarios') return 'Usuarios';
+  if (name === 'Categorias') return 'Categorías';
+  if (name === 'Import') return 'Import';
+  return 'Mesas';
+}
+
 function AdminWeb() {
   const [activeName, setActiveName] = React.useState('MesaTickets');
   const { profile, signOut } = useAuth();
@@ -31,9 +40,6 @@ function AdminWeb() {
 }
 
 function AdminWebInner({ activeName, setActiveName, profile, signOut }: { activeName: string; setActiveName: (n: string) => void; profile: { full_name?: string | null; email?: string | null; rol: string } | null; signOut: () => void }) {
-  const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024;
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
   const [nav, setNav] = React.useState<import('@react-navigation/native').NavigationProp<AdminStackParamList> | null>(null);
 
   const mesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
@@ -46,117 +52,55 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
     if (id === 'import') return activeName === 'Import';
     return false;
   };
-  // Fix pantalla blanca: evita navegar duplicado; si el destino ya está en el stack hace pop/navigate limpio
-  const navigateAndClose = (name: string) => {
-    if (activeName === name) { setDrawerOpen(false); return; }
-    // Para Admin todas las pantallas son hermanas en el mismo Stack: navigate normal basta, pero evitamos doble push si ya existe
+  // Fix pantalla blanca: evita navegar duplicado; si el destino ya está en el stack hace navigate limpio
+  const navigate = (name: string) => {
+    if (activeName === name) return;
     try {
       const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[] }; popToTop?: () => void };
       const st = anyNav?.getState?.();
       const hasTarget = st?.routes?.some((r) => r.name === name);
       if (hasTarget) {
-        // Si ya existe, navigate hará pop al existente sin dejar pantalla blanca
         nav?.navigate(name as never);
-        setDrawerOpen(false);
         return;
       }
     } catch {}
     nav?.navigate(name as never);
-    setDrawerOpen(false);
   };
   const ic = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
   const onPerfil = React.useCallback(() => {
-    navigateAndClose('Perfil');
-  }, [navigateAndClose]);
+    navigate('Perfil');
+  }, [navigate]);
   const allItems = [
-        { id: 'mesaTickets', label: 'MESAS', active: isActive('mesaTickets'), onPress: () => navigateAndClose('MesaTickets'), icon: <IconTable size={14} color={ic(isActive('mesaTickets'))} /> },
-        ...(isGeneralAdmin ? [{ id: 'mesas', label: 'DEPENDENCIAS', active: isActive('mesas'), onPress: () => navigateAndClose('Mesas'), icon: <IconLayers size={14} color={ic(isActive('mesas'))} /> } as const] : []),
-        { id: 'usuarios', label: 'USUARIOS', active: isActive('usuarios'), onPress: () => navigateAndClose('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
-        { id: 'categorias', label: 'CATEGORÍAS', active: isActive('categorias'), onPress: () => navigateAndClose('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
-        { id: 'import', label: 'IMPORT', active: isActive('import'), onPress: () => navigateAndClose('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
-      ];
-  const sidebarContent = (
-    <Sidebar
+    { id: 'mesaTickets', label: 'MESAS', active: isActive('mesaTickets'), onPress: () => navigate('MesaTickets'), icon: <IconTable size={14} color={ic(isActive('mesaTickets'))} /> },
+    ...(isGeneralAdmin ? [{ id: 'mesas', label: 'DEPENDENCIAS', active: isActive('mesas'), onPress: () => navigate('Mesas'), icon: <IconLayers size={14} color={ic(isActive('mesas'))} /> } as const] : []),
+    { id: 'usuarios', label: 'USUARIOS', active: isActive('usuarios'), onPress: () => navigate('Usuarios'), icon: <IconUsers size={14} color={ic(isActive('usuarios'))} /> },
+    { id: 'categorias', label: 'CATEGORÍAS', active: isActive('categorias'), onPress: () => navigate('Categorias'), icon: <IconTag size={14} color={ic(isActive('categorias'))} /> },
+    { id: 'import', label: 'IMPORT', active: isActive('import'), onPress: () => navigate('Import'), icon: <IconUpload size={14} color={ic(isActive('import'))} /> },
+  ];
+
+  return (
+    <AppShell
       items={allItems as never}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Administrador') as string, role: profile.rol, avatarUrl: (profile as any).avatar_url } : undefined}
       onLogout={signOut}
       onUserPress={onPerfil}
-    />
-  );
-
-  React.useEffect(() => { if (isDesktop) setDrawerOpen(false); }, [isDesktop]);
-  React.useEffect(() => { setDrawerOpen(false); }, [activeName]);
-
-  if (isDesktop) {
-    return (
-      <View style={w.root}>
-        <View style={w.sidebar}>{sidebarContent}</View>
-        <View style={w.main}>
-          <View style={w.topClockBar}><Text style={w.topTitle}>{activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'Mesas' ? 'Dependencias' : activeName === 'Usuarios' ? 'Usuarios' : activeName === 'Categorias' ? 'Categorías' : activeName === 'Import' ? 'Import' : 'Mesas'}</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><Clock /></View></View>
-          <View style={{ flex: 1 }}>
-            <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
-              <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
-              {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
-              <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
-              <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-              <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
-              <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-              <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
-            </Stack.Navigator>
-          </View>
-        </View>
-      </View>
-    );
-  }
-
-  const mobileTitle = activeName === 'Perfil' ? 'Mi perfil' : activeName === 'DetalleTicket' ? 'Detalle' : activeName === 'Mesas' ? 'DEPENDENCIAS' : activeName === 'MesaTickets' ? 'MESAS' : activeName === 'Categorias' ? 'CATEGORÍAS' : activeName === 'Import' ? 'IMPORT' : 'USUARIOS';
-  return (
-    <View style={w.rootMobile}>
-      <View style={w.mobileTopBar}>
-        <Pressable onPress={() => setDrawerOpen((v) => !v)} style={w.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
-          <Text style={w.burgerText}>☰</Text>
-        </Pressable>
-        <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} /><View style={w.clockMobile}><Clock size={13} /></View></View>
-      </View>
-      <View style={w.mainMobile}>
-        <View style={{ flex: 1 }}>
-          <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
-            <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
-            {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
-            <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
-            <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-            <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
-            <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-            <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
-          </Stack.Navigator>
-        </View>
-        {drawerOpen ? (
-          <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
-            <View style={w.drawer}>{sidebarContent}</View>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
+      topTitle={titleFor(activeName)}
+      headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
+    >
+      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
+        <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
+        {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
+        <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
+        <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
+        <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
+        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+        <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
+      </Stack.Navigator>
+    </AppShell>
   );
 }
 
 const w = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: theme.colors.bg },
-  rootMobile: { flex: 1, flexDirection: 'column', backgroundColor: theme.colors.bg },
-  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, paddingHorizontal: 16, paddingBottom: 16, paddingTop: 0 },
-  main: { flex: 1, minWidth: 0 as unknown as number, flexDirection: 'column' as const },
-  mainMobile: { flex: 1, minWidth: 0 as unknown as number, position: 'relative', flexDirection: 'column' as const },
-  mobileTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56, zIndex: 100, elevation: 10 },
-  burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  burgerText: { fontSize: 18, color: theme.colors.text },
-  burgerSpacer: { width: 44 },
-  clockMobile: { minWidth: 80, alignItems: 'flex-end' },
-  topClockBar: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, zIndex: 100, elevation: 10 },
-  topTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
-  mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
-  drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' },
   placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: theme.colors.muted },
 });
