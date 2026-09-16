@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail } from '@helpdesk/shared';
-import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
+import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, IaValidationCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -50,6 +50,8 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const [mesaNombre, setMesaNombre] = useState('');
   const [mesas, setMesas] = useState<Record<number, string>>({});
   const [categorias, setCategorias] = useState<Record<number, string>>({});
+  const [mesasRaw, setMesasRaw] = useState<{ id: number; nombre: string }[]>([]);
+  const [categoriasRaw, setCategoriasRaw] = useState<{ id: number; dominio: string; subcategoria: string }[]>([]);
   const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -67,10 +69,12 @@ export function DetalleTecnicoScreen({ route }: Props) {
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
+        setMesasRaw(ms.map((x) => ({ id: x.id, nombre: x.nombre })));
       } catch {}
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
+        setCategoriasRaw(cats.map((c) => ({ id: c.id, dominio: c.dominio, subcategoria: c.subcategoria })));
       } catch {}
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }, [id]);
@@ -278,6 +282,16 @@ export function DetalleTecnicoScreen({ route }: Props) {
   return (
     <ScrollView contentContainerStyle={s.container} style={{ backgroundColor: theme.colors.bg }}>
       {header}
+      <IaValidationCard
+        supabase={supabase}
+        ticketId={id}
+        ticketMesaId={ticket.mesaId ?? null}
+        ticketCategoriaId={ticket.categoriaId ?? null}
+        validadorId={profile?.id ?? null}
+        mesas={mesasRaw}
+        categorias={categoriasRaw}
+        onValidated={() => load()}
+      />
       <View style={[isWide ? { flexDirection:'row', gap: theme.space[4], alignItems:'flex-start' } : { gap: theme.space[3] }]}>
         {left}{right}
       </View>
