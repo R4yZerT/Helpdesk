@@ -52,8 +52,14 @@ begin
   -- new.raw_user_meta_data->>'password' NO existe. En su lugar, Supabase pasa el intento
   -- vía `auth.hook.before_user_created` con payload JSON que incluye `user` + `password`.
   -- Para compatibilidad con trigger directo sobre auth.users, validamos lo que tengamos.
-  -- Si no hay password disponible aquí, no bloqueamos (la validación real está en Edge Function auth-validate).
-  -- Este hook actúa como segunda capa para registros vía supabase.auth.signUp que sí exponen password al hook.
+  -- NOTA RF-01 (Fase 3): el trigger sobre auth.users NUNCA ve el plaintext en el
+  -- caso general (solo hash bcrypt en encrypted_password), así que este hook NO
+  -- puede verificar HIBP aquí. El enforcement real vive en: (1) Edges
+  -- admin-create-user / admin-update-user (HIBP fail-closed en servidor,
+  -- no-bypasseable), (2) validatePassword() de shared en cliente antes de
+  -- updateUser, (3) Edge auth-validate como Auth Hook before-user-created para
+  -- signups (ver config.toml). Este hook conserva checks locales como red de
+  -- seguridad cuando el plaintext sí viaja en el contexto.
   -- Intentamos leer password de varias fuentes:
   pw := coalesce(
     current_setting('request.jwt.claims', true)::jsonb->>'password',
@@ -61,7 +67,9 @@ begin
     ''
   );
 
-  -- Si no tenemos password en este contexto, dejar pasar (Edge Function ya validó)
+  -- Sin plaintext disponible: no hay nada que verificar localmente.
+  -- NO rechazar (bloquearía cualquier alta vía Auth API); el HIBP ya aplica
+  -- en las Edges de escritura de contraseña.
   if pw = '' or pw is null then
     return new;
   end if;

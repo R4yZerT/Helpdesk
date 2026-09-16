@@ -54,6 +54,36 @@ function validatePasswordNIST(pw: string, ctx:{email?:string;nombre?:string;rol?
   return reasons;
 }
 
+// RF-01: HIBP k-anonimity en servidor (fail-closed). El trigger DB no ve plaintext,
+// así que esta Edge es el punto de enforcement no-bypasseable para altas por admin.
+async function sha1HexUpper(text: string): Promise<string> {
+  const data = new TextEncoder().encode(text.normalize('NFKC'));
+  const buf = await crypto.subtle.digest('SHA-1', data);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+}
+async function checkPwnedServer(pw: string): Promise<{ pwned: boolean; count: number }> {
+  const hash = await sha1HexUpper(pw);
+  const prefix = hash.slice(0, 5);
+  const suffix = hash.slice(5);
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 3000);
+  try {
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'Add-Padding': 'true' },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HIBP ${res.status}`);
+    const bodyText = await res.text();
+    for (const line of bodyText.split('\n')) {
+      const [s, c] = line.trim().split(':');
+      if (s === suffix) return { pwned: true, count: parseInt(c, 10) };
+    }
+    return { pwned: false, count: 0 };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const headers = corsHeaders(req.headers.get('origin') ?? undefined);
   if (req.method === 'OPTIONS') return new Response(null, { headers });
@@ -105,6 +135,15 @@ Deno.serve(async (req: Request) => {
   else {
     const pwReasons = validatePasswordNIST(password, { email, nombre: fullName, rol: rolIn });
     if (pwReasons.length) errs.password = pwReasons.join(' · ');
+    else {
+      // Fail-closed: si HIBP no responde, rechazar y pedir reintentar (no aceptar dudoso)
+      try {
+        const { pwned, count } = await checkPwnedServer(password);
+        if (pwned) errs.password = `Apareció en ${count.toLocaleString('es-CO')} filtraciones — elige otra`;
+      } catch {
+        return Response.json({ error: 'No se pudo verificar contra filtraciones, intenta de nuevo' }, { status: 503, headers });
+      }
+    }
   }
   const rolDb = MAP_ROL[rolIn];
   if (!rolDb || !ALLOWED_ROLES_DB.has(rolDb)) errs.rol = 'Rol inválido';

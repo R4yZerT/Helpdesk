@@ -2,6 +2,17 @@
 // Valida contraseña contra HIBP k-anonimity (fail-closed) + checks síncronos
 // Se invoca desde el cliente antes de signUp / update password; también como fallback del hook
 // Si HIBP falla por red, responde 503 para que UI pida reintentar (no aceptar password dudoso)
+//
+// DESPLIEGUE COMO AUTH HOOK (RF-01 Fase 3, cierra bypass de signUp directo):
+// 1. supabase functions deploy auth-validate
+// 2. Dashboard → Authentication → Hooks → "Before user created" → habilitar,
+//    URL = https://<ref>.supabase.co/functions/v1/auth-validate, secreto compartido.
+// 3. Esta Edge responde {ok,reasons}; el hook de Auth la invoca en cada signup y
+//    rechaza el registro si ok=false. Ver ejemplo comentado en supabase/config.toml
+//    ([auth.hook.before_user_created]).
+// NOTA: el formato de respuesta del Auth Hook before-user-created de Supabase Auth
+// espera {decision} en versiones nuevas; si el dashboard rechaza este payload,
+// envolver: decision:"reject" cuando ok=false. Ajustar aquí tras probar en staging.
 
 const COMMON = new Set([
   'password','123456','123456789','qwerty','12345678','12345','1234567','password1',
