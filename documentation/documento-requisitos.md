@@ -73,7 +73,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-19 | Predecir picos de carga por hora/día/mes por mesa y dependencia | S |
 | RF-20 | Detectar patrones de demanda por categoría normalizada (usa la tabla maestra `ticket_categories`) | S |
 | RF-21 | Alertar anomalías: picos inusuales y tickets estancados (sin resolver > X días) | S |
-| RF-22 | Sugerencia automática de categoría/prioridad al crear ticket (modelo supervisado). Estado Fase 3: implementado BETO-primero con fallback a reglas (`shared/src/ia.ts predecirCategoria`, fuente visible en UI web+móvil como "modelo BETO"/"reglas locales"). Limitación conocida (Could): la fuente no se persiste (sin telemetría modelo-vs-reglas) y BETO requiere `ml/src/serve.py` desplegado + `EXPO_PUBLIC_BETO_URL`; sin eso opera solo con reglas | C |
+| RF-22 | Sugerencia automática de categoría/prioridad al crear ticket (modelo supervisado). Estado cierre: BETO-primero con fallback a reglas (`shared/src/ia.ts predecirCategoria`, fuente visible en UI web+móvil) + telemetría persistida por ticket en `ticket_ia_feedback` (fuente/confianza/sugerido) con validación del técnico (`IaValidationCard`: confirma o reclasifica; `dataset_entrenamiento_ia` + `ml/src/export_dataset_validado.py` solo con validados). Resta desplegar `ml/src/serve.py` + `EXPO_PUBLIC_BETO_URL`; sin eso opera solo con reglas | C |
 
 ### Módulo 6 — Notificaciones y catálogos
 
