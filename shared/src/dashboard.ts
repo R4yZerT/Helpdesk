@@ -250,6 +250,37 @@ export async function getPronosticoSemanal(client: SupabaseClient): Promise<Pron
   } catch (_) { return []; }
 }
 
+export type PronosticoSerieResumen = {
+  serie: string; total7d: number; diasPico: number;
+  maxForecast: number; maxFecha: string | null; modeloVersion: string | null;
+};
+
+// RF-19/B3 — resume el pronóstico ML por serie para el Dashboard.
+// Puro y testeado: agrupa días por serie (7 próximos días por serie).
+export function resumirPronosticoML(dias: PronosticoDia[]): PronosticoSerieResumen[] {
+  const porSerie = new Map<string, PronosticoDia[]>();
+  for (const d of dias) {
+    const arr = porSerie.get(d.serie) ?? [];
+    arr.push(d);
+    porSerie.set(d.serie, arr);
+  }
+  const out: PronosticoSerieResumen[] = [];
+  for (const [serie, arr] of porSerie) {
+    const prox = [...arr].sort((a, b) => (a.fecha < b.fecha ? -1 : 1)).slice(0, 7);
+    let pico = prox[0] ?? null;
+    for (const d of prox) if (d.forecast > (pico?.forecast ?? -Infinity)) pico = d;
+    out.push({
+      serie,
+      total7d: Math.round(prox.reduce((s, d) => s + d.forecast, 0) * 10) / 10,
+      diasPico: prox.filter((d) => d.esPico).length,
+      maxForecast: pico?.forecast ?? 0,
+      maxFecha: pico?.fecha ?? null,
+      modeloVersion: pico?.modeloVersion ?? prox[0]?.modeloVersion ?? null,
+    });
+  }
+  return out.sort((a, b) => b.total7d - a.total7d);
+}
+
 export async function marcarAlertaIA(client: any, id: number, estado: 'vista' | 'resuelta'): Promise<void> {
   const { error } = await client.from('alertas_ia').update({ estado }).eq('id', id);
   if (error) throw new Error(error.message);

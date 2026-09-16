@@ -9,6 +9,7 @@ import {
   marcarAlertaIA,
   generarAlertasIA,
   getPronosticoSemanal,
+  resumirPronosticoML,
 } from './dashboard.js';
 
 // Builder encadenable thenable con todos los filtros usados por dashboard.ts
@@ -123,5 +124,18 @@ describe('dashboard pronóstico semanal', () => {
     expect(await getPronosticoSemanal(ok)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1' }]);
     const vacio = { from: () => mockQuery({ data: null }) } as never;
     expect(await getPronosticoSemanal(vacio)).toEqual([]);
+  });
+
+  it('resumirPronosticoML agrupa por serie: total 7d, picos, peor día y versión', () => {
+    const dias = [
+      { fecha: '2026-09-16', serie: 'global', forecast: 10, nivel: 'baja', esPico: false, modeloVersion: 'v1' },
+      { fecha: '2026-09-17', serie: 'global', forecast: 30, nivel: 'pico', esPico: true, modeloVersion: 'v1' },
+      { fecha: '2026-09-16', serie: 'dep', forecast: 5, nivel: 'baja', esPico: false, modeloVersion: 'v1' },
+    ];
+    const r = resumirPronosticoML(dias);
+    expect(r).toHaveLength(2);
+    expect(r[0]).toEqual({ serie: 'global', total7d: 40, diasPico: 1, maxForecast: 30, maxFecha: '2026-09-17', modeloVersion: 'v1' });
+    expect(r[1].serie).toBe('dep');
+    expect(resumirPronosticoML([])).toEqual([]);
   });
 });

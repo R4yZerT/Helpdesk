@@ -3,13 +3,17 @@ import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { Card } from '../components.js';
-import type { PicoPrediccion, PicosResumen } from '../../dashboard.js';
+import type { PicoPrediccion, PicosResumen, PronosticoDia } from '../../dashboard.js';
+import { resumirPronosticoML } from '../../dashboard.js';
 
 const DOW = ['Lun','Mar','Mié','Jue','Vie'];
 const NIVEL_COLOR: Record<string,string> = { baja:'#EEF2F7', media:'#A0CAFF', alta:theme.colors.primary, pico:theme.colors.accent };
 
-export function PrediccionPicos({ picos, resumen }: { picos: PicoPrediccion[]; resumen: PicosResumen[] }) {
+export function PrediccionPicos({ picos, resumen, ml }: { picos: PicoPrediccion[]; resumen: PicosResumen[]; ml?: PronosticoDia[] }) {
   const top = picos.filter(p=>p.esPico).slice(0,8);
+  // RF-19/B3 — pronóstico ML (tabla pronosticos_picos); ausente = pipeline sin correr
+  const mlResumen = ml && ml.length ? resumirPronosticoML(ml) : [];
+  const mlVersion = ml?.find(d=>d.modeloVersion)?.modeloVersion ?? null;
   if (!picos.length && !resumen.length) return (
     <Card><Text style={s.title}>Predicción de picos (RF-19) — sin datos</Text><Text style={s.muted}>No hay historial suficiente (30d) para predecir.</Text></Card>
   );
@@ -47,6 +51,24 @@ export function PrediccionPicos({ picos, resumen }: { picos: PicoPrediccion[]; r
         </>
       )}
       {!top.length && <Text style={s.muted}>Sin franjas en nivel alta/pico — carga distribuida.</Text>}
+      {/* RF-19/B3 — pronóstico ML 7 días (fuente: modelo, no heurística) */}
+      <Text style={[s.title,{marginTop:4}]}>Pronóstico ML · próximos 7 días (RF-19)</Text>
+      {mlResumen.length ? (
+        <View style={{ gap: 4 }}>
+          <View style={[s.row,s.headerRow]}><Text style={[s.cellMesa,{fontWeight:'800'}]}>Serie</Text><Text style={s.cellVal}>7d</Text><Text style={s.cellVal}>Picos</Text><Text style={s.cellSlot}>Peor día</Text></View>
+          {mlResumen.slice(0,6).map((r)=>(
+            <View key={r.serie} style={[s.row,{backgroundColor:'#F8FAFC'}]}>
+              <Text style={s.cellMesa} numberOfLines={1}>{r.serie}</Text>
+              <Text style={s.cellVal}>{r.total7d}</Text>
+              <Text style={s.cellVal}>{r.diasPico}</Text>
+              <Text style={s.cellSlot}>{r.maxFecha ?? '—'} ({r.maxForecast})</Text>
+            </View>
+          ))}
+          <Text style={s.muted}>Fuente: modelo {mlVersion ?? 'desconocida'} (tabla pronosticos_picos).</Text>
+        </View>
+      ) : (
+        <Text style={s.muted}>Sin pronóstico ML — corre `pnpm forecast:refresh` y `pnpm upload:pronostico:push`.</Text>
+      )}
     </Card>
   );
 }

@@ -4,6 +4,7 @@
 //      pnpm run upload:pronostico -- --push --version rf-forecast-20260915
 import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
+import { buildPronosticoRows } from '../shared/src/pronostico-upload.js';
 
 const ROOT = path.resolve(import.meta.dirname ?? '.', '..');
 const FORECAST = path.join(ROOT, 'ml/models/forecast/forecast_7d.json');
@@ -17,14 +18,12 @@ function load(): Record<string, Dia[]> {
     process.exit(1);
   }
   const data = JSON.parse(readFileSync(FORECAST, 'utf-8')) as Record<string, Dia[]>;
-  // Validación de schema mínima
-  for (const [serie, dias] of Object.entries(data)) {
-    for (const d of dias) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha) || typeof d.forecast !== 'number' || !d.nivel) {
-        console.error(`[pronostico] fila inválida en serie ${serie}: ${JSON.stringify(d)}`);
-        process.exit(1);
-      }
-    }
+  // Validación + guards de vacío en shared (lanza Error descriptivo, nunca push silencioso)
+  try {
+    buildPronosticoRows(data, 'check');
+  } catch (e) {
+    console.error((e as Error).message);
+    process.exit(1);
   }
   return data;
 }
@@ -35,9 +34,7 @@ async function main() {
   const version = vi >= 0 && process.argv[vi + 1] ? process.argv[vi + 1] : `rf-forecast-${new Date().toISOString().slice(0, 10)}`;
   const data = load();
 
-  const rows = Object.entries(data).flatMap(([serie, dias]) =>
-    dias.map((d) => ({ fecha: d.fecha, serie, forecast: d.forecast, nivel: d.nivel, es_pico: d.es_pico, modelo_version: version })),
-  );
+  const rows = buildPronosticoRows(data, version);
   const picos = rows.filter((r) => r.es_pico && r.nivel === 'pico');
   console.log(`[pronostico] series=${Object.keys(data).length} filas=${rows.length} picos=${picos.length} version=${version}`);
   for (const p of picos) console.log(`  pico ${p.fecha} [${p.serie}]: ~${p.forecast}`);
