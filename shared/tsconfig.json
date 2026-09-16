@@ -5,6 +5,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "noEmit": true,
+    "types": ["node", "react", "react-native"],
     "ignoreDeprecations": "6.0"
   },
   "include": [

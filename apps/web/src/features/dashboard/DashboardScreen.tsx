@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
+import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -30,6 +30,8 @@ export function DashboardScreen() {
   const [carga, setCarga] = React.useState<any[]>([]);
   const [picos, setPicos] = React.useState<any[]>([]);
   const [picosResumen, setPicosResumen] = React.useState<any[]>([]);
+  // RF-19/B3 — pronóstico ML (tabla pronosticos_picos; [] si el pipeline no se corrió)
+  const [pronosticoML, setPronosticoML] = React.useState<PronosticoDia[]>([]);
   const [patrones, setPatrones] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
   const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
@@ -54,7 +56,7 @@ export function DashboardScreen() {
 
   const load = React.useCallback(async () => {
     try {
-      const [k, e, p, ev, c, pp, pr, pat, a, ms] = await Promise.all([
+      const [k, e, p, ev, c, pp, pr, pat, a, ms, ml] = await Promise.all([
         getKPIs(supabase, filters),
         getStatsPorEstado(supabase, filters),
         getStatsPorPrioridad(supabase, filters),
@@ -65,8 +67,9 @@ export function DashboardScreen() {
         getPatronesCategoria(supabase, { ...filters, dias: 30 }),
         listAlertasIA(supabase, { estado: 'nueva' }),
         mesas.length ? Promise.resolve(mesas) : fetchMesas(supabase),
+        getPronosticoSemanal(supabase),
       ]);
-      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a);
+      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a); setPronosticoML(ml);
       if (!mesas.length) setMesas(ms as any);
     } catch (err) {
       console.warn('[Dashboard] load', err);
@@ -74,6 +77,11 @@ export function DashboardScreen() {
   }, [filters, mesas.length]);
 
   React.useEffect(() => { setLoading(true); load(); }, [load]);
+  React.useEffect(() => {
+    // RF-24: tiempo real — recargar tablero ante cambios en tickets
+    const ch = supabase.channel('dashboard-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => load()).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [load]);
   React.useEffect(() => { // initial mesas + categorías + técnicos
     fetchMesas(supabase).then(setMesas).catch(() => {});
     (supabase.from('ticket_categories').select('id,subcategoria,dominio').eq('activa', true).order('subcategoria') as any).then(({ data }: any) => {
@@ -164,7 +172,7 @@ export function DashboardScreen() {
         <View style={{ flex: 5 }}><BarsPrioridad data={porPrioridad} /></View>
       </View>
       <AreaEvolucion data={evolucion} mesas={mesas} />
-      <PrediccionPicos picos={picos} resumen={picosResumen} />
+      <PrediccionPicos picos={picos} resumen={picosResumen} ml={pronosticoML} />
       <PatronesCategoria data={patrones} />
       <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
         <View style={{ flex: 7 }}><HeatmapCarga data={carga} /></View>

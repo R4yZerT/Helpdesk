@@ -3,7 +3,7 @@
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
@@ -27,7 +27,10 @@ export function AdminMesasScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
   const { profile } = useAuth();
-  const secretariaId = (profile as unknown as { mesa_id?: number | null; mesaId?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
+  // RF-30: el administrador ve todas las mesas (sin filtro por dependencia propia)
+  const rol = (profile as unknown as { rol?: string } | null)?.rol ?? null;
+  const mesaPropia = (profile as unknown as { mesa_id?: number | null; mesaId?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
+  const secretariaId = resolveSecretariaId(rol, mesaPropia);
   const [q, setQ] = useState('');
   const [qDeb, setQDeb] = useState('');
   const [activa, setActiva] = useState<boolean | 'todos'>('todos');

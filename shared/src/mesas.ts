@@ -40,8 +40,15 @@ export type ListMesasParams = {
   activa?: boolean | 'todos';
   page?: number; // 1-indexed
   pageSize?: number; // default 20
-  secretariaId?: number; // si admin tiene dependencia asignada, solo esa mesa
+  secretariaId?: number; // si NO es administrador y tiene dependencia asignada, solo esa mesa
 };
+
+/** RF-30: el administrador ve todas las mesas — el filtro por dependencia propia
+ * solo aplica a roles no-administrador con mesa asignada. */
+export function resolveSecretariaId(rol: string | null, mesaId: number | null): number | null {
+  if (rol === 'administrador') return null;
+  return mesaId;
+}
 
 export async function listMesasPaginated(
   supabase: SupabaseClient,

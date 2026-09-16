@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateCreateMesa, validateUpdateMesa, isCreateMesaValid, isUpdateMesaValid } from './mesas.js';
+import { validateCreateMesa, validateUpdateMesa, isCreateMesaValid, isUpdateMesaValid, resolveSecretariaId } from './mesas.js';
 
 describe('mesas RF-29', () => {
   it('rechaza nombre corto', () => {
@@ -23,6 +23,26 @@ describe('mesas RF-29', () => {
   });
   it('limite 60 exacto ok', () => {
     expect(isCreateMesaValid({ nombre: 'a'.repeat(60) })).toBe(true);
+  });
+});
+
+describe('mesas RF-30 (admin ve todas)', () => {
+  it('administrador con dependencia asignada ve todas (sin filtro)', () => {
+    expect(resolveSecretariaId('administrador', 3)).toBeNull();
+  });
+  it('administrador sin dependencia ve todas', () => {
+    expect(resolveSecretariaId('administrador', null)).toBeNull();
+  });
+  it('no-admin con dependencia solo ve la suya', () => {
+    expect(resolveSecretariaId('jefe', 3)).toBe(3);
+    expect(resolveSecretariaId('tecnico', 2)).toBe(2);
+  });
+  it('no-admin sin dependencia ve todas', () => {
+    expect(resolveSecretariaId('jefe', null)).toBeNull();
+  });
+  it('rol desconocido/nulo fail-closed: conserva filtro', () => {
+    expect(resolveSecretariaId(null, 3)).toBe(3);
+    expect(resolveSecretariaId('fantasma', 3)).toBe(3);
   });
 });
 

@@ -188,6 +188,16 @@ minimum_password_length = 8
 # Sin composición forzada (NIST prohíbe complexity rules); validación robusta en shared/src/password.ts + hook servidor
 password_requirements = ""
 
+# RF-01 (Fase 3): enforcement HIBP no-bypasseable para signups directos a Auth API.
+# Desplegar Edge auth-validate y cablearla como Auth Hook before-user-created
+# (Dashboard → Authentication → Hooks, o Management API). Ejemplo local:
+# [auth.hook.before_user_created]
+# enabled = true
+# uri = "pg-functions://postgres/public/auth-validate-hook"
+# secrets = "env(AUTH_HOOK_SECRET)"
+# NOTA: el password change self-service (updateUser) no tiene hook en Supabase Auth;
+# ahí el enforcement es validatePassword() en cliente + Edges admin en servidor.
+
 # Configure passkey sign-ins.
 # [auth.passkey]
 # enabled = false

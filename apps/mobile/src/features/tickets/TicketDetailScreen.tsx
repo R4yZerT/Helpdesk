@@ -222,6 +222,15 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const tiempoDiagnostico = conActor(evDiagnostico?.creadoEn, evDiagnostico?.usuarioId);
   const tiempoSolucion = conActor(ticket.fechaResolucion ?? evSolucion?.creadoEn, evSolucion?.usuarioId);
   const tiempoCierre = conActor(evCierre?.creadoEn, evCierre?.usuarioId);
+  // Etiqueta corta para adjuntos no-imagen (el thumb <Image> salía roto en PDF/DOC/XLS)
+  const etiquetaAdjunto = (mime?: string | null) => {
+    const m = String(mime ?? '');
+    if (m === 'application/pdf') return 'PDF';
+    if (m.includes('word')) return 'DOC';
+    if (m.includes('sheet') || m.includes('excel')) return 'XLS';
+    if (m === 'text/plain') return 'TXT';
+    return 'FILE';
+  };
   const onOpenAdjunto = async (a: { storagePath: string }) => {
     try {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
@@ -314,12 +323,16 @@ export function TicketDetailScreen({ route, navigation }: Props) {
             <View style={{ gap: 8 }}>
               {adjuntos.map((a) => (
                 <Pressable key={a.id} onPress={() => onOpenAdjunto(a)} style={s.adjRow}>
-                  <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={s.adjThumb} />
+                  {String(a.mime ?? '').startsWith('image/') ? (
+                    <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={s.adjThumb} />
+                  ) : (
+                    <View style={s.adjBadge}><Text style={s.adjBadgeText}>{etiquetaAdjunto(a.mime)}</Text></View>
+                  )}
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={s.adjName}>{a.nombre}</Text>
                     <Text style={s.mutedSmall}>{(a.size / 1024).toFixed(0)} KB · {a.mime}</Text>
                   </View>
-                  <Text style={s.adjLink}>Ver</Text>
+                  <Text style={s.adjLink}>{a.mime === 'application/pdf' ? 'Ver PDF' : 'Ver'}</Text>
                 </Pressable>
               ))}
             </View>
@@ -521,6 +534,8 @@ const s = StyleSheet.create({
   attrValue: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', flex: 1 },
   adjRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 8 },
   adjThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.border } as any,
+  adjBadge: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
+  adjBadgeText: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
   adjName: { fontSize: 12, fontWeight: '700', color: theme.colors.text, flex: 1 },
   adjLink: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
 });

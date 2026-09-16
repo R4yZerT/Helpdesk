@@ -13,6 +13,7 @@ import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { AdminStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { RequirePermission } from '../../components/RequirePermission';
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 
@@ -102,10 +103,20 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
 }
 
 export function AdminNavigator() {
-  if (Platform.OS === 'web') return <AdminWeb />;
+  // RF-05 (Fase 3 A3): guard por permiso aunque el router ya filtre por rol —
+  // profile:manage solo lo tiene administrador (defensa en profundidad).
+  if (Platform.OS === 'web') {
+    return (
+      <RequirePermission permission="profile:manage">
+        <AdminWeb />
+      </RequirePermission>
+    );
+  }
   return (
-    <Stack.Navigator screenOptions={screenOpts}>
-      <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
-    </Stack.Navigator>
+    <RequirePermission permission="profile:manage">
+      <Stack.Navigator screenOptions={screenOpts}>
+        <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
+      </Stack.Navigator>
+    </RequirePermission>
   );
 }

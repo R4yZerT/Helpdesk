@@ -1,9 +1,8 @@
-// RF-26 web — Importación de histórico: upload CSV (latin-1), preview, mapeo de columnas y log de auditoría.
-// El insert real a tickets se ejecuta vía CLI `pnpm run import:historico -- --push` (parquet + service_role);
-// esta pantalla valida el archivo en cliente y registra la corrida en `import_historico_log`.
+// RF-26 web — Importación de histórico: upload CSV (latin-1), preview, mapeo de columnas,
+// insert real a `tickets` en batches + log de auditoría en `import_historico_log`.
 import * as React from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { theme } from '@helpdesk/shared';
+import { theme, fetchCategorias, fetchMesas, mapImportRowsToTickets } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -59,6 +58,7 @@ export function AdminImportScreen() {
   const [fileName, setFileName] = React.useState<string | null>(null);
   const [map, setMap] = React.useState({ texto: -1, categoria: -1, dependencia: -1, fecha: -1 });
   const [saving, setSaving] = React.useState(false);
+  const [importing, setImporting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
   const [history, setHistory] = React.useState<ImportLog[]>([]);
@@ -149,7 +149,7 @@ export function AdminImportScreen() {
         iniciado_por: iniciadoPor,
       });
       if (e) throw e;
-      setOk(`Corrida registrada: ${stats.clean} limpias, ${stats.cuarentena} en cuarentena, ${stats.clases} clases. Ejecuta el push real con \`pnpm run import:historico -- --push\`.`);
+      setOk(`Corrida registrada: ${stats.clean} limpias, ${stats.cuarentena} en cuarentena, ${stats.clases} clases. Usa «Importar tickets válidos a BD» para el insert real.`);
       await loadHistory();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al registrar la importación');
@@ -158,11 +158,52 @@ export function AdminImportScreen() {
     }
   }, [stats, fileName, profile, loadHistory]);
 
+  // A5: insert real a `tickets` (batches de 200). Requiere policy
+  // tickets_insert_admin_import (migración 20261016000001); sin ella RLS rechaza
+  // al administrador con 42501 aunque la pantalla exija profile:manage.
+  const onImport = React.useCallback(async () => {
+    if (rows.length === 0 || map.texto < 0) {
+      setError('Selecciona un CSV con columna de texto mapeada antes de importar.');
+      return;
+    }
+    setImporting(true);
+    setError(null); setOk(null);
+    try {
+      const adminId = (profile as unknown as { id?: string } | null)?.id ?? null;
+      if (!adminId) throw new Error('Sesión sin perfil (reingresa).');
+      const [cats, mss] = await Promise.all([fetchCategorias(supabase as any), fetchMesas(supabase as any)]);
+      const { valid, cuarentena } = mapImportRowsToTickets(rows, map, cats as any, mss as any, adminId);
+      if (valid.length === 0) throw new Error(`Nada que importar: ${cuarentena} filas en cuarentena (revisa el mapeo categoría/dependencia).`);
+      let inserted = 0;
+      for (let i = 0; i < valid.length; i += 200) {
+        const batch = valid.slice(i, i + 200);
+        const { error: e } = await supabase.from('tickets').insert(batch as any);
+        if (e) throw e;
+        inserted += batch.length;
+      }
+      const { error: logErr } = await supabase.from('import_historico_log').insert({
+        archivo: fileName ?? 'importacion',
+        filas_raw: rows.length,
+        filas_clean: inserted,
+        filas_cuarentena: cuarentena,
+        clases: stats?.clases ?? 0,
+        iniciado_por: adminId,
+      });
+      if (logErr) throw logErr;
+      setOk(`Importados ${inserted} tickets en BD (cuarentena: ${cuarentena}). Corrida registrada en el log.`);
+      await loadHistory();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al importar tickets');
+    } finally {
+      setImporting(false);
+    }
+  }, [rows, map, fileName, stats, profile, loadHistory]);
+
   return (
     <ScrollView style={s.wrap} contentContainerStyle={s.content}>
       <Text style={s.h1}>Importar histórico</Text>
       <Text style={s.subtitle}>
-        Sube el CSV del histórico (latin-1 → UTF-8 NFD, igual que `ml/src/cleaning.py`). Se valida, se mapea y se registra la corrida en el log de auditoría (RF-26).
+        Sube el CSV del histórico (latin-1 → UTF-8 NFD, igual que `ml/src/cleaning.py`). Se valida, se mapea, se insertan los tickets válidos en BD y se registra la corrida en el log de auditoría (RF-26).
       </Text>
 
       <Pressable onPress={pickFile} style={s.btnPrimary}>
@@ -194,8 +235,11 @@ export function AdminImportScreen() {
             </Text>
           ))}
 
-          <Pressable onPress={onRegister} disabled={saving} style={[s.btnPrimary, saving && { opacity: 0.6 }]}>
+          <Pressable onPress={onRegister} disabled={saving || importing} style={[s.btnPrimary, (saving || importing) && { opacity: 0.6 }]}>
             <Text style={s.btnPrimaryText}>{saving ? 'Registrando…' : 'Registrar corrida en el log'}</Text>
+          </Pressable>
+          <Pressable onPress={onImport} disabled={importing || saving} style={[s.btnPrimary, (importing || saving) && { opacity: 0.6 }]}>
+            <Text style={s.btnPrimaryText}>{importing ? 'Importando…' : 'Importar tickets válidos a BD'}</Text>
           </Pressable>
         </View>
       ) : null}

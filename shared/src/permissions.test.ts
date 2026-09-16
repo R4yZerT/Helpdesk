@@ -9,6 +9,13 @@ describe('permissions.can', () => {
     expect(canAny(null, ['ticket:create'])).toBe(false);
     expect(canAll(undefined, ['ticket:create'])).toBe(false);
   });
+  it('RF-05 A3: rol desconocido/corrupto niega sin reventar (fail-closed)', () => {
+    const corrupto = 'superadmin' as never;
+    expect(can(corrupto, 'profile:manage')).toBe(false);
+    expect(can(corrupto, 'ticket:create')).toBe(false);
+    expect(canAny(corrupto, ['profile:manage'])).toBe(false);
+    expect(canAll(corrupto, ['ticket:create'])).toBe(false);
+  });
   it('usuario: crea y ve lo propio, sin dashboard ni gestión', () => {
     expect(can('usuario', 'ticket:create')).toBe(true);
     expect(can('usuario', 'ticket:listOwn')).toBe(true);
