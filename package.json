@@ -23,7 +23,8 @@
     "upload:pronostico": "tsx scripts/upload-pronostico.ts",
     "upload:pronostico:push": "tsx scripts/upload-pronostico.ts -- --push",
     "forecast:refresh": "python3 ml/src/forecast_picos.py && pnpm upload:pronostico",
-    "forecast:refresh:push": "python3 ml/src/forecast_picos.py && pnpm upload:pronostico:push"
+    "forecast:refresh:push": "python3 ml/src/forecast_picos.py && pnpm upload:pronostico:push",
+    "forecast:live": "python3 ml/src/export_tickets_live.py --output data/processed/tickets_live.parquet && python3 ml/src/forecast_picos.py --input data/processed/tickets_live.parquet && pnpm upload:pronostico"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.18.0",

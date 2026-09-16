@@ -1,0 +1,50 @@
+# Forecast semanal automatizado (RF-19).
+# Cada lunes 06:00 UTC: exporta tickets vivos -> regenera el pronóstico
+# de 7 días -> lo sube a public.pronosticos_picos.
+# Requiere secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+name: forecast-semanal
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instala deps ML
+        run: pip install pandas pyarrow scikit-learn joblib
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Instala deps JS
+        run: pnpm install --frozen-lockfile
+
+      - name: Exporta tickets vivos
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 ml/src/export_tickets_live.py --output data/processed/tickets_live.parquet
+
+      - name: Regenera forecast
+        run: python3 ml/src/forecast_picos.py --input data/processed/tickets_live.parquet
+
+      - name: Sube pronóstico
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: pnpm upload:pronostico:push
