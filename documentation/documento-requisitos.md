@@ -73,13 +73,13 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-19 | Predecir picos de carga por hora/día/mes por mesa y dependencia | S |
 | RF-20 | Detectar patrones de demanda por categoría normalizada (usa la tabla maestra `ticket_categories`) | S |
 | RF-21 | Alertar anomalías: picos inusuales y tickets estancados (sin resolver > X días) | S |
-| RF-22 | Sugerencia automática de categoría/prioridad al crear ticket (modelo supervisado) | C |
+| RF-22 | Sugerencia automática de categoría/prioridad al crear ticket (modelo supervisado). Estado Fase 3: implementado BETO-primero con fallback a reglas (`shared/src/ia.ts predecirCategoria`, fuente visible en UI web+móvil como "modelo BETO"/"reglas locales"). Limitación conocida (Could): la fuente no se persiste (sin telemetría modelo-vs-reglas) y BETO requiere `ml/src/serve.py` desplegado + `EXPO_PUBLIC_BETO_URL`; sin eso opera solo con reglas | C |
 
 ### Módulo 6 — Notificaciones y catálogos
 
 | ID | Requisito | Prio |
 |---|---|---|
-| RF-23 | Notificaciones push al usuario ante cambios de estado | S |
+| RF-23 | Notificaciones push al usuario ante cambios de estado. Alcance decidido Fase 3: **móvil (Expo push remoto) + in-app realtime** en ambas plataformas; **web = solo in-app** (campana `NotificationBell` con `subscribeNotificaciones`, sin push remoto). Despliegue sender (prod): habilitar `pg_net` + `pg_cron`, definir `app.settings.functions_url` y `app.settings.service_role_key`, verificar job `send_push_cada_5min` (`*/5 * * * *`); sin eso, el Edge `send-push` no se dispara y solo funciona el in-app | S |
 | RF-24 | Alertas del sistema de IA dirigidas al jefe | S |
 | RF-25 | Administración de catálogos: categorías, dependencias, técnicos | S |
 | RF-26 | Importación del histórico CSV normalizado (latin-1 → UTF-8, NFD) como datos de entrenamiento | M |
@@ -92,7 +92,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-28 | Asignar y reasignar a cada usuario su rol y su mesa | M |
 | RF-29 | Crear y gestionar las **mesas** (dependencias: TIC, Comunicaciones, Infraestructura Física, EAPSA, etc.) | M |
 | RF-30 | Ver **todas** las mesas y su configuración, independientemente de su cargo | M |
-| RF-31 | Asignar técnicos a mesas y definir mesas de respaldo | S |
+| RF-31 | Asignar técnicos a mesas (cada dependencia atiende lo suyo; no hay respaldos entre áreas por realidad operativa — `mesa_respaldos` eliminado en `20260918000000`) | S |
 | RF-32 | Gestionar el catálogo de categorías normalizadas (`ticket_categories`) | S |
 
 **Totales: 32 RF** (14 Must, 17 Should, 1 Could).
