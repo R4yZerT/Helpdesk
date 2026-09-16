@@ -1,9 +1,11 @@
 // JefeNavigator — AppShell unificado con sidebar + header + footer
 import * as React from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { theme, AppShell, NotificationBell, IconLayers, IconPlus, IconTag, IconUpload } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
+import { ReportesScreen } from './ReportesScreen';
+import { AlertasIAScreen } from './AlertasIAScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
@@ -20,17 +22,6 @@ const screenOpts = {
   headerShadowVisible: false,
   contentStyle: { backgroundColor: theme.colors.bg },
 };
-
-function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
-  const { signOut } = useAuth();
-  return (
-    <View style={{ flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      <Text style={{ fontSize: 18, fontWeight: '800' }}>{title}</Text>
-      {subtitle ? <Text style={{ opacity: 0.6, textAlign: 'center' }}>{subtitle}</Text> : null}
-      <Pressable onPress={signOut} style={{ marginTop: 8, backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12 }}><Text style={{ color: '#fff', fontWeight: '800' }}>Cerrar sesión</Text></Pressable>
-    </View>
-  );
-}
 
 function titleFor(name: string) {
   if (name === 'Perfil') return 'Mi perfil';
@@ -83,8 +74,8 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="Dashboard">
         <Stack.Screen name="Dashboard" component={DashboardScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
         <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-        <Stack.Screen name="Reportes" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })}>{() => <Placeholder title="Reportes" subtitle="Exportación PDF/CSV" />}</Stack.Screen>
-        <Stack.Screen name="Alertas" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })}>{() => <Placeholder title="Alertas IA" subtitle="Anomalías y picos" />}</Stack.Screen>
+        <Stack.Screen name="Reportes" component={ReportesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })} />
+        <Stack.Screen name="Alertas" component={AlertasIAScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })} />
         <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
         <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
       </Stack.Navigator>

@@ -33,6 +33,7 @@ export type JefeStackParamList = {
 export type AdminStackParamList = {
   Usuarios: undefined;
   Mesas: undefined;
+  MesaTickets: undefined;
   DetalleTicket: { id: string };
   Categorias: undefined;
   Import: undefined;
