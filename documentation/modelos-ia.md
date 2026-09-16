@@ -23,19 +23,42 @@ La sugerencia es editable; si el usuario elige manualmente, su elección manda.
 - **Arquitectura**: BETO (`dccuchile/bert-base-spanish-wwm-cased`, 110M parámetros),
   fine-tune para clasificación de secuencias.
 - **Clases**: 13 categorías consolidadas (`dominio:subcategoria`), sin el comodín
-  `general:Sin clasificar / Otros` (se eliminó del dataset con reclasificación
-  inteligente por contenido léxico en `ml/src/category_mapping.py`).
-- **Datos**: `data/processed/tickets_clean.parquet` (~7926 filas, texto + `label_id`),
-  generados por `ml/src/cleaning.py` desde el CSV histórico (RF-26).
-  Desbalance fuerte: la clase mayoritaria tiene ~80× filas que la menor (2087/26).
-- **Entrenamiento** (`ml/src/train_beto.py`):
-  split estratificado 80/10/10, `class_weight` balanceado, early stopping,
-  mejor checkpoint por **macro-F1**. Defaults: 3 epochs, batch 16, lr 3e-5,
-  max-length 128. Requiere GPU para tiempo razonable (`--subset 500` = smoke test en CPU).
-- **Baseline previo**: TF-IDF + LogisticRegression, macro-F1 ~0.78
-  (ver `ml/notebooks/01_eda.ipynb`). BETO se adoptó por superar ese piso.
+  `general:Sin clasificar / Otros`. El notebook (`02_train_beto_colab.ipynb`,
+  celda 6) aplica `mapping_consolidation` (8 entradas: Gestión de
+  usuarios/Permisos/Contraseñas → Gestión de Accesos y Seguridad; Software y
+  aplicaciones/Soporte institucional → Software y Sistemas;
+  Datos/Impresoras/Equipos y hardware → Equipos e Infraestructura) y filtra
+  las filas comodín. En `ml/src/cleaning.py` el comodín se reclasifica por
+  contenido léxico (`category_mapping._reclassify_general`) o se filtra.
+- **Datos**: `data/processed/tickets_clean.parquet` (7928 filas, texto +
+  `label_id`), generados por `ml/src/cleaning.py` desde el CSV histórico (RF-26).
+  Distribución: Piezas gráficas 2087, Accesos 1197, Equipos 1038, Software 1005,
+  Audiovisual 672, Conectividad 443, Correo 278, Eventos 265, Web 247,
+  Carpintería 246, Eléctrica 179, Hidrosanitaria 177, Obra civil 94.
+  Desbalance mayoritaria/menor ≈ 22× (2087/94).
+- **Entrenamiento** (`ml/src/train_beto.py`, réplica local del notebook):
+  split estratificado 80/10/10 y **augmentation solo en train** (sinónimos
+  usuario/cuenta/colaborador, falla/error/problema, acceso/entrada/ingreso,
+  equipo/pc/computador; clases con < 80 filas, ×2 por fila → train 6492 /
+  val 793 / test 793). `Trainer` plano (**sin `class_weight`**), early
+  stopping (patience 2), mejor checkpoint por **macro-F1**. Hiperparámetros
+  del notebook: 4 epochs, batch 16, lr 5e-5 (default de transformers),
+  max-length 128, weight_decay 0.0, warmup 10, seed 42. Barrido explorado:
+  lr [2e-5, 3e-5, 5e-5] × wd [0.01, 0.1] a 2 épocas (resultados no registrados
+  en el notebook guardado). Requiere GPU para tiempo razonable
+  (`--subset 500` = smoke test en CPU).
+- **Métricas del notebook** (celda 12): val acc 0.7932 / macro-F1 0.7839,
+  test acc 0.7755 / macro-F1 0.7468. Peores F1: Correo electrónico 0.51,
+  Software y Sistemas 0.55.
+- **Baseline previo**: TF-IDF + LogisticRegression, macro-F1 ~0.78 medido
+  sobre la taxonomía anterior (19 clases, ver `ml/notebooks/01_eda.ipynb`);
+  no comparable directo con el 0.7468 en test (13 clases).
 - **Artefactos**: `ml/models/beto-smoke/` (default en local) o
-  `ml/models/beto-tickets/` (entrenamiento completo). Incluyen `label_mapping.json`.
+  `ml/models/beto-tickets/` (entrenamiento completo del notebook: config,
+  `model.safetensors`, tokenizer, `label_mapping.json`, `metrics.json` con
+  hp + clases). Ojo: `beto-smoke` ordena los ids alfabéticamente mientras el
+  mapping procesado va por frecuencia — mismo set de 13 clases, distinto
+  orden; cada artefacto es autoconsistente (no mezclar ids entre artefactos).
 
 ### Servicio (`ml/src/serve.py`)
 
