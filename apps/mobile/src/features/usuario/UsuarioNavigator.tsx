@@ -142,7 +142,6 @@ const w = StyleSheet.create({
 
 // --- Native: Bottom Tabs (Mis solicitudes + Nueva + Perfil)
 function UsuarioMobileTabs() {
-  const { profile } = useAuth();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -190,16 +189,6 @@ function UsuarioMobileTabs() {
     </Tab.Navigator>
   );
 }
-
-const m = StyleSheet.create({
-  perfilWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
-  avatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.text, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '800', fontSize: 18 },
-  perfilName: { fontSize: 15, fontWeight: '800', color: theme.colors.text, marginTop: 4 },
-  perfilRole: { fontSize: 12, color: theme.colors.muted, textTransform: 'capitalize' },
-  logoutBtn: { marginTop: 16, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 },
-  logoutText: { fontSize: 13, fontWeight: '700', color: theme.colors.text },
-});
 
 export function UsuarioNavigator() {
   if (Platform.OS === 'web') return <UsuarioWeb />;

@@ -4,6 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { Session } from '@supabase/supabase-js';
 import { fetchProfile, type Profile, can, type Permission } from '@helpdesk/shared';
 import { supabase } from '../lib/supabase';
+import { useIdleTimeout } from '../hooks/useIdleTimeout';
 
 type AuthContextValue = {
   session: Session | null;
@@ -12,8 +13,11 @@ type AuthContextValue = {
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  signOutGlobal: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   can: (permission: Permission) => boolean;
+  idleWarning: string | null;
+  resetIdle: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -23,6 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [idleWarning, setIdleWarning] = useState<string | null>(null);
 
   const loadProfile = useCallback(async (userId: string) => {
     try {
@@ -125,6 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   }, []);
 
+  const signOutGlobal = useCallback(async () => {
+    // RF-04 — cierre global (todas las sesiones) tras cambio de contraseña / compromiso (paridad mobile)
+    await supabase.auth.signOut({ scope: 'global' });
+    setProfile(null);
+    setSession(null);
+  }, []);
+
   const refreshProfile = useCallback(async () => {
     if (!session?.user) return;
     await loadProfile(session.user.id);
@@ -135,9 +147,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [profile],
   );
 
+  // RF-04 idle 30m — solo cuando hay sesión (paridad mobile)
+  const handleIdleTimeout = useCallback(async () => {
+    setIdleWarning(null);
+    setError('Sesión cerrada por inactividad (30m)');
+    await supabase.auth.signOut();
+    setProfile(null);
+    setSession(null);
+  }, []);
+
+  const handleIdleWarning = useCallback((ms: number) => {
+    setIdleWarning(`Inactividad detectada — cierre en ${Math.round(ms / 1000)}s`);
+  }, []);
+
+  const { reset: resetIdle } = useIdleTimeout({
+    enabled: !!session,
+    onTimeout: handleIdleTimeout,
+    onWarning: handleIdleWarning,
+  });
+
+  // Limpia warning al re-activar
+  useEffect(() => { if (session) setIdleWarning(null); }, [session]);
+
   const value = useMemo(
-    () => ({ session, profile, loading, error, signIn, signOut, refreshProfile, can: canCheck }),
-    [session, profile, loading, error, signIn, signOut, refreshProfile, canCheck],
+    () => ({ session, profile, loading, error, signIn, signOut, signOutGlobal, refreshProfile, can: canCheck, idleWarning, resetIdle }),
+    [session, profile, loading, error, signIn, signOut, signOutGlobal, refreshProfile, canCheck, idleWarning, resetIdle],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { MesaEquipoModal } from './MesaEquipoModal';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
@@ -48,6 +49,7 @@ export function AdminMesasScreen() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<Mesa | null>(null);
+  const [equipoMesa, setEquipoMesa] = useState<Mesa | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -184,6 +186,7 @@ export function AdminMesasScreen() {
       <Text style={s.name} numberOfLines={2}>{item.nombre}</Text>
       <View style={s.actions}>
         <Pressable onPress={() => openEdit(item)} style={s.btnGhost} accessibilityRole="button"><Text style={s.btnGhostText}>EDITAR</Text></Pressable>
+        <Pressable onPress={() => setEquipoMesa(item)} style={s.btnGhost} accessibilityRole="button" accessibilityLabel={`Equipo de ${item.nombre}`}><Text style={s.btnGhostText}>EQUIPO</Text></Pressable>
         <Pressable onPress={() => toggleActiva(item)} style={[s.btnGhost, !item.activa && s.btnGhostAccent]} accessibilityRole="button">
           <Text style={[s.btnGhostText, !item.activa && { color: theme.colors.primary }]}>{item.activa ? 'DESACTIVAR' : 'ACTIVAR'}</Text>
         </Pressable>
@@ -277,6 +280,7 @@ export function AdminMesasScreen() {
         </View>
       </Modal>
       {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
+      <MesaEquipoModal mesa={equipoMesa} mesas={mesas} onClose={() => setEquipoMesa(null)} />
       <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activa ? 'Desactivar mesa' : 'Activar mesa'} message={confirmToggle ? `¿${confirmToggle.activa ? 'Desactivar' : 'Activar'} "${confirmToggle.nombre}"?` : undefined} confirmText={confirmToggle?.activa ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActiva} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );

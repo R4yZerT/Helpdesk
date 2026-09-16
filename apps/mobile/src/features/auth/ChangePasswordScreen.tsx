@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: () => void } }) {
-  const { profile } = useAuth();
+  const { profile, signOutGlobal } = useAuth();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -37,7 +37,11 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
 
       const { error } = await supabase.auth.updateUser({ password: next });
       if (error) throw error;
-      Alert.alert('Contraseña actualizada', 'Se cerrarán otras sesiones por seguridad (12h/30m).', [{ text: 'OK', onPress: () => navigation?.goBack?.() }]);
+      // RF-04 — cierre global real: invalida las demás sesiones (incluida la actual)
+      await signOutGlobal();
+      Alert.alert('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.', [
+        { text: 'OK', onPress: () => { try { navigation?.goBack?.(); } catch { /* el gate ya muestra Login */ } } },
+      ]);
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }

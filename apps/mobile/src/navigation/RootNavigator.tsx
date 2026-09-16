@@ -7,6 +7,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
+import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
 import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
@@ -48,10 +49,13 @@ const screenOpts = {
 };
 
 function AuthNavigator() {
+  // RF-03 recovery: si hay tokens pendientes, entrar directo a Nueva contraseña
+  const { recoveryPending } = useAuth();
   return (
-    <AuthStack.Navigator screenOptions={screenOpts}>
+    <AuthStack.Navigator screenOptions={screenOpts} initialRouteName={recoveryPending ? 'UpdatePassword' : 'Login'}>
       <AuthStack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Recuperar contraseña' }} />
+      <AuthStack.Screen name="UpdatePassword" component={UpdatePasswordScreen} options={{ title: 'Nueva contraseña' }} />
       <AuthStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Cambiar contraseña' }} />
     </AuthStack.Navigator>
   );
@@ -79,7 +83,7 @@ function TecnicoNavigator() {
 }
 
 export function RootNavigator() {
-  const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
+  const { session, profile, loading, idleWarning, resetIdle, error, recoveryPending } = useAuth();
   // RF-23: suscripción realtime + refresh al volver a primer plano (no-op sin sesión)
   usePushNotificaciones();
   if (loading) {
@@ -105,7 +109,7 @@ export function RootNavigator() {
         </View>
       ) : null}
       <NavigationContainer ref={navigationRef} theme={navTheme}>
-        {!session || !profile ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
+        {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
       </NavigationContainer>
     </View>
   );

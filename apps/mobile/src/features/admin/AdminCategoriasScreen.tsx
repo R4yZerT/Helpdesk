@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -84,15 +85,21 @@ export function AdminCategoriasScreen() {
   const onEndReached = useCallback(() => { if (loadingMore || loading || !hasMore) return; fetchPage(page + 1); }, [loadingMore, loading, hasMore, page, fetchPage]);
   const hasFilters = !!qDeb || effectiveDominio !== 'todos' || activa !== 'todos';
   const clearFilters = () => { setQ(''); if (isGeneralAdmin) setDominio('todos'); setActiva('todos'); };
-  const onExportCsv = useCallback(() => {
+  const onExportCsv = useCallback(async () => {
     try {
       const header = ['id', 'dominio', 'subcategoria', 'orden', 'estado'];
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const exportRows = rows.map((r) => [String(r.id), r.dominio, r.subcategoria, String(r.orden), r.activa ? 'activa' : 'inactiva']);
       const csv = [header.map(esc).join(','), ...exportRows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${exportRows.length}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-categorias', 'csv'), meta);
-      if (!ok) window.alert(`CSV generado (${exportRows.length} filas).`);
+      const filename = buildExportFilename('admin-categorias', 'csv');
+      if (Platform.OS !== 'web') {
+        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
+        const shared = await shareCsvNativo(filename, meta);
+        if (!shared) alert('Compartir no disponible en este dispositivo');
+        return;
+      }
+      downloadCsv(filename, meta);
     } catch (e: any) { console.warn('[AdminCategorias] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
   }, [rows]);
   const onExportPng = useCallback(async () => { alert('Exportar PNG solo disponible en web — en móvil usa CSV'); }, []);
