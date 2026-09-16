@@ -115,7 +115,8 @@ const PERMISSIONS: Record<RolUsuario, ReadonlySet<Permission>> = {
  */
 export function can(rol: RolUsuario | null | undefined, permission: Permission): boolean {
   if (!rol) return false;
-  return PERMISSIONS[rol].has(permission);
+  // RF-05 fail-closed: rol desconocido/corrupto niega (antes TypeError por undefined.has)
+  return (PERMISSIONS[rol] as ReadonlySet<Permission> | undefined)?.has(permission) ?? false;
 }
 
 /**
@@ -126,7 +127,8 @@ export function canAny(
   permissions: readonly Permission[],
 ): boolean {
   if (!rol) return false;
-  const set = PERMISSIONS[rol];
+  const set = (PERMISSIONS[rol] as ReadonlySet<Permission> | undefined);
+  if (!set) return false;
   return permissions.some((p) => set.has(p));
 }
 
@@ -138,7 +140,8 @@ export function canAll(
   permissions: readonly Permission[],
 ): boolean {
   if (!rol) return false;
-  const set = PERMISSIONS[rol];
+  const set = (PERMISSIONS[rol] as ReadonlySet<Permission> | undefined);
+  if (!set) return false;
   return permissions.every((p) => set.has(p));
 }
 

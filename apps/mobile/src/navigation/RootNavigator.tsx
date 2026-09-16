@@ -63,6 +63,21 @@ function AuthNavigator() {
 function EmpleadoNavigator() {
   return <UsuarioNavigator />;
 }
+// RF-05 fail-closed (Fase 3 A3): rol desconocido/corrupto NUNCA cae a Admin.
+function RolDesconocido() {
+  const { signOut } = useAuth();
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: theme.colors.bg }}>
+      <Text style={{ fontWeight: '700', color: theme.colors.text }}>Rol no reconocido</Text>
+      <Text style={{ opacity: 0.6, marginTop: 8, textAlign: 'center', color: theme.colors.text }}>
+        Tu cuenta tiene un rol inválido. Contacta al administrador.
+      </Text>
+      <Pressable onPress={signOut} style={{ marginTop: 16, padding: 10 }}>
+        <Text style={{ textDecorationLine: 'underline', color: theme.colors.primary }}>Cerrar sesión</Text>
+      </Pressable>
+    </View>
+  );
+}
 function TecnicoBandejaStack() {
   return (
     <TecnicoStack.Navigator screenOptions={screenOpts}>
@@ -109,7 +124,7 @@ export function RootNavigator() {
         </View>
       ) : null}
       <NavigationContainer ref={navigationRef} theme={navTheme}>
-        {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : <AdminNavigator />}
+        {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
       </NavigationContainer>
     </View>
   );

@@ -11,6 +11,7 @@ import { AdminCategoriasScreen } from './AdminCategoriasScreen';
 import { DetalleTecnicoScreen } from '../tecnico/DetalleTecnicoScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { HeaderBell } from '../../components/HeaderBell';
+import { RequirePermission } from '../../components/RequirePermission';
 import type { AdminStackParamList } from '../../navigation/types';
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
@@ -46,11 +47,15 @@ function AdminMainStack() {
 }
 
 export function AdminNavigator() {
+  // RF-05 (Fase 3 A3): guard por permiso aunque el router ya filtre por rol —
+  // profile:manage solo lo tiene administrador (defensa en profundidad).
   return (
-    <Tab.Navigator screenOptions={tabOpts}>
-      <Tab.Screen name="AdminMainTab" options={{ tabBarLabel: 'Admin', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⚙</Text> }} component={AdminMainStack} />
-      <Tab.Screen name="AdminMesasTab" options={{ tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>▦</Text>, headerShown: true, headerTitle: 'Tickets de mi dependencia', headerRight: () => <HeaderBell /> }} component={AdminMesaTicketsScreen} />
-      <Tab.Screen name="AdminPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilScreen} />
-    </Tab.Navigator>
+    <RequirePermission permission="profile:manage">
+      <Tab.Navigator screenOptions={tabOpts}>
+        <Tab.Screen name="AdminMainTab" options={{ tabBarLabel: 'Admin', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⚙</Text> }} component={AdminMainStack} />
+        <Tab.Screen name="AdminMesasTab" options={{ tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>▦</Text>, headerShown: true, headerTitle: 'Tickets de mi dependencia', headerRight: () => <HeaderBell /> }} component={AdminMesaTicketsScreen} />
+        <Tab.Screen name="AdminPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilScreen} />
+      </Tab.Navigator>
+    </RequirePermission>
   );
 }

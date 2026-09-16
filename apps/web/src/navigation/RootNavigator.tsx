@@ -31,12 +31,24 @@ function AuthNavigator() {
 }
 
 function RoleNavigator() {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   if (!profile) return null;
   if (profile.rol === 'usuario') return <UsuarioNavigator />;
   if (profile.rol === 'tecnico') return <TecnicoNavigator />;
   if (profile.rol === 'jefe') return <JefeNavigator />;
-  return <AdminNavigator />;
+  if (profile.rol === 'administrador') return <AdminNavigator />;
+  // RF-05 fail-closed (Fase 3 A3): rol desconocido/corrupto NUNCA cae a Admin.
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <Text style={{ fontWeight: '700' }}>Rol no reconocido</Text>
+      <Text style={{ opacity: 0.6, marginTop: 8, textAlign: 'center' }}>
+        Tu cuenta tiene un rol inválido. Contacta al administrador.
+      </Text>
+      <Pressable onPress={signOut} style={{ marginTop: 16, padding: 10 }}>
+        <Text style={{ textDecorationLine: 'underline' }}>Cerrar sesión</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 export function RootNavigator() {
