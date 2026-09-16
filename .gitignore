@@ -30,8 +30,14 @@ supabase/.branches/
 # Agentes y tooling local
 .agents/
 .opencode/
+opencode.json
 skills-lock.json
 .opencode-*
+hive/
+roster.json
+roster-backups/
+worktrees/
+auth.json
 
 # Datos y modelos ML - PII y artefactos pesados
 data/raw/

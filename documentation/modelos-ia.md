@@ -93,6 +93,24 @@ muestran la fuente ("modelo BETO" vs "reglas locales") y el % de confianza.
 La Edge Function `supabase/functions/classify` (RF-22) es un MVP por keywords
 con los mismos IDs del seed; el camino principal es `ia.ts` → BETO.
 
+### Loop de validación técnica (cierre RF-22: telemetría modelo-vs-reglas)
+
+La fuente ya se persiste por ticket en `ticket_ia_feedback`
+(migración `20261017000000`):
+
+- **Crear:** `CreateTicketScreen` (web/móvil) guarda lo sugerido vía
+  `registrarSugerenciaIa` (`shared/src/ia-feedback.ts`); el trigger
+  `trg_tickets_crear_ia_feedback` crea la fila `pendiente` al insertar.
+- **Validar:** `IaValidationCard` (`shared/src/ui/ticket/IaValidationCard.tsx`)
+  en `DetalleTecnicoScreen` (web/móvil). El técnico confirma
+  (`confirmarClasificacion`) o reclasifica mesa+categoría obligatorias
+  (`corregirClasificacion`). Solo técnico asignado, jefe o admin
+  (`puede_validar_ia` + RLS). Sin respuesta queda `pendiente` y NO entrena.
+- **Dataset:** vista `dataset_entrenamiento_ia` (solo `confirmada`/`corregida`)
+  + `python ml/src/export_dataset_validado.py` → CSV para reentrenamiento.
+  `esAptoEntrenamiento` es la guarda en cliente. Tests en
+  `shared/src/ia-feedback.test.ts` (21 files / 188 tests en shared).
+
 ---
 
 ## 2. Predictor de picos de tickets (ML clásico)
