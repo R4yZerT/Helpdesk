@@ -79,7 +79,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 
 | ID | Requisito | Prio |
 |---|---|---|
-| RF-23 | Notificaciones push al usuario ante cambios de estado. Alcance decidido Fase 3: **móvil (Expo push remoto) + in-app realtime** en ambas plataformas; **web = solo in-app** (campana `NotificationBell` con `subscribeNotificaciones`, sin push remoto). Despliegue sender (prod): habilitar `pg_net` + `pg_cron`, definir `app.settings.functions_url` y `app.settings.service_role_key`, verificar job `send_push_cada_5min` (`*/5 * * * *`); sin eso, el Edge `send-push` no se dispara y solo funciona el in-app | S |
+| RF-23 | Notificaciones push al usuario ante cambios de estado. Alcance decidido Fase 3: **móvil (Expo push remoto) + in-app realtime** en ambas plataformas; **web = solo in-app** (campana `NotificationBell` con `subscribeNotificaciones`, sin push remoto). Despliegue sender (prod): habilitar `pg_net` + `pg_cron`, definir `app.settings.functions_url` y `app.settings.service_role_key`, verificar job `send_push_cada_5min` (`*/5 * * * *`); sin eso, el Edge `send-push` no se dispara y solo funciona el in-app. Runbook: `documentation/runbook-push.md` | S |
 | RF-24 | Alertas del sistema de IA dirigidas al jefe | S |
 | RF-25 | Administración de catálogos: categorías, dependencias, técnicos | S |
 | RF-26 | Importación del histórico CSV normalizado (latin-1 → UTF-8, NFD) como datos de entrenamiento | M |
