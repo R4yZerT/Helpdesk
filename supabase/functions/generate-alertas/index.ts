@@ -43,5 +43,11 @@ Deno.serve(async (req: Request) => {
   const { data, error } = await admin.rpc('generar_alertas_ia');
   if (error) return Response.json({ error: error.message }, { status: 500, headers });
   const insertados = Array.isArray(data) ? (data[0]?.insertados ?? data.length) : (data as any)?.insertados ?? 0;
-  return Response.json({ insertados, data }, { headers });
+  // Alertas preventivas del forecast ML (tabla pronosticos_picos; 0 si la migración aún no se aplicó)
+  let preventivas = 0;
+  try {
+    const { data: prev, error: errPrev } = await admin.rpc('generar_alertas_pronostico');
+    if (!errPrev && prev) preventivas = Array.isArray(prev) ? (prev[0]?.insertados ?? 0) : (prev as any)?.insertados ?? 0;
+  } catch { /* migración pendiente: se omite */ }
+  return Response.json({ insertados, preventivas, data }, { headers });
 });
