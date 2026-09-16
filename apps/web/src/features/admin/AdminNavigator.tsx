@@ -1,12 +1,13 @@
 // AdminNavigator — AppShell unificado + sidebar global + footer legal
 import * as React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { theme, AppShell, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
 import { AdminCategoriasScreen } from './AdminCategoriasScreen';
+import { AdminImportScreen } from './AdminImportScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { AdminStackParamList } from '../../navigation/types';
@@ -92,18 +93,13 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
         {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
         <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
         <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-        <Stack.Screen name="Import" listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })}>{() => <View style={w.placeholder}><Text style={w.placeholderText}>IMPORT PENDIENTE</Text></View>}</Stack.Screen>
+        <Stack.Screen name="Import" component={AdminImportScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })} />
         <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
         <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
       </Stack.Navigator>
     </AppShell>
   );
 }
-
-const w = StyleSheet.create({
-  placeholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  placeholderText: { color: theme.colors.muted },
-});
 
 export function AdminNavigator() {
   if (Platform.OS === 'web') return <AdminWeb />;
