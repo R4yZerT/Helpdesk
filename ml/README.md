@@ -24,6 +24,13 @@ ml/notebooks/01_eda.ipynb          # EDA + baseline TF-IDF/LogReg + recomendacio
 - `max_length=256` cubre p99 (99% textos <120 palabras).
 - Modelo exportado a `ml/models/beto-tickets/` para inferencia en Supabase Edge Function.
 
+## Forecast de picos (ML clásico)
+- Script: `ml/src/forecast_picos.py` — serie diaria global + top 3 dependencias, features calendario + lags + rodantes.
+- Modelos: `ridge` / `random_forest` / `hist_gb` vs baseline `avg28` (heurística SQL RF-19). Split temporal últimos 30 días.
+- Resultado actual: global `random_forest` MAE 10.8 vs baseline 25.6; umbrales sobre días activos (alta p60, pico p85).
+- Uso: `python ml/src/forecast_picos.py --test-dias 30 --forecast-dias 7` → artefactos en `ml/models/forecast/` (gitignored: `metrics.json`, `forecast_7d.json`, `perfil_horario.json`, `*_model.pkl`).
+- Integración pendiente: batch que suba `forecast_7d.json` a tabla `pronosticos_picos` para el dashboard.
+
 ## Reproducibilidad
 ```bash
 python ml/src/cleaning.py

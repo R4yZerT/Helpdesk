@@ -234,6 +234,22 @@ export async function generarAlertasIA(client: any): Promise<number> {
   return Number((data as any)?.insertados ?? 0);
 }
 
+// ── Pronóstico ML (tabla pronosticos_picos; [] si la migración aún no se aplicó) ──
+export type PronosticoDia = { fecha: string; serie: string; forecast: number; nivel: string; esPico: boolean; modeloVersion: string | null };
+export async function getPronosticoSemanal(client: SupabaseClient): Promise<PronosticoDia[]> {
+  try {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const { data, error } = await (client.from('pronosticos_picos') as any)
+      .select('fecha,serie,forecast,nivel,es_pico,modelo_version')
+      .gte('fecha', hoy).order('fecha', { ascending: true }).limit(28);
+    if (error || !data) return [];
+    return (data as any[]).map((r) => ({
+      fecha: String(r.fecha).slice(0, 10), serie: r.serie, forecast: Number(r.forecast),
+      nivel: r.nivel, esPico: Boolean(r.es_pico), modeloVersion: r.modelo_version ?? null,
+    }));
+  } catch (_) { return []; }
+}
+
 export async function marcarAlertaIA(client: any, id: number, estado: 'vista' | 'resuelta'): Promise<void> {
   const { error } = await client.from('alertas_ia').update({ estado }).eq('id', id);
   if (error) throw new Error(error.message);

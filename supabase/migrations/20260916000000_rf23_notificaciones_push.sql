@@ -21,7 +21,14 @@ do $$ begin
   end if;
 exception when duplicate_object then null;
 end $$;
-alter publication supabase_realtime add table public.notificaciones;
+do $$ begin
+  if not exists (
+    select 1 from pg_publication_tables where pubname = 'supabase_realtime'
+      and schemaname = 'public' and tablename = 'notificaciones'
+  ) then
+    alter publication supabase_realtime add table public.notificaciones;
+  end if;
+end $$;
 
 -- 2) Función trigger que genera notificaciones en cambios de estado / asignación
 create or replace function public.trg_notificar_cambio_ticket()
