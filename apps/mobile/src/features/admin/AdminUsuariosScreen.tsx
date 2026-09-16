@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
@@ -104,16 +105,24 @@ export function AdminUsuariosScreen() {
   const hasActiveFilters = !!qDebounced || rol !== 'todos' || (isGeneralAdmin && mesaId !== 'todos') || activo !== 'todos';
   const clearFilters = () => { setQ(''); setRol('todos'); if (isGeneralAdmin) setMesaId('todos'); setActivo('todos'); };
 
-  // Export: CSV/PNG/PDF — mismo patrón que DashboardScreen (RF-18) via html2canvas + jsPDF, id admin-export-root
-  const onExportCsv = useCallback(() => {
+  // Export: CSV (web descarga directa; nativo hoja de compartir) + PNG/PDF solo web (RF-18)
+  const onExportCsv = useCallback(async () => {
     try {
       const header = ['nombre', 'cedula', 'correo', 'rol', 'dependencia', 'estado'];
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const rows = users.map((u) => [u.fullName, u.cedula ?? '', u.email ?? '', u.rol, u.mesaNombre ?? (u.mesaId ? String(u.mesaId) : ''), u.activo ? 'activo' : 'inactivo']);
       const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${users.length}`, `# Filtros: ${hasActiveFilters ? 'filtrado' : 'sin filtros'}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-usuarios', 'csv'), meta);
-      if (!ok) setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'No se pudo descargar el CSV en esta plataforma (motivo: descarga no soportada).' });
+      const filename = buildExportFilename('admin-usuarios', 'csv');
+      if (Platform.OS !== 'web') {
+        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
+        const shared = await shareCsvNativo(filename, meta);
+        setFeedback(shared
+          ? { visible: true, variant: 'success', title: 'CSV listo', message: `CSV generado (${users.length} filas), elige dónde compartirlo.` }
+          : { visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Compartir no disponible en este dispositivo.' });
+        return;
+      }
+      downloadCsv(filename, meta);
     } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
   }, [users, hasActiveFilters]);
   const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PNG solo está disponible en web (motivo: plataforma móvil). Usa CSV.' }); }, []);

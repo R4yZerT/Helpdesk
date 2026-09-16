@@ -1,7 +1,7 @@
 // Navegacion raiz — gatea por sesion y rol (RF-05)
 // Usa @react-navigation/native-stack; cada rol tiene su stack.
 
-import { ActivityIndicator, Button, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -16,18 +16,6 @@ import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import type { AuthStackParamList } from './types';
-
-function Placeholder({ title, subtitle }: { title: string; subtitle?: string }) {
-  const { profile, signOut } = useAuth();
-  return (
-    <View style={{ flex: 1, padding: 24, justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-      <Text style={{ fontSize: 18, fontWeight: '700' }}>{title}</Text>
-      {subtitle ? <Text style={{ opacity: 0.6, textAlign: 'center' }}>{subtitle}</Text> : null}
-      {profile ? <Text style={{ fontSize: 11, opacity: 0.5 }}>Rol: {profile.rol} · {profile.email}</Text> : null}
-      <Button title="Cerrar sesión" onPress={signOut} />
-    </View>
-  );
-}
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator();
@@ -51,18 +39,8 @@ function RoleNavigator() {
   return <AdminNavigator />;
 }
 
-function EmpleadoNavigator() {
-  return <UsuarioNavigator />;
-}
-
-
-
-/* JefeNavigator movido a features/jefe/JefeNavigator.tsx con AppShell sidebar+reloj 56px */
-
-
-
 export function RootNavigator() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
 
   if (loading) {
     return (
@@ -74,18 +52,39 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {!session || !profile ? (
-          <RootStack.Screen name="Auth" component={AuthNavigator} />
-        ) : (
-          <>
-            <RootStack.Screen name="App" component={RoleNavigator} />
-            <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
-            <RootStack.Screen name="Perfil" component={PerfilScreen} options={{ headerShown: true, title: 'Mi perfil', presentation: 'modal' }} />
-          </>
-        )}
-      </RootStack.Navigator>
-    </NavigationContainer>
+    <View style={{ flex: 1 }} onTouchStart={resetIdle}>
+      {idleWarning ? (
+        <View style={s.idleBar}>
+          <Text style={s.idleText}>{idleWarning}</Text>
+          <Pressable onPress={resetIdle}><Text style={s.idleLink}>Seguir activo</Text></Pressable>
+        </View>
+      ) : null}
+      {error ? (
+        <View style={s.errorBar}>
+          <Text style={s.errorText}>{error}</Text>
+        </View>
+      ) : null}
+      <NavigationContainer>
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          {!session || !profile ? (
+            <RootStack.Screen name="Auth" component={AuthNavigator} />
+          ) : (
+            <>
+              <RootStack.Screen name="App" component={RoleNavigator} />
+              <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
+              <RootStack.Screen name="Perfil" component={PerfilScreen} options={{ headerShown: true, title: 'Mi perfil', presentation: 'modal' }} />
+            </>
+          )}
+        </RootStack.Navigator>
+      </NavigationContainer>
+    </View>
   );
 }
+
+const s = StyleSheet.create({
+  idleBar: { backgroundColor: '#8A6A2E', paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  idleText: { color: '#FFF8E6', fontWeight: '700', fontSize: 11, flex: 1 },
+  idleLink: { color: '#fff', textDecorationLine: 'underline', fontSize: 11, fontWeight: '700' },
+  errorBar: { backgroundColor: '#7F1D1D', paddingVertical: 7, paddingHorizontal: 12, alignItems: 'center' },
+  errorText: { color: '#FFE4E6', fontSize: 11, fontWeight: '600', textAlign: 'center' },
+});

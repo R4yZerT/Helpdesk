@@ -1,12 +1,12 @@
 // RF-03 — Cambio de contraseña (logueado) web — Stitch + NIST 800-63B
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { theme, validatePassword, validatePasswordSync, PasswordStrength, Card, Button, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
 export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: () => void } }) {
-  const { profile } = useAuth();
+  const { profile, signOutGlobal } = useAuth();
   const { width } = useWindowDimensions();
   const isDesktop = width >= 768;
   const [current, setCurrent] = useState('');
@@ -17,7 +17,6 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
 
   const sync = useMemo(
     () => (next ? validatePasswordSync(next, { email: profile?.email ?? undefined, nombre: profile?.full_name ?? undefined, rol: profile?.rol }) : null),
@@ -26,7 +25,6 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
 
   const onSubmit = async () => {
     setServerError(null);
-    setOk(false);
     if (!next || !confirm) {
       setServerError('Completa los campos');
       return;
@@ -57,10 +55,12 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
       }
       const { error } = await supabase.auth.updateUser({ password: next });
       if (error) throw error;
-      setOk(true);
+      // RF-04 — cierre global real: invalida las demás sesiones (incluida la actual)
+      await signOutGlobal();
       setCurrent('');
       setNext('');
       setConfirm('');
+      Alert.alert('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.');
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -108,11 +108,6 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
             {serverError ? (
               <View style={s.errorBox}>
                 <Text style={s.error}>{serverError}</Text>
-              </View>
-            ) : null}
-            {ok ? (
-              <View style={[s.errorBox, { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}>
-                <Text style={[s.error, { color: '#065F46' }]}>Contraseña actualizada. Se cerrarán otras sesiones por seguridad.</Text>
               </View>
             ) : null}
             {loading ? (

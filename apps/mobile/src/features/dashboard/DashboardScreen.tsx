@@ -3,6 +3,7 @@ import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { shareCsvNativo } from '../../lib/share-csv';
 
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
@@ -97,9 +98,14 @@ export function DashboardScreen() {
       const tecnicoName = (id: string) => tecnicos.find((t) => t.id === id)?.nombre ?? id;
       const rows = ticketsToRows((data as any) ?? [], mesaName);
       const csv = toCsvWithMeta(rows, filters, { mesaName, categoriaName, tecnicoName });
-      const ok = downloadCsv(buildExportFilename('dashboard', 'csv'), csv);
-      // En móvil downloadCsv es no-op (sin document): informar por alert
-      if (!ok) alert(`CSV generado: ${rows.length} filas. En móvil usa “Compartir” (próxima versión).`);
+      const filename = buildExportFilename('dashboard', 'csv');
+      if (Platform.OS !== 'web') {
+        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
+        const shared = await shareCsvNativo(filename, csv);
+        alert(shared ? `CSV listo para compartir: ${rows.length} filas.` : 'Compartir no disponible en este dispositivo');
+        return;
+      }
+      downloadCsv(filename, csv);
     } catch (e: any) { console.warn('[Dashboard] export', e); alert(e?.message ?? 'Error al exportar CSV'); }
   }, [filters, mesas, categorias, tecnicos]);
   const onExportPng = React.useCallback(async () => {

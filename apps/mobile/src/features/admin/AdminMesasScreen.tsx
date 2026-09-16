@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 import { MesaEquipoModal } from './MesaEquipoModal';
 
@@ -92,15 +93,21 @@ export function AdminMesasScreen() {
 
   const hasActiveFilters = !!qDeb || activa !== 'todos';
   const clearFilters = () => { setQ(''); setActiva('todos'); };
-  const onExportCsv = useCallback(() => {
+  const onExportCsv = useCallback(async () => {
     try {
       const header = ['id', 'nombre', 'estado'];
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
       const rows = mesas.map((m) => [String(m.id), m.nombre, m.activa ? 'activa' : 'inactiva']);
       const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${mesas.length}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-dependencias', 'csv'), meta);
-      if (!ok) window.alert(`CSV generado (${mesas.length} filas).`);
+      const filename = buildExportFilename('admin-dependencias', 'csv');
+      if (Platform.OS !== 'web') {
+        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
+        const shared = await shareCsvNativo(filename, meta);
+        if (!shared) alert('Compartir no disponible en este dispositivo');
+        return;
+      }
+      downloadCsv(filename, meta);
     } catch (e: any) { console.warn('[AdminMesas] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
   }, [mesas]);
   const onExportPng = useCallback(async () => { alert('Exportar PNG solo disponible en web — en móvil usa CSV'); }, []);

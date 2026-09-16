@@ -1,10 +1,11 @@
 // RF replanteo mobile — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia.
-// Port de apps/web AdminMesaTicketsScreen; export adaptado a móvil (CSV via downloadCsv con fallback alert,
+// Port de apps/web AdminMesaTicketsScreen; export adaptado a móvil (CSV nativo via hoja de compartir,
 // PNG/PDF solo en mobile --web con import dinámico, igual que DashboardScreen móvil).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 
 function getErrorMessage(e: unknown): string {
@@ -75,16 +76,21 @@ export function AdminMesaTicketsScreen() {
     })();
   }, [mesaId]);
 
-  const onExportCsv = useCallback(() => {
+  const onExportCsv = useCallback(async () => {
     try {
       const header = ['numero', 'asunto', 'estado', 'prioridad', 'tecnico'];
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const csvRows = tickets.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ?? 'Sin asignar']);
-      const csv = [header.map(esc).join(','), ...csvRows.map((r) => r.map(esc).join(','))].join('\r\n');
-      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${tickets.length}`, `# Mesa: ${mesaId ?? '—'}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-mesa-tickets', 'csv'), meta);
-      // En móvil downloadCsv es no-op (sin document): informar por alert
-      if (!ok) alert(`CSV generado (${tickets.length} filas). En móvil usa “Compartir” (próxima versión).`);
+      const rows = tickets.map((t) => [String(t.numero ?? ''), t.asunto, formatEstado(t.estado), formatPrioridad(t.prioridad), t.tecnicoAsignadoId ?? 'sin asignar']);
+      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
+      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${tickets.length}`].join('\r\n') + '\r\n' + csv;
+      const filename = buildExportFilename('admin-mesa-tickets', 'csv');
+      if (Platform.OS !== 'web') {
+        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
+        const shared = await shareCsvNativo(filename, meta);
+        if (!shared) alert('Compartir no disponible en este dispositivo');
+        return;
+      }
+      downloadCsv(filename, meta);
     } catch (e: unknown) { console.warn('[AdminMesaTickets] export csv', e); alert(getErrorMessage(e)); }
   }, [tickets, mesaId]);
   const onExportPng = useCallback(async () => {
