@@ -13,6 +13,7 @@ import {
   resolverMesaId,
   predecirCategoria,
   listTecnicosPorMesa,
+  registrarSugerenciaIa,
   type CreateTicketInput,
   type PrediccionCategoria,
   type Mesa,
@@ -178,6 +179,20 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       console.log('[CreateTicket] submit', form);
       const { data: { user } } = await supabase.auth.getUser();
       const res = await createTicket(supabase, form);
+      // Guarda la sugerencia IA vista al crear — el trigger crea la fila pendiente,
+      // aquí se completa con mesa/categoría sugeridas para el loop de validación.
+      try {
+        if (sugerencia) {
+          await registrarSugerenciaIa(supabase, res.id, {
+            mesaId: sugerencia.mesaId ?? null,
+            categoriaId: sugerencia.categoriaId ?? null,
+            confianza: sugerencia.confianza ?? null,
+            fuente: sugerencia.fuente === 'beto' ? 'beto' : 'reglas',
+          });
+        }
+      } catch (fbErr) {
+        console.warn('[CreateTicket] feedback IA no guardado', fbErr);
+      }
       const adjuntosFailed: string[] = [];
       if (adjuntos.length) {
         for (const a of adjuntos) {
