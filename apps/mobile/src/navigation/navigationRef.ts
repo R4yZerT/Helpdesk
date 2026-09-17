@@ -66,6 +66,37 @@ export function abrirTicketDesdeCampana(ticketId: string): boolean {
   }
 }
 
+// Cola de tickets pendientes (cold-start): el tap llega antes de que el nav
+// esté listo o de que exista sesión/rol. Se drena cuando hay sesión + nav.
+let pendientes: string[] = [];
+
+export function encolarTicketPendiente(ticketId: string): void {
+  if (!ticketId) return;
+  if (!pendientes.includes(ticketId)) pendientes.push(ticketId);
+}
+
+// Intenta abrir el primer pendiente; conserva la cola si aún no se puede.
+// Retorna true si la cola quedó vacía.
+export function drenarTicketsPendientes(): boolean {
+  while (pendientes.length > 0) {
+    const next = pendientes[0];
+    if (!abrirTicketDesdeCampana(next)) return false;
+    pendientes = pendientes.slice(1);
+  }
+  return true;
+}
+
 export function abrirTicketDesdePush(ticketId: string): boolean {
-  return abrirTicketDesdeCampana(ticketId);
+  if (abrirTicketDesdeCampana(ticketId)) return true;
+  // Nav o sesión aún no listos (cold-start): encolar para drenar después.
+  encolarTicketPendiente(ticketId);
+  return false;
+}
+
+// Deep-link OS (helpdesk://ticket/<id>): entra por la misma cola role-aware,
+// porque el árbol montado depende del rol y un config estático fallaría.
+export function extraerTicketIdDeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = /ticket\/([^/?#]+)/.exec(url);
+  return m?.[1] ? decodeURIComponent(m[1]) : null;
 }

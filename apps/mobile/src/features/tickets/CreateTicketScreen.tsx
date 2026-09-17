@@ -1,7 +1,8 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere dependencia + categoría → prioridad bloqueada
 // La IA no sugiere técnico: el ticket entra a la cola de la dependencia.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   createTicket,
   fetchCategorias,
@@ -21,7 +22,7 @@ import {
   type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
-import { Card, Badge, Divider, FilterDropdown } from '@helpdesk/shared';
+import { Card, Badge, Divider, FilterDropdown, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () => void; navigate: (s: string) => void } }) {
@@ -49,9 +50,10 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
+  const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: Blob }[]>([]);
   const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fb = useFeedback();
 
   const load = useCallback(async () => {
     setLoadingCats(true);
@@ -60,7 +62,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       setCategorias(cats);
       setMesas(ms);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : String(e));
+      fb.show('Error', e instanceof Error ? e.message : String(e), 'error');
     } finally {
       setLoadingCats(false);
     }
@@ -117,13 +119,10 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     return msg;
   };
 
-  const showAlert = (title: string, msg: string, onOk?: () => void) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.alert === 'function') {
-      window.alert(`${title}: ${msg}`);
-      onOk?.();
-    } else {
-      Alert.alert(title, msg, onOk ? [{ text: 'OK', onPress: onOk }] : undefined);
-    }
+  // Limpia el formulario tras confirmar el modal (antes: showAlert con Alert/window.alert)
+  const resetTrasCrear = () => {
+    setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
+    setAdjuntos([]); setErrors({}); setTouched({}); setSugerencia(null); eleccionManualRef.current = false; navigation?.goBack?.();
   };
 
   const onPickFiles = (files: FileList | null) => {
@@ -141,6 +140,37 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       next.push({ name: f.name, size: f.size, type: f.type || 'image/jpeg', file: f });
     }
     setAdjuntos(next);
+  };
+
+  // QA-C2 — picker nativo (iOS/Android): el <input type="file"> no existe en nativo.
+  // Mismos tipos y topes que en web (RF-07); el Blob resultante sube igual a Storage.
+  const onPickNative = async () => {
+    try {
+      setAdjuntoError(null);
+      const res = await DocumentPicker.getDocumentAsync({
+        multiple: true,
+        copyToCacheDirectory: true,
+        type: ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+      });
+      if (res.canceled || !res.assets?.length) return;
+      if (adjuntos.length + res.assets.length > ADJUNTO_MAX_COUNT) {
+        setAdjuntoError(`Máximo ${ADJUNTO_MAX_COUNT} archivos`);
+        return;
+      }
+      const next: typeof adjuntos = [...adjuntos];
+      for (const asset of res.assets) {
+        const blob = await (await fetch(asset.uri)).blob();
+        const name = asset.name ?? asset.uri.split('/').pop() ?? `adjunto-${Date.now()}`;
+        const type = asset.mimeType ?? blob.type ?? 'application/octet-stream';
+        const size = blob.size || asset.size || 0;
+        const err = validateAdjunto({ name, size, type });
+        if (err) { setAdjuntoError(`${name}: ${err}`); return; }
+        next.push({ name, size, type, file: blob });
+      }
+      setAdjuntos(next);
+    } catch (e) {
+      setAdjuntoError(e instanceof Error ? e.message : 'No se pudo abrir el selector de archivos');
+    }
   };
 
   const onSelectCategoria = (c: TicketCategoria) => {
@@ -211,26 +241,15 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       if (adjuntosFailed.length) {
         const msg = `Ticket #${res.numero} creado, pero falló la subida de: ${adjuntosFailed.join(', ')}`;
         setAdjuntoError(msg);
-        showAlert(adjuntosFailed.length === adjuntos.length ? 'Ticket creado — adjuntos fallaron' : 'Algunos adjuntos fallaron', msg, () => {
-          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
-          setAdjuntos([]); setErrors({}); setTouched({}); setSugerencia(null); eleccionManualRef.current = false; navigation?.goBack?.();
-        });
+        fb.show(adjuntosFailed.length === adjuntos.length ? 'Ticket creado — adjuntos fallaron' : 'Algunos adjuntos fallaron', msg, 'warning', { onConfirm: resetTrasCrear });
         return;
       }
-      showAlert('Solicitud creada', `Ticket #${res.numero} creado correctamente`, () => {
-        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
-        setAdjuntos([]);
-        setErrors({});
-        setTouched({});
-        setSugerencia(null);
-        eleccionManualRef.current = false;
-        navigation?.goBack?.();
-      });
+      fb.show('Solicitud creada', `Ticket #${res.numero} creado correctamente`, 'success', { onConfirm: resetTrasCrear });
     } catch (e) {
       const msg = humanizeError(e instanceof Error ? e.message : String(e));
       console.error('[CreateTicket] error', e);
       setSubmitError(msg);
-      showAlert('Error al crear', msg);
+      fb.show('Error al crear', msg, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -407,13 +426,14 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </View>
           {touched.prioridad && errors.prioridad ? <Text style={s.error}>{errors.prioridad}</Text> : null}
 
-          {/* Adjuntos RF-07 imágenes + PDF/DOCX — clic abre picker */}
-          <Pressable onPress={() => (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.()} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar adjuntos">
+          {/* Adjuntos RF-07 imágenes + PDF/DOCX — web usa input oculto, nativo usa DocumentPicker (QA-C2) */}
+          <Pressable onPress={() => { if (Platform.OS === 'web') { (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.(); } else { void onPickNative(); } }} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar adjuntos">
             <Text style={s.dropIcon}>⤒</Text>
             <Text style={s.dropTitle}>Adjuntos (opcional) — tocar para cargar</Text>
             <Text style={s.dropSub}>Imágenes, PDF o Word (DOC/DOCX) · 10 MB máx · 5 máx {adjuntos.length ? `· ${adjuntos.length} seleccionado(s)` : ''}</Text>
           </Pressable>
-          {/* input web nativo oculto */}
+          {/* input web nativo oculto (solo web; en nativo se usa DocumentPicker) */}
+          {Platform.OS === 'web' ? (
           <View style={{ display: 'none' } as unknown as object}>
             {/* @ts-ignore web only */}
             <input
@@ -424,6 +444,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               onChange={(e: { target: { files: FileList | null; value: string } }) => { onPickFiles(e.target.files); e.target.value = ''; }}
             />
           </View>
+          ) : null}
           {adjuntoError ? <Text style={s.error}>{adjuntoError}</Text> : null}
           {adjuntos.length ? (
             <View style={s.adjList}>
@@ -447,11 +468,12 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               accessibilityLabel="Crear solicitud"
               accessibilityState={{ disabled: submitting }}
               style={({ pressed }) => [s.submit, pressed && { opacity: 0.92 }, submitting && { opacity: 0.6 }]}>
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>Crear solicitud</Text>}
+              {submitting ? <ActivityIndicator color={theme.colors.inkOnAccent} /> : <Text style={s.submitText}>Crear solicitud</Text>}
             </Pressable>
           </View>
         </Card>
       </View>
+      {fb.modal}
     </ScrollView>
   );
 }
@@ -541,7 +563,7 @@ const s = StyleSheet.create({
   btnGhost: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   btnGhostText: { color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 },
   submit: { flex: 1.2, backgroundColor: theme.colors.accent, paddingVertical: 13, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
-  submitText: { color: '#fff', fontWeight: '800', letterSpacing: 0.3, fontSize: 13 },
+  submitText: { color: theme.colors.inkOnAccent, fontWeight: '800', letterSpacing: 0.3, fontSize: 13 },
   footnote: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'center', fontWeight: '600' },
   btnPrimary: { marginTop: 4, backgroundColor: theme.colors.primary, paddingHorizontal: 18, paddingVertical: 10, borderRadius: theme.radius.full },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },

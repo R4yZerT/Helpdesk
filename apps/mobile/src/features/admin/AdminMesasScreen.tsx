@@ -107,14 +107,15 @@ export function AdminMesasScreen() {
       if (Platform.OS !== 'web') {
         // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
         const shared = await shareCsvNativo(filename, meta);
-        if (!shared) alert('Compartir no disponible en este dispositivo');
+        if (!shared) { setFeedback({ visible: true, variant: 'info', title: 'Compartir no disponible en este dispositivo' }); return; }
+        setFeedback({ visible: true, variant: 'success', title: `CSV listo para compartir: ${mesas.length} filas.` });
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: any) { console.warn('[AdminMesas] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+    } catch (e: any) { console.warn('[AdminMesas] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message }); }
   }, [mesas]);
-  const onExportPng = useCallback(async () => { alert('Exportar PNG solo disponible en web — en móvil usa CSV'); }, []);
-  const onExportPdf = useCallback(async () => { alert('Exportar PDF solo disponible en web — en móvil usa CSV'); }, []);
+  const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PNG solo disponible en web — en móvil usa CSV' }); }, []);
+  const onExportPdf = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PDF solo disponible en web — en móvil usa CSV' }); }, []);
 
   const toggleActiva = (m: Mesa) => setConfirmToggle(m);
   const doToggleActiva = async () => {

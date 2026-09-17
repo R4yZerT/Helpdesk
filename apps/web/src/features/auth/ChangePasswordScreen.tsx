@@ -1,7 +1,7 @@
 // RF-03 — Cambio de contraseña (logueado) web — Stitch + NIST 800-63B
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, validatePassword, validatePasswordSync, PasswordStrength, Card, Button, IconEye, IconEyeOff, IconLock } from '@helpdesk/shared';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { theme, validatePassword, validatePasswordSync, PasswordStrength, Card, Button, IconEye, IconEyeOff, IconLock, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -17,6 +17,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const fb = useFeedback();
 
   const sync = useMemo(
     () => (next ? validatePasswordSync(next, { email: profile?.email ?? undefined, nombre: profile?.full_name ?? undefined, rol: profile?.rol }) : null),
@@ -60,7 +61,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
       setCurrent('');
       setNext('');
       setConfirm('');
-      Alert.alert('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.');
+      fb.show('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.', 'success');
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -123,6 +124,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
           </View>
         </View>
       </ScrollView>
+      {fb.modal}
     </View>
   );
 }

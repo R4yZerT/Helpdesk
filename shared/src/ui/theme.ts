@@ -9,6 +9,8 @@ export const theme = {
     accent: '#FD7C06',
     accentStrong: '#C65A00',
     accentMuted: '#FFF3E6',
+    // Tinta sobre accent: blanco da ~2.9:1 (falla AA); #1A1000 da ~7:1
+    inkOnAccent: '#1A1000',
     // Tonal tints para tablas/stripes
     blue50: '#EFF6FF',
     orange50: '#FFF7ED',
