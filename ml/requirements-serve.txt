@@ -1,0 +1,7 @@
+# ml/requirements-serve.txt — solo inferencia (serve.py). Pines fijos para imagen prod.
+# torch se instala aparte desde el índice CPU de PyTorch (ver ml/Dockerfile).
+transformers==4.55.*
+safetensors>=0.4
+fastapi==0.116.*
+uvicorn[standard]==0.35.*
+pydantic>=2.0

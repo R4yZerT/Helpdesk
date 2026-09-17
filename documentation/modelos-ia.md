@@ -73,6 +73,19 @@ Trunca a 2000 caracteres / 256 tokens, mínimo 5 caracteres, inferencia con
 `torch.no_grad()` + softmax. La variable `BETO_MODEL_DIR` elige el modelo;
 `EXPO_PUBLIC_BETO_URL` lo expone a web/móvil en build.
 
+#### Despliegue prod (imagen + compose)
+
+- **Imagen** `ml/Dockerfile` (python 3.11-slim, torch CPU 2.8.*, deps en
+  `ml/requirements-serve.txt`, usuario non-root, HEALTHCHECK a `/health`).
+  El modelo NO va en la imagen: se monta read-only (`/model`).
+- **Compose**: servicio `beto` (`./ml/models/beto-smoke:/model:ro`, puerto
+  8001, healthcheck); `web` lo espera (`depends_on: service_healthy`) y
+  hornea `EXPO_PUBLIC_BETO_URL` (default `http://localhost:8001` en local;
+  en prod, URL pública del servicio BETO).
+- **Verificado en vivo** (2026-10): `/health` → 13 etiquetas;
+  `/classify {"text":"No tengo internet…"}` →
+  `tic:Conectividad y redes` con confianza 0.9141.
+
 ### Integración en pantallas (`shared/src/ia.ts`)
 
 `predecirCategoria(texto, {categorias, mesas})`:
@@ -110,6 +123,12 @@ La fuente ya se persiste por ticket en `ticket_ia_feedback`
   + `python ml/src/export_dataset_validado.py` → CSV para reentrenamiento.
   `esAptoEntrenamiento` es la guarda en cliente. Tests en
   `shared/src/ia-feedback.test.ts` (21 files / 188 tests en shared).
+- **Métricas:** vista `metricas_ia_feedback` (migración `20261019000000`):
+  por fuente (`beto`/`reglas`/`manual`) total, pendientes, confirmadas,
+  corregidas, `precision_validada` (confirmadas / validadas) y
+  `confianza_promedio`. Ambas vistas con `security_invoker = true`: el
+  jefe/admin ve el agregado global; el técnico solo el de sus tickets
+  (RLS del consultante).
 
 ---
 
