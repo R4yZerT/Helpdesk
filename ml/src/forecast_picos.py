@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -82,8 +83,13 @@ def evaluar(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     }
 
 
-def pronostico_recursivo(model, hist: pd.DataFrame, dias: int) -> list[dict]:
-    """Pronóstico multi-paso recursivo: cada día predicho alimenta los lags del siguiente."""
+def pronostico_recursivo(model, hist: pd.DataFrame, dias: int, q10_err: float, q90_err: float) -> list[dict]:
+    """Pronóstico multi-paso recursivo: cada día predicho alimenta los lags del siguiente.
+
+    Cada día trae el puntual (q50) más el rango q10–q90 calibrado con los
+    residuos del propio modelo en la ventana de test: lo = max(0, pred+q10),
+    hi = pred+q90. El rango comunica incertidumbre, no un número cerrado.
+    """
     serie = hist[["y"]].copy()
     out: list[dict] = []
     ultima = serie.index.max()
@@ -95,7 +101,13 @@ def pronostico_recursivo(model, hist: pd.DataFrame, dias: int) -> list[dict]:
         feats = construir_features(extendida).tail(1).drop(columns=["y"])
         pred = max(0.0, float(model.predict(feats)[0]))
         serie.loc[fecha, "y"] = pred
-        out.append({"fecha": fecha.strftime("%Y-%m-%d"), "dow": int(fecha.dayofweek), "forecast": round(pred, 1)})
+        out.append({
+            "fecha": fecha.strftime("%Y-%m-%d"),
+            "dow": int(fecha.dayofweek),
+            "forecast": round(pred, 1),
+            "lo": round(max(0.0, pred + q10_err), 1),
+            "hi": round(max(0.0, pred + q90_err), 1),
+        })
     return out
 
 
@@ -108,39 +120,58 @@ def marcar_nivel(forecast: list[dict], umbral_alta: float, umbral_pico: float) -
     return forecast
 
 
-def entrenar_serie(nombre: str, serie: pd.DataFrame, test_dias: int, forecast_dias: int) -> dict:
+def entrenar_serie(nombre: str, serie: pd.DataFrame, test_dias: int, forecast_dias: int,
+                  umbral_pico_q: float = 0.85) -> dict:
     data = construir_features(serie)
     feats = [c for c in data.columns if c != "y"]
     train, test = data.iloc[:-test_dias], data.iloc[-test_dias:]
+    y_true = test["y"].to_numpy()
 
     # Baseline heurístico actual (SQL RF-19): promedio rodante 28 días
     base_pred = test["roll_mean_28"].to_numpy()
-    resultados = {"baseline_avg28": evaluar(test["y"].to_numpy(), base_pred)}
+    resultados = {"baseline_avg28": evaluar(y_true, base_pred)}
 
-    mejor_nombre, mejor_mae, mejor_model = "baseline_avg28", resultados["baseline_avg28"]["mae"], None
+    mejor_nombre, mejor_mae = "baseline_avg28", resultados["baseline_avg28"]["mae"]
+    mejor_pred_test, mejor_model = base_pred, None
     for nombre_m, model in modelos_candidatos().items():
         model.fit(train[feats], train["y"])
         pred = model.predict(test[feats])
-        m = evaluar(test["y"].to_numpy(), pred)
+        m = evaluar(y_true, pred)
         resultados[nombre_m] = m
         if m["mae"] < mejor_mae:
-            mejor_nombre, mejor_mae, mejor_model = nombre_m, m["mae"], model
+            mejor_nombre, mejor_mae = nombre_m, m["mae"]
+            mejor_pred_test, mejor_model = pred, model
+
+    # Rango q10–q90 calibrado con los residuos del ganador en test.
+    # cobertura = fracción de días reales que cayeron dentro del rango.
+    residuos = y_true - mejor_pred_test
+    q10_err = round(float(np.quantile(residuos, 0.10)), 2)
+    q90_err = round(float(np.quantile(residuos, 0.90)), 2)
+    dentro = ((y_true >= mejor_pred_test + q10_err) & (y_true <= mejor_pred_test + q90_err))
+    cobertura = round(float(dentro.mean()), 3) if len(y_true) else 0.0
+    resultados[mejor_nombre]["cobertura_q10_q90"] = cobertura
 
     # Reentrena el ganador con toda la data y pronostica
     if mejor_model is not None:
         mejor_model.fit(data[feats], data["y"])
         joblib.dump(mejor_model, OUT_DIR / f"{nombre}_model.pkl")
-        forecast = pronostico_recursivo(mejor_model, serie, forecast_dias)
+        forecast = pronostico_recursivo(mejor_model, serie, forecast_dias, q10_err, q90_err)
     else:
+        media = round(float(base_pred.mean()), 1)
         forecast = [
-            {"fecha": (serie.index.max() + pd.Timedelta(days=i)).strftime("%Y-%m-%d"), "forecast": round(float(base_pred.mean()), 1)}
+            {"fecha": (serie.index.max() + pd.Timedelta(days=i)).strftime("%Y-%m-%d"),
+             "forecast": media,
+             "lo": round(max(0.0, media + q10_err), 1),
+             "hi": round(max(0.0, media + q90_err), 1)}
             for i in range(1, forecast_dias + 1)
         ]
 
-    # Umbrales sobre días con actividad (evita que los ceros por finde/gap los hundan)
+    # Umbrales sobre días con actividad (evita que los ceros por finde/gap los hundan).
+    # umbral_pico_q configurable: bajarlo (ej. 0.75) atrapa más picos (recall)
+    # a costa de más avisos (menos precisión).
     activos = serie["y"][serie["y"] > 0]
     base = activos if len(activos) >= 20 else serie["y"]
-    umbral_pico = round(float(base.quantile(0.85)), 1)
+    umbral_pico = round(float(base.quantile(umbral_pico_q)), 1)
     umbral_alta = round(float(base.quantile(0.60)), 1)
     forecast = marcar_nivel(forecast, umbral_alta, umbral_pico)
     # Fin de semana con pronóstico bajo nunca es pico (regla operativa)
@@ -170,6 +201,8 @@ def main() -> None:
     parser.add_argument("--forecast-dias", type=int, default=7)
     parser.add_argument("--input", type=str, default=str(INPUT),
                         help="Parquet de entrada (por defecto el histórico limpio)")
+    parser.add_argument("--umbral-pico-q", type=float, default=0.85,
+                        help="Cuantil para umbral de pico (menor = más avisos/recall, ej. 0.75)")
     args = parser.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -182,7 +215,7 @@ def main() -> None:
         serie = cargar_serie(df, dep)
         etiqueta = "global" if dep is None else dep
         print(f"\n[{etiqueta}] días={len(serie)} media_dia={serie['y'].mean():.1f} max={serie['y'].max()}")
-        res = entrenar_serie(nombre, serie, args.test_dias, args.forecast_dias)
+        res = entrenar_serie(nombre, serie, args.test_dias, args.forecast_dias, args.umbral_pico_q)
         todo[etiqueta] = res
         print(f"  métricas: {res['metricas']} -> mejor: {res['mejor_modelo']}")
 
@@ -192,7 +225,16 @@ def main() -> None:
     (OUT_DIR / "forecast_7d.json").write_text(json.dumps(
         {k: v["forecast"] for k, v in todo.items()}, indent=2, ensure_ascii=False), encoding="utf-8")
     (OUT_DIR / "perfil_horario.json").write_text(json.dumps(perfil_horario(df), ensure_ascii=False), encoding="utf-8")
-    print(f"\n[ok] artefactos en {OUT_DIR}/ (metrics, forecast_7d, perfil_horario, *_model.pkl)")
+    # Metadatos de frescura: el dashboard avisa si el forecast está vencido.
+    # generado_en lo propaga upload-pronostico.ts a pronosticos_picos.generado_en.
+    (OUT_DIR / "forecast_meta.json").write_text(json.dumps({
+        "generado_en": datetime.now(timezone.utc).isoformat(),
+        "input": args.input,
+        "test_dias": args.test_dias,
+        "forecast_dias": args.forecast_dias,
+        "umbral_pico_q": args.umbral_pico_q,
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\n[ok] artefactos en {OUT_DIR}/ (metrics, forecast_7d, forecast_meta, perfil_horario, *_model.pkl)")
 
 
 if __name__ == "__main__":

@@ -235,18 +235,38 @@ export async function generarAlertasIA(client: any): Promise<number> {
 }
 
 // ── Pronóstico ML (tabla pronosticos_picos; [] si la migración aún no se aplicó) ──
-export type PronosticoDia = { fecha: string; serie: string; forecast: number; nivel: string; esPico: boolean; modeloVersion: string | null };
+// B (rangos): lo/hi = banda q10–q90 calibrada; null = fila anterior a la migración.
+// C (frescura): generadoEn = instante UTC en que el pipeline generó el forecast.
+export type PronosticoDia = {
+  fecha: string; serie: string; forecast: number; nivel: string; esPico: boolean;
+  modeloVersion: string | null; lo?: number | null; hi?: number | null; generadoEn?: string | null;
+};
+const SELECT_PRONOSTICO = 'fecha,serie,forecast,nivel,es_pico,modelo_version,lo,hi,generado_en';
+const SELECT_PRONOSTICO_LEGACY = 'fecha,serie,forecast,nivel,es_pico,modelo_version';
+function mapearPronosticoDia(r: any): PronosticoDia {
+  return {
+    fecha: String(r.fecha).slice(0, 10), serie: r.serie, forecast: Number(r.forecast),
+    nivel: r.nivel, esPico: Boolean(r.es_pico), modeloVersion: r.modelo_version ?? null,
+    lo: r.lo == null ? null : Number(r.lo), hi: r.hi == null ? null : Number(r.hi),
+    generadoEn: r.generado_en ?? null,
+  };
+}
 export async function getPronosticoSemanal(client: SupabaseClient): Promise<PronosticoDia[]> {
   try {
     const hoy = new Date().toISOString().slice(0, 10);
-    const { data, error } = await (client.from('pronosticos_picos') as any)
-      .select('fecha,serie,forecast,nivel,es_pico,modelo_version')
-      .gte('fecha', hoy).order('fecha', { ascending: true }).limit(28);
+    // `from()` fresco por intento: no se reusa el builder entre el select con
+    // rangos y el fallback legacy (postgrest-js muta el builder en cada llamada).
+    const pedir = (cols: string) => (client.from('pronosticos_picos') as any)
+      .select(cols).gte('fecha', hoy).order('fecha', { ascending: true }).limit(28);
+    let { data, error } = await pedir(SELECT_PRONOSTICO);
+    if (error) {
+      // Compatibilidad: BD sin la migración de rangos (sin columnas lo/hi/generado_en)
+      const legacy = await pedir(SELECT_PRONOSTICO_LEGACY);
+      data = legacy.data;
+      error = legacy.error;
+    }
     if (error || !data) return [];
-    return (data as any[]).map((r) => ({
-      fecha: String(r.fecha).slice(0, 10), serie: r.serie, forecast: Number(r.forecast),
-      nivel: r.nivel, esPico: Boolean(r.es_pico), modeloVersion: r.modelo_version ?? null,
-    }));
+    return (data as any[]).map(mapearPronosticoDia);
   } catch (_) { return []; }
 }
 
@@ -279,6 +299,22 @@ export function resumirPronosticoML(dias: PronosticoDia[]): PronosticoSerieResum
     });
   }
   return out.sort((a, b) => b.total7d - a.total7d);
+}
+
+// C (forecast fresco) — estado del pronóstico según edad del generado_en más reciente.
+// El pipeline corre los lunes 06:00 UTC: <5d vigente, 5–8d próximo a vencer, >8d vencido
+// (se saltó una corrida), sin generado_en o vacío = sin datos. Puro y testeado.
+export type FrescuraPronostico = 'vigente' | 'proximo_a_vencer' | 'vencido' | 'sin_datos';
+export function estadoFrescuraPronostico(
+  dias: PronosticoDia[], ahora: Date = new Date(),
+): { estado: FrescuraPronostico; generadoEn: string | null; edadDias: number | null } {
+  const stamps = dias.map((d) => d.generadoEn).filter((g): g is string => !!g);
+  if (!dias.length || !stamps.length) return { estado: 'sin_datos', generadoEn: null, edadDias: null };
+  const generadoEn = stamps.sort()[stamps.length - 1]!;
+  const edadDias = Math.max(0, (ahora.getTime() - new Date(generadoEn).getTime()) / 86400000);
+  if (Number.isNaN(edadDias)) return { estado: 'sin_datos', generadoEn, edadDias: null };
+  const estado: FrescuraPronostico = edadDias > 8 ? 'vencido' : edadDias > 5 ? 'proximo_a_vencer' : 'vigente';
+  return { estado, generadoEn, edadDias: Math.round(edadDias * 10) / 10 };
 }
 
 export async function marcarAlertaIA(client: any, id: number, estado: 'vista' | 'resuelta'): Promise<void> {
