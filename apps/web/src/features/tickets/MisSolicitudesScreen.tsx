@@ -298,6 +298,6 @@ const s = StyleSheet.create({
   bannerBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   bannerBtnText: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
   fab: { position: 'absolute', right: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: theme.colors.accent, paddingHorizontal: 18, height: 48, borderRadius: 999, ...theme.shadow.medium as object, borderWidth: 1, borderColor: '#FED7AA' },
-  fabIcon: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: -1 },
-  fabText: { color: '#fff', fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
+  fabIcon: { color: theme.colors.inkOnAccent, fontSize: 16, fontWeight: '800', marginTop: -1 },
+  fabText: { color: theme.colors.inkOnAccent, fontWeight: '800', fontSize: 13, letterSpacing: 0.2 },
 });

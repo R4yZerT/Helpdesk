@@ -1,7 +1,7 @@
 // RF-03 robusto — Cambio elegante con fortaleza
 import { useState, useMemo } from 'react';
-import { Alert, ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, validatePasswordSync, validatePassword, Card, Button } from '@helpdesk/shared';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme, validatePasswordSync, validatePassword, Card, Button, useFeedback } from '@helpdesk/shared';
 import { PasswordStrength } from '../../components/PasswordStrength';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +13,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const fb = useFeedback();
 
   const sync = useMemo(() => (next ? validatePasswordSync(next, { email: profile?.email ?? undefined, nombre: profile?.full_name ?? undefined, rol: profile?.rol }) : null), [next, profile]);
 
@@ -39,9 +40,9 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
       if (error) throw error;
       // RF-04 — cierre global real: invalida las demás sesiones (incluida la actual)
       await signOutGlobal();
-      Alert.alert('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.', [
-        { text: 'OK', onPress: () => { try { navigation?.goBack?.(); } catch { /* el gate ya muestra Login */ } } },
-      ]);
+      fb.show('Contraseña actualizada', 'Por seguridad se cerraron todas las sesiones. Inicia sesión de nuevo.', 'success', {
+        onConfirm: () => { try { navigation?.goBack?.(); } catch { /* el gate ya muestra Login */ } },
+      });
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
     } finally { setLoading(false); }
@@ -68,6 +69,7 @@ export function ChangePasswordScreen({ navigation }: { navigation?: { goBack: ()
           {loading ? <ActivityIndicator /> : <Button title="Actualizar contraseña" onPress={onSubmit} variant="brass" disabled={loading || !next || !confirm} />}
         </Card>
       </View>
+      {fb.modal}
     </ScrollView>
   );
 }

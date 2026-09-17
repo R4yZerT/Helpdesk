@@ -1,13 +1,14 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
+import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { shareCsvNativo } from '../../lib/share-csv';
 
 export function DashboardScreen() {
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
+  const fb = useFeedback();
 
   const [range, setRange] = React.useState<FilterRange>('30d');
   const [customDesde, setCustomDesde] = React.useState('');
@@ -110,28 +111,29 @@ export function DashboardScreen() {
       if (Platform.OS !== 'web') {
         // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
         const shared = await shareCsvNativo(filename, csv);
-        alert(shared ? `CSV listo para compartir: ${rows.length} filas.` : 'Compartir no disponible en este dispositivo');
+        fb.show(shared ? 'CSV listo' : 'Compartir no disponible', shared ? `CSV listo para compartir: ${rows.length} filas.` : 'Compartir no disponible en este dispositivo', shared ? 'success' : 'warning');
         return;
       }
       downloadCsv(filename, csv);
-    } catch (e: any) { console.warn('[Dashboard] export', e); alert(e?.message ?? 'Error al exportar CSV'); }
+      fb.show('CSV descargado', `CSV generado (${rows.length} filas).`, 'success');
+    } catch (e: any) { console.warn('[Dashboard] export', e); fb.show('Error al exportar', e?.message ?? 'Error al exportar CSV', 'error'); }
   }, [filters, mesas, categorias, tecnicos]);
   const onExportPng = React.useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('PNG de gráficas solo en web — en móvil usa CSV'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('Solo en web', 'PNG de gráficas solo en web — en móvil usa CSV', 'info'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
+      if (!el) { fb.show('Sin gráficas', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('dashboard', 'png'); a.click();
-    } catch (e) { console.warn('[Dashboard] export png', e); alert('Error al exportar PNG'); }
+    } catch (e) { console.warn('[Dashboard] export png', e); fb.show('Error al exportar', 'Error al exportar PNG', 'error'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('PDF de gráficas solo en web — en móvil usa CSV'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('Solo en web', 'PDF de gráficas solo en web — en móvil usa CSV', 'info'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
+      if (!el) { fb.show('Sin gráficas', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
@@ -139,7 +141,7 @@ export function DashboardScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('dashboard', 'pdf'));
-    } catch (e) { console.warn('[Dashboard] export pdf', e); alert('Error al exportar PDF'); }
+    } catch (e) { console.warn('[Dashboard] export pdf', e); fb.show('Error al exportar', 'Error al exportar PDF', 'error'); }
   }, []);
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
@@ -200,6 +202,7 @@ export function DashboardScreen() {
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />} contentContainerStyle={{ padding: 16 }} style={{ flex: 1 }}>
         {content}
       </ScrollView>
+      {fb.modal}
     </View>
   );
 }

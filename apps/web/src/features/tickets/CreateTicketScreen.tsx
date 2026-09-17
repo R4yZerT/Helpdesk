@@ -463,7 +463,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               accessibilityLabel="Crear solicitud"
               accessibilityState={{ disabled: submitting }}
               style={({ pressed }) => [s.submit, pressed && { opacity: 0.92 }, submitting && { opacity: 0.6 }]}>
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>Crear solicitud</Text>}
+              {submitting ? <ActivityIndicator color={theme.colors.inkOnAccent} /> : <Text style={s.submitText}>Crear solicitud</Text>}
             </Pressable>
           </View>
         </Card>
@@ -565,7 +565,7 @@ const s = StyleSheet.create({
   btnGhost: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   btnGhostText: { color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 },
   submit: { flex: 1.2, backgroundColor: theme.colors.accent, paddingVertical: 13, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#FED7AA' },
-  submitText: { color: '#fff', fontWeight: '800', letterSpacing: 0.3, fontSize: 13 },
+  submitText: { color: theme.colors.inkOnAccent, fontWeight: '800', letterSpacing: 0.3, fontSize: 13 },
   footnote: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'center', fontWeight: '600' },
   btnPrimary: { marginTop: 4, backgroundColor: theme.colors.primary, paddingHorizontal: 18, paddingVertical: 10, borderRadius: theme.radius.full },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },

@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   buttonAccent: { backgroundColor: theme.colors.accent } as ViewStyle, // #FD7C06 solo urgencia
   buttonGhost: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border } as ViewStyle,
   buttonText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14, letterSpacing: 0.2 } as TextStyle,
-  buttonAccentText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14, letterSpacing: 0.2 } as TextStyle,
+  buttonAccentText: { color: theme.colors.inkOnAccent, fontWeight: '700', fontSize: 14, letterSpacing: 0.2 } as TextStyle,
   buttonGhostText: { color: theme.colors.textSoft, fontWeight: '600', fontSize: 14 } as TextStyle,
   eyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', color: theme.colors.primary } as TextStyle,
   sectionTitle: { fontSize: 20, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4 } as TextStyle,

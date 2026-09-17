@@ -1,6 +1,7 @@
-// DonutEstado — 5 estados con dona segmentada (conic-gradient) + leyenda barras
+// DonutEstado — 5 estados con dona segmentada (react-native-svg, web+nativo) + leyenda
 import * as React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { Circle, G, Svg } from 'react-native-svg';
 import { theme } from '../theme.js';
 import { Card } from '../components.js';
 
@@ -13,6 +14,12 @@ const COLORS: Record<string, string> = {
   devuelto: theme.colors.danger,      // rojo
 };
 
+// Geometría del anillo: exterior 96, interior 62 → trazo 17, radio medio 39.5
+const SIZE = 96;
+const STROKE = 17;
+const RADIO = (SIZE - STROKE) / 2;
+const CIRCUNFERENCIA = 2 * Math.PI * RADIO;
+
 export function DonutEstado({ data }: { data: { estado: string; count: number }[] }) {
   const byEstado = new Map(data.map((d) => [d.estado, d.count]));
   if (byEstado.has('programado')) {
@@ -20,21 +27,29 @@ export function DonutEstado({ data }: { data: { estado: string; count: number }[
     byEstado.delete('programado');
   }
   const filled = ESTADOS_ORDEN.map((e) => ({ estado: e, count: byEstado.get(e) ?? 0 }));
-  const total = filled.reduce((a, b) => a + b.count, 0) || 1;
+  const total = filled.reduce((a, b) => a + b.count, 0);
 
-  // conic-gradient para web: calcula stops acumulados
+  // Segmentos acumulados: cada Circle dibuja su fracción con dashoffset
   let acc = 0;
-  const stops: string[] = [];
+  const segmentos: { estado: string; color: string; dash: string; offset: number }[] = [];
   for (const d of filled) {
-    const pct = (d.count / total) * 100;
-    if (pct <= 0) continue;
+    const frac = total > 0 ? d.count / total : 0;
+    if (frac <= 0) continue;
     const color = COLORS[d.estado] ?? theme.colors.muted;
-    const start = acc;
-    const end = acc + pct;
-    stops.push(`${color} ${start.toFixed(2)}% ${end.toFixed(2)}%`);
-    acc = end;
+    const len = frac * CIRCUNFERENCIA;
+    segmentos.push({
+      estado: d.estado,
+      color,
+      dash: `${len.toFixed(2)} ${(CIRCUNFERENCIA - len).toFixed(2)}`,
+      offset: -acc * CIRCUNFERENCIA,
+    });
+    acc += frac;
   }
-  const gradient = stops.length ? `conic-gradient(${stops.join(', ')})` : `conic-gradient(${theme.colors.border} 0% 100%)`;
+
+  // Resumen textual para lector de pantalla (los charts no exponen nodos)
+  const resumen = total > 0
+    ? `Distribución por estado: ${filled.map((d) => `${d.estado.replace('_', ' ')} ${d.count}`).join(', ')}. Total ${total} tickets.`
+    : 'Sin tickets para mostrar distribución por estado.';
 
   return (
     <Card style={{ gap: 12 }}>
@@ -43,7 +58,35 @@ export function DonutEstado({ data }: { data: { estado: string; count: number }[
         <Text style={s.subtitle}>{total} tickets · 5 estados</Text>
       </View>
       <View style={s.donutRow}>
-        <View style={[s.donutOuter, { backgroundImage: gradient } as any]}>
+        <View style={s.donutOuter} accessible accessibilityRole="image" accessibilityLabel={resumen}>
+          <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+            <G rotation="-90" origin={`${SIZE / 2}, ${SIZE / 2}`}>
+              {segmentos.length === 0 ? (
+                <Circle
+                  cx={SIZE / 2}
+                  cy={SIZE / 2}
+                  r={RADIO}
+                  fill="none"
+                  stroke={theme.colors.border}
+                  strokeWidth={STROKE}
+                />
+              ) : (
+                segmentos.map((sg) => (
+                  <Circle
+                    key={sg.estado}
+                    cx={SIZE / 2}
+                    cy={SIZE / 2}
+                    r={RADIO}
+                    fill="none"
+                    stroke={sg.color}
+                    strokeWidth={STROKE}
+                    strokeDasharray={sg.dash}
+                    strokeDashoffset={sg.offset}
+                  />
+                ))
+              )}
+            </G>
+          </Svg>
           <View style={s.donutInner}>
             <Text style={s.centerNum}>{total}</Text>
             <Text style={s.centerLabel}>total</Text>
@@ -51,7 +94,7 @@ export function DonutEstado({ data }: { data: { estado: string; count: number }[
         </View>
         <View style={{ flex: 1, gap: 6 }}>
           {filled.map((d) => {
-            const pct = Math.round((d.count / total) * 100);
+            const pct = total > 0 ? Math.round((d.count / total) * 100) : 0;
             return (
               <View key={d.estado} style={s.legendRow}>
                 <View style={[s.dot, { backgroundColor: COLORS[d.estado] ?? theme.colors.muted }]} />
@@ -77,15 +120,15 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 10, fontWeight: '600', color: theme.colors.muted },
   donutRow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
   donutOuter: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: SIZE,
+    height: SIZE,
+    borderRadius: SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 0,
     overflow: 'hidden',
-  } as any,
+  },
   donutInner: {
+    position: 'absolute',
     width: 62,
     height: 62,
     borderRadius: 31,

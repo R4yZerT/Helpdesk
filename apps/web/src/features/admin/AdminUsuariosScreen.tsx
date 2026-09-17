@@ -115,7 +115,7 @@ export function AdminUsuariosScreen() {
       const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${users.length}`, `# Filtros: ${hasActiveFilters ? 'filtrado' : 'sin filtros'}`].join('\r\n') + '\r\n' + csv;
       const ok = downloadCsv(buildExportFilename('admin-usuarios', 'csv'), meta);
-      if (!ok) window.alert(`CSV generado (${users.length} filas).`);
+      if (!ok) setFeedback({ visible: true, variant: 'info', title: 'CSV generado', message: `Se generaron ${users.length} filas.` });
     } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
   }, [users, hasActiveFilters]);
   const onExportPng = useCallback(async () => {

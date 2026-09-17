@@ -526,7 +526,7 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary },
   btnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   btnAccent: { backgroundColor: theme.colors.accent, borderWidth: 1, borderColor: '#FED7AA' },
-  btnAccentText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  btnAccentText: { color: theme.colors.inkOnAccent, fontWeight: '800', fontSize: 12 },
   btnGhost: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   btnGhostText: { color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 },
   btnDanger: { backgroundColor: theme.colors.danger },

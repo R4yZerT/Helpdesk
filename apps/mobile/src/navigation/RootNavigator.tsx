@@ -123,7 +123,13 @@ export function RootNavigator() {
           <Text style={s.errorText}>{error}</Text>
         </View>
       ) : null}
-      <NavigationContainer ref={navigationRef} theme={navTheme}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navTheme}
+        // El SO abre la app con helpdesk://ticket/<id>; el ruteo lo resuelve
+        // la cola pendiente (árbol por rol) en usePushNotificaciones.
+        linking={{ prefixes: ['helpdesk://'] }}
+      >
         {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
       </NavigationContainer>
     </View>
