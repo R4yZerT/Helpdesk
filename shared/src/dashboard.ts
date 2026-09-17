@@ -297,3 +297,24 @@ export async function listAlertasIA(client: SupabaseClient, opts: { estado?: str
   }
   return ((data ?? []) as any[]).map((r) => ({ id: r.id, tipo: r.tipo, mensaje: r.mensaje, severidad: r.severidad, estado: r.estado, creadoEn: r.creado_en, mesaId: r.mesa_id }));
 }
+
+// ── Telemetría IA (vista metricas_ia_feedback; [] si la migración aún no se aplicó) ──
+export type MetricaIaFuente = {
+  fuente: string; total: number; pendientes: number;
+  confirmadas: number; corregidas: number;
+  precisionValidada: number | null; confianzaPromedio: number | null;
+};
+export async function getMetricasIaFeedback(client: SupabaseClient): Promise<MetricaIaFuente[]> {
+  try {
+    const { data, error } = await (client.from('metricas_ia_feedback') as any)
+      .select('fuente,total,pendientes,confirmadas,corregidas,precision_validada,confianza_promedio')
+      .order('total', { ascending: false });
+    if (error || !data) return [];
+    return (data as any[]).map((r) => ({
+      fuente: String(r.fuente), total: Number(r.total), pendientes: Number(r.pendientes),
+      confirmadas: Number(r.confirmadas), corregidas: Number(r.corregidas),
+      precisionValidada: r.precision_validada != null ? Number(r.precision_validada) : null,
+      confianzaPromedio: r.confianza_promedio != null ? Number(r.confianza_promedio) : null,
+    }));
+  } catch (_) { return []; }
+}
