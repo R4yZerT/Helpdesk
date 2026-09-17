@@ -1,8 +1,8 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 
@@ -32,6 +32,7 @@ const tonoPrioridad = (p: string) => {
 
 export function TicketDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
+  const fb = useFeedback();
   // Volver a bandeja: pop del stack; fallback a MisSolicitudes si no hay historial
   const handleBack = () => {
     const nav = navigation as { canGoBack?: () => boolean; goBack?: () => void; navigate?: (name: string) => void } | undefined;
@@ -162,12 +163,15 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     } catch (e) { setEditError(e instanceof Error ? e.message : String(e)); } finally { setEditSaving(false); }
   };
   const onCancelTicket = () => {
-    Alert.alert('Cancelar solicitud', '¿Seguro que quieres cerrar esta solicitud?', [
-      { text: 'No', style: 'cancel' },
-      { text: 'Sí, cerrar', style: 'destructive', onPress: async () => {
-        try { await cancelTicket(supabase, id); await load(); } catch (e) { Alert.alert('Error', e instanceof Error ? e.message : String(e)); }
-      }},
-    ]);
+    fb.ask({
+      title: 'Cancelar solicitud',
+      message: '¿Seguro que quieres cerrar esta solicitud?',
+      confirmText: 'Sí, cerrar',
+      cancelText: 'No',
+      onConfirm: async () => {
+        try { await cancelTicket(supabase, id); await load(); } catch (e) { fb.show('Error', e instanceof Error ? e.message : String(e), 'error'); }
+      },
+    });
   };
   const onTransition = async (estado: string) => {
     // El solicitante confirma con la solución ya registrada por el técnico (no la escribe)
@@ -441,6 +445,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         {left}
         {right}
       </View>
+      {fb.modal}
     </ScrollView>
   );
 }
@@ -498,7 +503,7 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary },
   btnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   btnAccent: { backgroundColor: theme.colors.accent, borderWidth: 1, borderColor: '#FED7AA' },
-  btnAccentText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  btnAccentText: { color: theme.colors.inkOnAccent, fontWeight: '800', fontSize: 12 },
   btnGhost: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
   btnGhostText: { color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 },
   btnDanger: { backgroundColor: theme.colors.danger },

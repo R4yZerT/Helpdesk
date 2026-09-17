@@ -87,28 +87,29 @@ export function AdminMesaTicketsScreen() {
       if (Platform.OS !== 'web') {
         // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
         const shared = await shareCsvNativo(filename, meta);
-        if (!shared) alert('Compartir no disponible en este dispositivo');
+        if (!shared) { setFeedback({ visible: true, variant: 'info', title: 'Compartir no disponible en este dispositivo' }); return; }
+        setFeedback({ visible: true, variant: 'success', title: `CSV listo para compartir: ${tickets.length} filas.` });
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export csv', e); alert(getErrorMessage(e)); }
+    } catch (e: unknown) { console.warn('[AdminMesaTickets] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: getErrorMessage(e) }); }
   }, [tickets, mesaId]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportar PNG solo disponible en web' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de tickets'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'info', title: 'No se encontró el contenedor de tickets' }); return; }
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await (html2canvas as unknown as (el: HTMLElement, opts: object) => Promise<HTMLCanvasElement>)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-mesa-tickets', 'png'); a.click();
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export png', e); alert('Error al exportar PNG'); }
+    } catch (e: unknown) { console.warn('[AdminMesaTickets] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG' }); }
   }, []);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportar PDF solo disponible en web' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de tickets'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'info', title: 'No se encontró el contenedor de tickets' }); return; }
       const html2canvas = (await import('html2canvas')).default;
       const { jsPDF } = await import('jspdf');
       const canvas = await (html2canvas as unknown as (el: HTMLElement, opts: object) => Promise<HTMLCanvasElement>)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
@@ -116,7 +117,7 @@ export function AdminMesaTicketsScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('admin-mesa-tickets', 'pdf'));
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export pdf', e); alert('Error al exportar PDF'); }
+    } catch (e: unknown) { console.warn('[AdminMesaTickets] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF' }); }
   }, []);
 
   const openAssign = async (t: Ticket) => {

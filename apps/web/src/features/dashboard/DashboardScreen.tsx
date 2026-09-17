@@ -1,12 +1,13 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename } from '@helpdesk/shared';
+import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
 export function DashboardScreen() {
+  const fb = useFeedback();
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
 
@@ -108,28 +109,29 @@ export function DashboardScreen() {
       const rows = ticketsToRows((data as any) ?? [], mesaName);
       const csv = toCsvWithMeta(rows, filters, { mesaName, categoriaName, tecnicoName });
       const ok = downloadCsv(buildExportFilename('dashboard', 'csv'), csv);
-      if (!ok && typeof window !== 'undefined') window.alert(`CSV generado (${rows.length} filas). Copia desde consola.`);
+      if (ok) fb.show('CSV listo', `Se generaron ${rows.length} filas.`, 'success');
+      else if (typeof window !== 'undefined') fb.show('CSV generado', `Se generaron ${rows.length} filas. Copia desde consola.`, 'info');
     } catch (e: any) {
       console.warn('[Dashboard] export', e);
-      if (typeof window !== 'undefined') window.alert(e?.message ?? 'Error al exportar CSV');
+      fb.show('Error al exportar', e?.message ?? 'Error al exportar CSV', 'error');
     }
   }, [filters, mesas, categorias, tecnicos]);
   const onExportPng = React.useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('No disponible', 'Exportar PNG solo disponible en web', 'warning'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
+      if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('dashboard', 'png'); a.click();
-    } catch (e: any) { console.warn('[Dashboard] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+    } catch (e: any) { console.warn('[Dashboard] export png', e); fb.show('Error al exportar', e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG', 'error'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('No disponible', 'Exportar PDF solo disponible en web', 'warning'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de gráficas'); return; }
+      if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       // jsPDF importado estático arriba
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
@@ -137,7 +139,7 @@ export function DashboardScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('dashboard', 'pdf'));
-    } catch (e: any) { console.warn('[Dashboard] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+    } catch (e: any) { console.warn('[Dashboard] export pdf', e); fb.show('Error al exportar', e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF', 'error'); }
   }, []);
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
@@ -198,6 +200,7 @@ export function DashboardScreen() {
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />} contentContainerStyle={{ padding: 16 }} style={{ flex: 1 }}>
         {content}
       </ScrollView>
+      {fb.modal}
     </View>
   );
 }

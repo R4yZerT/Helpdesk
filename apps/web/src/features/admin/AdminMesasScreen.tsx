@@ -105,25 +105,25 @@ export function AdminMesasScreen() {
       const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${mesas.length}`].join('\r\n') + '\r\n' + csv;
       const ok = downloadCsv(buildExportFilename('admin-dependencias', 'csv'), meta);
-      if (!ok) window.alert(`CSV generado (${mesas.length} filas).`);
-    } catch (e: any) { console.warn('[AdminMesas] export csv', e); alert(e?.message ?? 'Error al exportar CSV'); }
+      if (!ok) setFeedback({ visible: true, variant: 'info', title: 'CSV generado', message: `Se generaron ${mesas.length} filas.` });
+    } catch (e: any) { console.warn('[AdminMesas] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message ?? 'Error al exportar CSV' }); }
   }, [mesas]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PNG solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PNG solo disponible en web' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de dependencias'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: 'No se encontró el contenedor de dependencias' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-dependencias', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminMesas] export png', e); alert(e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG'); }
+    } catch (e: any) { console.warn('[AdminMesas] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG' }); }
   }, []);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { alert('Exportar PDF solo disponible en web'); return; }
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PDF solo disponible en web' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { alert('No se encontró el contenedor de dependencias'); return; }
+      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: 'No se encontró el contenedor de dependencias' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       // jsPDF importado estático arriba
       const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
@@ -131,7 +131,7 @@ export function AdminMesasScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('admin-dependencias', 'pdf'));
-    } catch (e: any) { console.warn('[AdminMesas] export pdf', e); alert(e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF'); }
+    } catch (e: any) { console.warn('[AdminMesas] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF' }); }
   }, []);
 
   const toggleActiva = (m: Mesa) => setConfirmToggle(m);

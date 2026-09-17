@@ -3,17 +3,17 @@
 // - Nativo: obtiene token Expo en device físico, lo registra en push_tokens,
 //   muestra foreground y abre el ticket al tocar la notificación.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, Linking, type AppStateStatus } from 'react-native';
 import {
   countNoLeidas, listNotificaciones, registerPushToken,
   subscribeNotificaciones, type Notificacion,
 } from '@helpdesk/shared';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { abrirTicketDesdePush } from '../navigation/navigationRef';
+import { abrirTicketDesdePush, drenarTicketsPendientes, encolarTicketPendiente, extraerTicketIdDeUrl } from '../navigation/navigationRef';
 import {
   addPushRecibidoListener, addPushRespuestaListener, ensureAndroidChannel,
-  initPushHandler, obtenerExpoPushToken,
+  initPushHandler, obtenerExpoPushToken, obtenerTicketIdInicialPush,
 } from '../lib/push';
 
 // Handler seguro: en Expo Go no lanza (ver push.ts).
@@ -37,6 +37,8 @@ export function usePushNotificaciones() {
     } catch {
       // Sin red / sin tabla: la campana muestra estado vacío.
     }
+    // La sesión ya cargó (árbol por rol montado): drenar taps encolados.
+    drenarTicketsPendientes();
   }, [session]);
 
   // Registra el token Expo una vez por sesión (solo device físico).
@@ -63,6 +65,31 @@ export function usePushNotificaciones() {
     }
     refresh();
     registrarTokenNativo();
+    // Cold-start: tap con app muerta o URL inicial (sesión restaurada después).
+    let cancelado = false;
+    (async () => {
+      try {
+        const [ticketPush, urlInicial] = await Promise.all([
+          obtenerTicketIdInicialPush(),
+          Linking.getInitialURL().catch(() => null),
+        ]);
+        if (cancelado) return;
+        if (ticketPush) encolarTicketPendiente(ticketPush);
+        const ticketUrl = extraerTicketIdDeUrl(urlInicial);
+        if (ticketUrl) encolarTicketPendiente(ticketUrl);
+        drenarTicketsPendientes();
+      } catch {
+        // Sin push nativo / sin URL: nada que drenar.
+      }
+    })();
+    // Deep-link en caliente (helpdesk://ticket/<id> con app abierta).
+    const subUrl = Linking.addEventListener('url', ({ url }) => {
+      const ticketId = extraerTicketIdDeUrl(url);
+      if (ticketId) {
+        encolarTicketPendiente(ticketId);
+        drenarTicketsPendientes();
+      }
+    });
     const unsub = subscribeNotificaciones(supabase as never, (n) => {
       setItems((prev) => [n, ...prev].slice(0, 12));
       setNoLeidas((c) => c + 1);
@@ -100,9 +127,11 @@ export function usePushNotificaciones() {
     });
 
     return () => {
+      cancelado = true;
       unsub();
       clearInterval(poll);
       sub.remove();
+      subUrl.remove();
       recv?.remove();
       resp?.remove();
     };

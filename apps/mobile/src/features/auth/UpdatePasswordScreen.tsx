@@ -2,8 +2,8 @@
 // Los tokens llegan por deep-link; AuthProvider los guarda y mantiene recoveryPending
 // para que el AuthNavigator siga montado hasta completar el flujo.
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, validatePassword, validatePasswordSync, Card, Button } from '@helpdesk/shared';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme, validatePassword, validatePasswordSync, Card, Button, useFeedback } from '@helpdesk/shared';
 import { PasswordStrength } from '../../components/PasswordStrength';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +17,7 @@ export function UpdatePasswordScreen() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const fb = useFeedback();
 
   // Canjea los tokens del enlace por sesión de recovery al montar
   useEffect(() => {
@@ -79,9 +80,9 @@ export function UpdatePasswordScreen() {
       }
       const { error } = await supabase.auth.updateUser({ password: next });
       if (error) throw error;
-      Alert.alert('Contraseña actualizada', 'Ya puedes usar el aplicativo con tu nueva contraseña.', [
-        { text: 'OK', onPress: () => clearRecovery() },
-      ]);
+      fb.show('Contraseña actualizada', 'Ya puedes usar el aplicativo con tu nueva contraseña.', 'success', {
+        onConfirm: () => clearRecovery(),
+      });
     } catch (e) {
       setServerError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -119,6 +120,7 @@ export function UpdatePasswordScreen() {
           )}
         </Card>
       </View>
+      {fb.modal}
     </ScrollView>
   );
 }

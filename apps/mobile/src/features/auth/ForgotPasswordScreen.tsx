@@ -1,7 +1,7 @@
 // RF-03 — Recuperación elegante
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
-import { theme, Card, Button } from '@helpdesk/shared';
+import { Pressable, StyleSheet, Text, TextInput, View, ScrollView } from 'react-native';
+import { theme, Card, Button, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 
 export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: (r: string) => void; goBack: () => void } }) {
@@ -9,6 +9,7 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const fb = useFeedback();
 
   const onSubmit = async () => {
     setError(null);
@@ -18,7 +19,7 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo: 'helpdesk://reset-password' });
       if (error) throw error;
       setSent(true);
-      Alert.alert('Correo enviado', 'Revisa tu bandeja y sigue el enlace (expira en 1h, max 60s entre envíos).');
+      fb.show('Correo enviado', 'Revisa tu bandeja y sigue el enlace (expira en 1h, max 60s entre envíos).', 'success');
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
@@ -43,6 +44,7 @@ export function ForgotPasswordScreen({ navigation }: { navigation?: { navigate: 
           </Pressable>
         </Card>
       </View>
+      {fb.modal}
     </ScrollView>
   );
 }

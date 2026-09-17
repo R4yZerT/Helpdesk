@@ -115,3 +115,20 @@ export function addPushRespuestaListener(
     return null;
   }
 }
+
+// Cold-start: ticket_id del tap que abrió la app con ella muerta.
+// Null en web / Expo Go / si no hubo tap pendiente (consume la respuesta una vez).
+export async function obtenerTicketIdInicialPush(): Promise<string | null> {
+  try {
+    const N = getNotifications();
+    if (!N) return null;
+    const resp = await N.getLastNotificationResponseAsync();
+    const ticketId = (resp?.notification.request.content.data ?? {}) as { ticket_id?: unknown };
+    return typeof ticketId.ticket_id === 'string' && ticketId.ticket_id.length > 0
+      ? ticketId.ticket_id
+      : null;
+  } catch (e) {
+    console.log('[push] initial response error:', e instanceof Error ? e.message : e);
+    return null;
+  }
+}
