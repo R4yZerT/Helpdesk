@@ -179,7 +179,22 @@ forecast_7d.json ──upload-pronostico──▶ pronosticos_picos ──▶ ge
 - **Dashboard**: `getPronosticoSemanal()` (`shared/src/dashboard.ts`) lee la
   tabla y devuelve 7 días por serie; retorna `[]` si la migración aún no se aplicó.
 
-### Operación semanal
+### Operación semanal (automatizada)
+
+Workflow `.github/workflows/forecast-semanal.yml` (cron lunes 06:00 UTC,
+ejecutable manual con `workflow_dispatch`):
+
+1. `python3 ml/src/export_tickets_live.py` → `data/processed/tickets_live.parquet`
+   (tickets vivos vía REST con `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`)
+2. `python3 ml/src/forecast_picos.py --input data/processed/tickets_live.parquet`
+3. `pnpm upload:pronostico:push` → upsert en `pronosticos_picos`
+4. Invocar `generate-alertas` (o esperar el cron diario 06:00).
+
+Equivalente manual: `pnpm forecast:live` (requiere las env vars y termina
+en dry-run de subida; añade `-- --push` vía `upload:pronostico:push` si se
+quiere publicar). Las fechas del forecast parten del último día de datos.
+
+### Operación manual (histórico estático)
 
 1. Importar datos nuevos → 2. `python3 ml/src/forecast_picos.py`
 3. `pnpm run upload:pronostico -- --push --sql /tmp/p.sql` + apply vía CLI

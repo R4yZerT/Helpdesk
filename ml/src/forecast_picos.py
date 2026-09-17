@@ -168,10 +168,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Forecast ML clásico de picos de tickets")
     parser.add_argument("--test-dias", type=int, default=30)
     parser.add_argument("--forecast-dias", type=int, default=7)
+    parser.add_argument("--input", type=str, default=str(INPUT),
+                        help="Parquet de entrada (por defecto el histórico limpio)")
     args = parser.parse_args()
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    df = pd.read_parquet(INPUT)
+    df = pd.read_parquet(args.input)
     df["fecha_parsed"] = pd.to_datetime(df["fecha_parsed"])
 
     series = {"global": None, **{f"dep_{i}": d for i, d in enumerate(TOP_DEPENDENCIAS)}}
