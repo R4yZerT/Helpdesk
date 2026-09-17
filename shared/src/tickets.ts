@@ -510,15 +510,33 @@ export async function transitionTicket(
   }
   const payload: Record<string, unknown> = { estado: nuevoEstado };
   if (opts?.solucionAplicada !== undefined) payload.solucion_aplicada = opts.solucionAplicada.trim() || null;
-  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
+  // QA-H4 — update condicional anti-TOCTOU: si otro técnico cambió el estado
+  // entre la lectura y el update, esto afecta 0 filas en vez de pisarlo.
+  const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).eq('estado', actual).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').maybeSingle();
   if (error) throw new Error(error.message);
+  if (!data) throw new Error('El ticket cambió de estado mientras lo editabas. Recarga e inténtalo de nuevo.');
   if (opts?.comentario?.trim()) {
-    try { await addComentario(client, ticketId, opts.comentario.trim()); } catch { /* no bloquea transición */ }
+    try { await addComentario(client, ticketId, opts.comentario.trim()); } catch (e) { console.warn('[transitionTicket] comentario no guardado', e); }
   }
   return mapTicket(data as unknown as Record<string, unknown>);
 }
 
 // RF-14 — Reasignar a otro técnico o mesa
+export type DestinoReasignacion = {
+  id: string;
+  rol: string | null;
+  activo: boolean | null;
+  mesaId: number | null;
+};
+
+/** QA-H6 — validación pura del destino de reasignación (testeable sin DB). */
+export function validarDestinoReasignacion(destino: DestinoReasignacion | null, mesaDestino: number): void {
+  if (!destino) throw new Error('Técnico no encontrado');
+  if (destino.rol !== 'tecnico') throw new Error('La reasignación solo admite usuarios con rol técnico');
+  if (!destino.activo) throw new Error('El técnico está inactivo');
+  if (destino.mesaId !== mesaDestino) throw new Error('El técnico no pertenece a la mesa destino');
+}
+
 export async function reassignTicket(
   client: SupabaseClient,
   ticketId: string,
@@ -531,6 +549,23 @@ export async function reassignTicket(
   if (patch.mesaId !== undefined) {
     if (patch.mesaId !== null && (!Number.isInteger(patch.mesaId) || patch.mesaId <= 0)) throw new Error('Mesa inválida');
     payload.mesa_id = patch.mesaId;
+  }
+  // QA-H6 — validar destino antes de mutar: rol técnico, activo y de la mesa
+  // destino (la mesa nueva si se cambia a la vez, si no la actual del ticket).
+  if (patch.tecnicoId) {
+    const [perfilRes, ticketRes] = await Promise.all([
+      client.from('profiles').select('id,rol,activo,mesa_id').eq('id', patch.tecnicoId).maybeSingle(),
+      patch.mesaId === undefined
+        ? client.from('tickets').select('mesa_id').eq('id', ticketId).single()
+        : Promise.resolve({ data: { mesa_id: patch.mesaId }, error: null }),
+    ]);
+    if (perfilRes.error) throw new Error(perfilRes.error.message);
+    if (ticketRes.error) throw new Error(ticketRes.error.message);
+    const p = perfilRes.data as unknown as { id: string; rol: string | null; activo: boolean | null; mesa_id: number | null } | null;
+    validarDestinoReasignacion(
+      p ? { id: p.id, rol: p.rol, activo: p.activo, mesaId: p.mesa_id } : null,
+      (ticketRes.data as unknown as { mesa_id: number }).mesa_id,
+    );
   }
   const { data, error } = await client.from('tickets').update(payload).eq('id', ticketId).select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en').single();
   if (error) throw new Error(error.message);
@@ -559,8 +594,9 @@ export async function listAssignedTickets(client: SupabaseClient, params: ListAs
   const uid = user.user?.id;
   let query = client.from('tickets').select('id,numero,usuario_id,mesa_id,categoria_id,asunto,descripcion,prioridad,estado,tecnico_asignado_id,fecha_resolucion,solucion_aplicada,creado_en,actualizado_en,sla_vence_en', { count: 'exact' });
   if (uid) query = query.eq('tecnico_asignado_id', uid);
-  // Orden base por antigüedad; prioridad se ordena en memoria para respetar peso sin depender de orden alfabético
-  query = query.order('creado_en', { ascending: true }).order('id', { ascending: true }).range(from, to);
+  // QA-H3 — orden por prioridad en DB (prioridad_peso, migración
+  // 20261018000002) antes de .range(), para que la paginación sea correcta
+  query = query.order('prioridad_peso', { ascending: false }).order('creado_en', { ascending: true }).order('id', { ascending: true }).range(from, to);
   if (params.estado && isEstadoTicket(params.estado)) query = query.eq('estado', params.estado);
   if (params.prioridad && isPrioridadTicket(params.prioridad)) query = query.eq('prioridad', params.prioridad);
   if (params.mesaId) query = query.eq('mesa_id', params.mesaId);
@@ -571,14 +607,7 @@ export async function listAssignedTickets(client: SupabaseClient, params: ListAs
   }
   const { data, error, count } = await query;
   if (error) throw new Error(error.message);
-  let rows = (data ?? []) as Record<string, unknown>[];
-  // Orden prioridad descendente + antigüedad ascendente (memoria, page ya acotado)
-  rows = [...rows].sort((a, b) => {
-    const pa = PRIORIDAD_PESO[a.prioridad as PrioridadTicket] ?? 0;
-    const pb = PRIORIDAD_PESO[b.prioridad as PrioridadTicket] ?? 0;
-    if (pb !== pa) return pb - pa;
-    return String(a.creado_en).localeCompare(String(b.creado_en));
-  });
+  const rows = ((data ?? []) as Record<string, unknown>[]);
   const total = count ?? rows.length;
   return { data: rows.map(mapTicket), total, hasMore: from + rows.length < total, page, pageSize };
 }
