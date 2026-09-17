@@ -1,7 +1,23 @@
-# HelpDesk — web contra Supabase Cloud
+# HelpDesk — web contra Supabase Cloud + BETO local (RF-22)
 # Uso: docker compose up --build  (usa .env con https://*.supabase.co)
 # Variables: EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY (ver .env.example)
+#   EXPO_PUBLIC_BETO_URL — URL que el NAVEGADOR usa para /classify (default http://localhost:8001)
 services:
+  beto:
+    build:
+      context: .
+      dockerfile: ml/Dockerfile
+    volumes:
+      # El modelo no va en la imagen: se monta read-only desde el repo
+      - ./ml/models/beto-smoke:/model:ro
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=4).status == 200 else 1)"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
   web:
     build:
       context: .
@@ -9,6 +25,10 @@ services:
       args:
         EXPO_PUBLIC_SUPABASE_URL: ${EXPO_PUBLIC_SUPABASE_URL}
         EXPO_PUBLIC_SUPABASE_ANON_KEY: ${EXPO_PUBLIC_SUPABASE_ANON_KEY}
+        EXPO_PUBLIC_BETO_URL: ${EXPO_PUBLIC_BETO_URL:-http://localhost:8001}
+    depends_on:
+      beto:
+        condition: service_healthy
     ports:
       - "3000:80"
     restart: unless-stopped
