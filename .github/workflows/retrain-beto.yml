@@ -1,0 +1,49 @@
+# Reentrenamiento BETO (RF-22): mensual + manual.
+# Flujo: exporta feedback validado -> une con histórico -> fine-tune con gate
+# de baseline -> publica al bucket modelos-ia SOLO si promoted=true.
+# Requiere secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY.
+name: retrain-beto
+
+on:
+  schedule:
+    - cron: '0 5 1 * *' # día 1 de cada mes, 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: 'Publicar aunque el gate no promocione (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instala deps ML
+        run: pip install -r ml/requirements-serve.txt pandas pyarrow scikit-learn accelerate
+
+      - name: Exporta feedback validado
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python3 ml/src/export_dataset_validado.py --output data/processed/dataset_validado.csv
+
+      - name: Construye dataset de reentrenamiento
+        run: python3 ml/src/build_retrain_dataset.py --clean data/processed/tickets_clean.parquet --validated data/processed/dataset_validado.csv --out data/processed/dataset_retrain.parquet
+
+      - name: Fine-tune BETO (con gate de baseline)
+        run: python3 ml/src/train_beto.py --input data/processed/dataset_retrain.parquet --output models/beto-tickets --baseline-metrics ml/baseline_beto.json
+
+      - name: Publica modelo (solo si promoted)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          ARGS="--model-dir models/beto-tickets --version v$(date +%Y-%m-%d)"
+          if [ "${{ inputs.force_publish }}" = "true" ]; then ARGS="$ARGS --force"; fi
+          python3 ml/src/publish_model.py $ARGS

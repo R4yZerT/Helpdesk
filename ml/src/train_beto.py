@@ -61,7 +61,14 @@ SYNONYMS: dict[str, list[str]] = {
 MINORITY_THRESHOLD = 80
 
 
-def load_data(root: Path):
+def load_data(root: Path, input_path: str | None = None):
+    if input_path:
+        p = Path(input_path)
+        if not p.is_absolute():
+            p = root / p
+        if p.suffix == ".csv":
+            return pd.read_csv(p)
+        return pd.read_parquet(p)
     parquet = root / "data" / "processed" / "tickets_clean.parquet"
     csv = root / "data" / "processed" / "tickets_clean.csv"
     if parquet.exists():
@@ -150,6 +157,11 @@ def main():
     parser.add_argument("--model", type=str, default="dccuchile/bert-base-spanish-wwm-cased")
     parser.add_argument("--output", type=str, default="ml/models/beto-tickets")
     parser.add_argument("--subset", type=int, default=0, help="si >0, entrena solo con N filas (smoke test CPU)")
+    parser.add_argument("--input", type=str, default="",
+                        help="dataset de entrada (parquet/csv, ej. dataset_retrain.parquet de build_retrain_dataset.py)")
+    parser.add_argument("--baseline-metrics", type=str, default="",
+                        help="JSON con la métrica de referencia ({'test_macro_f1': x}); si el test macro-F1 "
+                             "no la supera, el modelo queda marcado promoted=false (no publicar)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--grid", action="store_true",
                         help="barrido lr x wd a 2 épocas (como celda 8) y entrena final con el mejor")
@@ -159,8 +171,8 @@ def main():
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parents[2]
-    df = load_data(root)
-    print(f"[data] filas={len(df)}")
+    df = load_data(root, args.input or None)
+    print(f"[data] filas={len(df)}" + (f" fuente={args.input}" if args.input else ""))
 
     if "categoria_label" in df.columns:
         df, label2id, id2label = consolidar(df)
@@ -306,8 +318,20 @@ def main():
     tokenizer.save_pretrained(str(out_dir))
     hp = hp_dict(args)
     hp.update({"lr_final": lr, "weight_decay_final": wd, "grid": args.grid})
+    test_macro_f1 = float(test_metrics.get("eval_macro_f1", 0.0))
+    # Gate de promoción: el modelo solo se publica si supera la baseline.
+    promoted = True
+    baseline_f1 = None
+    if args.baseline_metrics:
+        with open(args.baseline_metrics, encoding="utf-8") as f:
+            base = json.load(f)
+        baseline_f1 = float(base.get("test_macro_f1", base.get("eval_macro_f1", 0.0)))
+        promoted = test_macro_f1 >= baseline_f1
+        print(f"[gate] test macro-F1={test_macro_f1:.4f} vs baseline={baseline_f1:.4f} -> "
+              f"{'PROMOTED' if promoted else 'NO PROMOTED (no publicar)'}")
     with open(out_dir / "metrics.json", "w", encoding="utf-8") as f:
-        json.dump({"val": val_metrics, "test": test_metrics, "hp": hp, "clases": len(id2label)},
+        json.dump({"val": val_metrics, "test": test_metrics, "hp": hp, "clases": len(id2label),
+                   "promoted": promoted, "baseline_macro_f1": baseline_f1, "input": args.input or None},
                   f, ensure_ascii=False, indent=2)
     with open(out_dir / "label_mapping.json", "w", encoding="utf-8") as f:
         json.dump({"label2id": label2id, "id2label": {str(k): v for k, v in id2label.items()}},
