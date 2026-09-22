@@ -1,9 +1,8 @@
 // AdminNavigator móvil — Tabs: Admin (Usuarios/Dependencias/Categorías) · Mesas (tickets dependencia) · Perfil
 // Paridad con apps/web AdminNavigator; en móvil se usa tab bar nativa + campana RF-23.
-import { Text } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme } from '@helpdesk/shared';
+import { theme, IconGrid, IconSettings, IconUser } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
@@ -52,9 +51,9 @@ export function AdminNavigator() {
   return (
     <RequirePermission permission="profile:manage">
       <Tab.Navigator screenOptions={tabOpts}>
-        <Tab.Screen name="AdminMainTab" options={{ tabBarLabel: 'Admin', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⚙</Text> }} component={AdminMainStack} />
-        <Tab.Screen name="AdminMesasTab" options={{ tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>▦</Text>, headerShown: true, headerTitle: 'Tickets de mi dependencia', headerRight: () => <HeaderBell /> }} component={AdminMesaTicketsScreen} />
-        <Tab.Screen name="AdminPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilScreen} />
+        <Tab.Screen name="AdminMainTab" options={{ tabBarLabel: 'Admin', tabBarIcon: ({ color }) => <IconSettings size={16} color={color} /> }} component={AdminMainStack} />
+        <Tab.Screen name="AdminMesasTab" options={{ tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <IconGrid size={16} color={color} />, headerShown: true, headerTitle: 'Tickets de mi dependencia', headerRight: () => <HeaderBell /> }} component={AdminMesaTicketsScreen} />
+        <Tab.Screen name="AdminPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <IconUser size={16} color={color} />, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilScreen} />
       </Tab.Navigator>
     </RequirePermission>
   );

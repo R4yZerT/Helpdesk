@@ -8,7 +8,7 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
-import { theme } from '@helpdesk/shared';
+import { theme, ErrorBoundary } from '@helpdesk/shared';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
@@ -97,7 +97,9 @@ export function RootNavigator() {
         // la cola pendiente (árbol por rol) en usePushNotificaciones.
         linking={{ prefixes: ['helpdesk://'] }}
       >
-        {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
+        <ErrorBoundary titulo="La navegación no pudo cargarse">
+          {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
+        </ErrorBoundary>
       </NavigationContainer>
     </View>
   );

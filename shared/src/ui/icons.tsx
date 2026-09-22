@@ -152,6 +152,58 @@ export function IconTable({ size = 16, color = '#64748b' }: P) {
   );
 }
 
+export function IconUser({ size = 16, color = '#64748b' }: P) {
+  const r = size * 0.22;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* cabeza */}
+      <View style={{ width: r * 2, height: r * 2, borderRadius: r, borderWidth: 1.6, borderColor: color }} />
+      {/* hombros */}
+      <View style={{ width: size * 0.8, height: size * 0.32, borderWidth: 1.6, borderColor: color, borderBottomWidth: 0, borderTopLeftRadius: size * 0.4, borderTopRightRadius: size * 0.4, marginTop: 1 }} />
+    </View>
+  );
+}
+
+export function IconGrid({ size = 16, color = '#64748b' }: P) {
+  const c = size * 0.38;
+  const gap = size * 0.1;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', gap }}>
+        <View style={{ width: c, height: c, borderRadius: 2, backgroundColor: color }} />
+        <View style={{ width: c, height: c, borderRadius: 2, backgroundColor: color, opacity: 0.55 }} />
+      </View>
+      <View style={{ flexDirection: 'row', gap, marginTop: gap }}>
+        <View style={{ width: c, height: c, borderRadius: 2, backgroundColor: color, opacity: 0.55 }} />
+        <View style={{ width: c, height: c, borderRadius: 2, backgroundColor: color }} />
+      </View>
+    </View>
+  );
+}
+
+export function IconSettings({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* sliders */}
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ width: size * 0.85, height: 1.6, backgroundColor: color, borderRadius: 1, marginVertical: size * 0.09, opacity: i === 1 ? 0.55 : 1 }} />
+      ))}
+      <View style={{ position: 'absolute', left: size * 0.18, top: size * 0.16, width: size * 0.2, height: size * 0.2, borderRadius: size * 0.1, backgroundColor: color }} />
+      <View style={{ position: 'absolute', right: size * 0.18, bottom: size * 0.16, width: size * 0.2, height: size * 0.2, borderRadius: size * 0.1, backgroundColor: color }} />
+    </View>
+  );
+}
+
+export function IconMenu({ size = 16, color = '#64748b' }: P) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', gap: size * 0.16 }}>
+      {[0, 1, 2].map((i) => (
+        <View key={i} style={{ width: size * 0.85, height: 1.8, backgroundColor: color, borderRadius: 1 }} />
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   eyeOuter: { borderWidth: 1.8, alignItems: 'center', justifyContent: 'center' },
   eyeInner: { borderWidth: 1.8 },

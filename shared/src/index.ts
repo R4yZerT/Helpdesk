@@ -26,6 +26,7 @@ export * from './ui/layout/Sidebar.js';
 export * from './ui/layout/AppFooter.js';
 export * from './ui/PasswordStrength.js';
 export * from './ui/icons.js';
+export * from './ui/ErrorBoundary.js';
 export * from './ui/Clock.js';
 export * from './ui/FeedbackModal.js';
 export * from './ui/useFeedback.js';

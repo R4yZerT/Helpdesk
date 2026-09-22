@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, AppShell, IconInbox, IconPlus, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconInbox, IconPlus, IconUser, NotificationBell } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
@@ -69,7 +69,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
         if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
         return;
       }
-    } catch {}
+    } catch (e) { console.warn('[UsuarioNavigator] navigate', e); }
     nav?.navigate(name as never);
   };
   const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
@@ -118,7 +118,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Solicitudes',
           tabBarLabel: 'Mis solicitudes',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>☰</Text>,
+          tabBarIcon: ({ color }) => <IconInbox size={18} color={color} />,
         }}
         component={MisStack}
       />
@@ -127,7 +127,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Nueva',
           tabBarLabel: 'Nueva',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>＋</Text>,
+          tabBarIcon: ({ color }) => <IconPlus size={20} color={color} />,
           headerShown: true,
           headerStyle: { backgroundColor: theme.colors.surface } as never,
           headerTintColor: theme.colors.primary,
@@ -140,7 +140,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Perfil',
           tabBarLabel: profile?.full_name?.split(' ')[0] ?? 'Perfil',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>,
+          tabBarIcon: ({ color }) => <IconUser size={16} color={color} />,
         }}
       >
         {() => {
