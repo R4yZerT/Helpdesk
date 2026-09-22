@@ -15,8 +15,24 @@ import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import type { AuthStackParamList } from './types';
-import { ErrorBoundary } from '@helpdesk/shared';
-import { reportError } from '../lib/sentry';
+import { ErrorBoundary, useOnboarding, OnboardingCard, type RolOnboarding } from '@helpdesk/shared';
+
+const webStorage = {
+  getItem: (key: string) => {
+    try {
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+    } catch {
+      // Sin almacenamiento: la guía se muestra pero no persiste
+    }
+  },
+};
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator();
@@ -54,6 +70,8 @@ function RoleNavigator() {
 
 export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
+  // H12 — guía de primer uso por rol (una vez por versión)
+  const ob = useOnboarding(session && profile ? webStorage : null, (profile?.rol as RolOnboarding | undefined) ?? null);
 
   if (loading) {
     return (
@@ -92,6 +110,7 @@ export function RootNavigator() {
           </RootStack.Navigator>
         </ErrorBoundary>
       </NavigationContainer>
+      {ob.visible ? <OnboardingCard pasos={ob.pasos} paso={ob.paso} onSiguiente={ob.siguiente} onOmitir={ob.cerrar} /> : null}
     </View>
   );
 }
