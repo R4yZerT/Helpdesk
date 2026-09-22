@@ -98,7 +98,7 @@ export function RootNavigator() {
         </View>
       ) : null}
       <NavigationContainer>
-        <ErrorBoundary titulo="La navegación no pudo cargarse">
+        <ErrorBoundary titulo="La navegación no pudo cargarse" onError={(e) => reportError(e)}>
           <RootStack.Navigator screenOptions={{ headerShown: false }}>
             {!session || !profile ? (
               <RootStack.Screen name="Auth" component={AuthNavigator} />

@@ -8,6 +8,8 @@ import { Card } from './components.js';
 type Props = {
   children: React.ReactNode;
   titulo?: string;
+  /** Reportero externo (Sentry). Opcional para no acoplar shared. */
+  onError?: (error: Error, info: string) => void;
 };
 
 type State = { error: Error | null };
@@ -21,6 +23,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.warn('[ErrorBoundary]', error, info.componentStack);
+    try {
+      this.props.onError?.(error, info.componentStack ?? '');
+    } catch {
+      // El reportero nunca debe romper el fallback
+    }
   }
 
   render() {

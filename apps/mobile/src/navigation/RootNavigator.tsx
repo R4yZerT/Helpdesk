@@ -106,7 +106,7 @@ export function RootNavigator() {
         // la cola pendiente (árbol por rol) en usePushNotificaciones.
         linking={{ prefixes: ['helpdesk://'] }}
       >
-        <ErrorBoundary titulo="La navegación no pudo cargarse">
+        <ErrorBoundary titulo="La navegación no pudo cargarse" onError={(e) => reportError(e)}>
           {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
         </ErrorBoundary>
       </NavigationContainer>
