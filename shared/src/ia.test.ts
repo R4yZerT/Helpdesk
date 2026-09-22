@@ -36,6 +36,8 @@ const mesas: Mesa[] = [
 ];
 const catalogos: CatalogosPrediccion = { categorias, mesas };
 
+afterEach(() => { vi.restoreAllMocks(); });
+
 describe('classifyLocal por nombres (13 categorías consolidadas)', () => {
   it('wifi -> Conectividad y redes', () => {
     const r = classifyLocal('El wifi del bloque 3 se cae cada 10 minutos desde ayer', categorias);

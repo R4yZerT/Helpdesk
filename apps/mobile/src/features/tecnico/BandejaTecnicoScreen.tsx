@@ -1,15 +1,13 @@
 // RF-12 — Bandeja técnico asignados orden prioridad/antigüedad + Realtime
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
-import { getSlaEstado, getSlaVencimiento, formatSlaRestante } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { listAssignedTickets, fetchMesas, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
+import { theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { TecnicoStackParamList } from '../../navigation/types';
 import { TicketRow } from '../tickets/components/TicketRow';
 import { TicketFilters } from '../tickets/components/TicketFilters';
-import { fetchMesas } from '@helpdesk/shared';
 
 const PAGE_SIZE = 20;
 
@@ -99,7 +97,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         qDebounced={qDebounced}
         onReset={() => { setEstado(''); setPrioridad(''); setQ(''); }}
       />
-      <FlatList data={tickets} keyExtractor={(t) => t.id} renderItem={({ item }) => <TicketRow ticket={item} mesaName={mesaName} tecnicoNombres={{}} onPress={() => navigation.navigate('DetalleTicket', { id: item.id })} />} ListEmptyComponent={<View style={s.empty}><Text style={s.muted}>Sin tickets asignados</Text></View>} ListFooterComponent={loadingMore ? <View style={s.footer}><ActivityIndicator color={theme.colors.primary} /></View> : null} contentContainerStyle={s.listContent} />
+      <FlatList data={tickets} keyExtractor={(t) => t.id} renderItem={({ item }) => <TicketRow ticket={item} mesaName={mesaName} tecnicoNombres={{}} onPress={() => navigation.navigate('DetalleTicket', { id: item.id })} />} onEndReached={onEndReached} onEndReachedThreshold={0.4} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />} ListEmptyComponent={<View style={s.empty}><Text style={s.muted}>Sin tickets asignados</Text></View>} ListFooterComponent={loadingMore ? <View style={s.footer}><ActivityIndicator color={theme.colors.primary} /></View> : null} contentContainerStyle={s.listContent} />
     </View>
   );
 }
