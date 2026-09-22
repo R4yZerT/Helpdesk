@@ -1,4 +1,5 @@
 // Entry web — mismo stack que mobile via react-native-web
+import './src/lib/sentry';
 import { Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';

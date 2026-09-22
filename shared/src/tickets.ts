@@ -16,6 +16,20 @@ export function isEstadoTicket(v: string): v is EstadoTicket {
   return (ESTADOS as readonly string[]).includes(v);
 }
 
+// H9 — Respuesta de listado para el fallback full-text → ILIKE.
+type RespuestaLista<F> = { data: F | null; error: { message: string } | null; count: number | null };
+
+// H9 — Ejecuta la búsqueda full-text en español; si la migración aún no aplicó
+// (columna search_vector ausente), reintenta con ILIKE sobre asunto.
+async function conFallbackFulltext<F>(
+  intento: () => Promise<RespuestaLista<F>>,
+  alternativa: () => Promise<RespuestaLista<F>>,
+): Promise<RespuestaLista<F>> {
+  const r = await intento();
+  if (r.error && /search_vector|does not exist/i.test(r.error.message)) return alternativa();
+  return r;
+}
+
 export type CreateTicketInput = {
   categoriaId: number;
   asunto: string;
@@ -349,18 +363,22 @@ export async function listMyTickets(
     else query = query.eq('tecnico_asignado_id', params.tecnicoId);
   }
   const q = params.q?.trim();
-  if (q) {
-    // Usa ILIKE; con pg_trgm + GIN acelera %q% si existe índice. Si q es numérico, busca también por número de ticket
-    const escaped = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const num = Number(q.replace(/^#/, ''));
-    if (Number.isInteger(num) && String(num) === q.replace(/^#/, '').trim()) {
-      query = query.or(`numero.eq.${num},asunto.ilike.%${escaped}%`);
-    } else {
-      query = query.ilike('asunto', `%${escaped}%`);
-    }
+  // H9 — full-text en español (asunto+descripción) con fallback a ILIKE.
+  // Si q es numérico, busca también por número de ticket (comportamiento previo).
+  const escaped = (q ?? '').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const num = Number((q ?? '').replace(/^#/, ''));
+  const esNumero = !!q && Number.isInteger(num) && String(num) === (q as string).replace(/^#/, '').trim();
+  if (esNumero) {
+    query = query.or(`numero.eq.${num},asunto.ilike.%${escaped}%`);
   }
 
-  const { data, error, count } = await query;
+  const res = q && !esNumero
+    ? await conFallbackFulltext(
+      async () => query.textSearch('search_vector', q as string, { type: 'websearch', config: 'spanish' }),
+      async () => query.ilike('asunto', `%${escaped}%`),
+    )
+    : await query;
+  const { data, error, count } = res;
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as Record<string, unknown>[];
   const total = count ?? rows.length;
@@ -601,11 +619,15 @@ export async function listAssignedTickets(client: SupabaseClient, params: ListAs
   if (params.prioridad && isPrioridadTicket(params.prioridad)) query = query.eq('prioridad', params.prioridad);
   if (params.mesaId) query = query.eq('mesa_id', params.mesaId);
   const q = params.q?.trim();
-  if (q) {
-    const esc = q.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    query = query.ilike('asunto', `%${esc}%`);
-  }
-  const { data, error, count } = await query;
+  // H9 — full-text en español (asunto+descripción) con fallback a ILIKE.
+  const esc = (q ?? '').replace(/%/g, '\\%').replace(/_/g, '\\_');
+  const res = q
+    ? await conFallbackFulltext(
+      async () => query.textSearch('search_vector', q as string, { type: 'websearch', config: 'spanish' }),
+      async () => query.ilike('asunto', `%${esc}%`),
+    )
+    : await query;
+  const { data, error, count } = res;
   if (error) throw new Error(error.message);
   const rows = ((data ?? []) as Record<string, unknown>[]);
   const total = count ?? rows.length;
