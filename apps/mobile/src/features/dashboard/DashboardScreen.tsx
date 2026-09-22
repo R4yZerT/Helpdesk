@@ -1,7 +1,7 @@
 // Dashboard mobile — wrapper delgado, lógica en shared
 import * as React from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, useFeedback } from '@helpdesk/shared';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { KpiRow } from '@helpdesk/shared/ui/dashboard/KpiRow.js';
@@ -27,18 +27,18 @@ export function DashboardScreen() {
   const [tecnicoId, setTecnicoId] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [kpis, setKpis] = React.useState<any>(null);
-  const [porEstado, setPorEstado] = React.useState<any[]>([]);
-  const [porPrioridad, setPorPrioridad] = React.useState<any[]>([]);
-  const [evolucion, setEvolucion] = React.useState<any[]>([]);
-  const [carga, setCarga] = React.useState<any[]>([]);
-  const [picos, setPicos] = React.useState<any[]>([]);
-  const [picosResumen, setPicosResumen] = React.useState<any[]>([]);
+  const [kpis, setKpis] = React.useState<Kpis | null>(null);
+  const [porEstado, setPorEstado] = React.useState<StatsEstado>([]);
+  const [porPrioridad, setPorPrioridad] = React.useState<StatsPrioridad>([]);
+  const [evolucion, setEvolucion] = React.useState<EvolucionPunto[]>([]);
+  const [carga, setCarga] = React.useState<CargaCelda[]>([]);
+  const [picos, setPicos] = React.useState<PicoPrediccion[]>([]);
+  const [picosResumen, setPicosResumen] = React.useState<PicosResumen[]>([]);
   const [pronosticoML, setPronosticoML] = React.useState<PronosticoDia[]>([]);
   // Telemetría IA — precisión validada por fuente (vista metricas_ia_feedback)
   const [metricasIa, setMetricasIa] = React.useState<MetricaIaFuente[]>([]);
-  const [patrones, setPatrones] = React.useState<any[]>([]);
-  const [alertas, setAlertas] = React.useState<any[]>([]);
+  const [patrones, setPatrones] = React.useState<PatronCategoria[]>([]);
+  const [alertas, setAlertas] = React.useState<AlertaIA[]>([]);
   const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
 
   const filters: DashboardFilters = React.useMemo(() => {

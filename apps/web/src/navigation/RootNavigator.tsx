@@ -9,13 +9,13 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
-import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
 import { PerfilScreen } from '../features/perfil/PerfilScreen';
 import { TecnicoNavigator } from '../features/tecnico/TecnicoNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import type { AuthStackParamList } from './types';
+import { ErrorBoundary } from '@helpdesk/shared';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const RootStack = createNativeStackNavigator();
@@ -77,17 +77,19 @@ export function RootNavigator() {
         </View>
       ) : null}
       <NavigationContainer>
-        <RootStack.Navigator screenOptions={{ headerShown: false }}>
-          {!session || !profile ? (
-            <RootStack.Screen name="Auth" component={AuthNavigator} />
-          ) : (
-            <>
-              <RootStack.Screen name="App" component={RoleNavigator} />
-              <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
-              <RootStack.Screen name="Perfil" component={PerfilScreen} options={{ headerShown: true, title: 'Mi perfil', presentation: 'modal' }} />
-            </>
-          )}
-        </RootStack.Navigator>
+        <ErrorBoundary titulo="La navegación no pudo cargarse">
+          <RootStack.Navigator screenOptions={{ headerShown: false }}>
+            {!session || !profile ? (
+              <RootStack.Screen name="Auth" component={AuthNavigator} />
+            ) : (
+              <>
+                <RootStack.Screen name="App" component={RoleNavigator} />
+                <RootStack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Cambiar contraseña', presentation: 'modal' }} />
+                <RootStack.Screen name="Perfil" component={PerfilScreen} options={{ headerShown: true, title: 'Mi perfil', presentation: 'modal' }} />
+              </>
+            )}
+          </RootStack.Navigator>
+        </ErrorBoundary>
       </NavigationContainer>
     </View>
   );

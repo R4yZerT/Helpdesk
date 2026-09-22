@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme } from '@helpdesk/shared';
+import { theme, IconInbox, IconPlus, IconUser, IconMenu } from '@helpdesk/shared';
 import { Sidebar } from '@helpdesk/shared';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
@@ -102,7 +102,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
     <View style={w.rootMobile}>
       <View style={w.mobileTopBar}>
         <Pressable onPress={() => setDrawerOpen((v) => !v)} style={w.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
-          <Text style={w.burgerText}>☰</Text>
+          <IconMenu size={18} color={theme.colors.text} />
         </Pressable>
         <Text style={w.mobileTitle}>{mobileTitle}</Text>
         <View style={w.burgerSpacer} />
@@ -157,7 +157,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Solicitudes',
           tabBarLabel: 'Mis solicitudes',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>☰</Text>,
+          tabBarIcon: ({ color }) => <IconInbox size={18} color={color} />,
         }}
         component={MisStack}
       />
@@ -166,7 +166,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Nueva',
           tabBarLabel: 'Nueva',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>＋</Text>,
+          tabBarIcon: ({ color }) => <IconPlus size={20} color={color} />,
           headerShown: true,
           headerStyle: { backgroundColor: theme.colors.surface } as never,
           headerTintColor: theme.colors.primary,
@@ -180,7 +180,7 @@ function UsuarioMobileTabs() {
         options={{
           title: 'Mi perfil',
           tabBarLabel: 'Perfil',
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>,
+          tabBarIcon: ({ color }) => <IconUser size={16} color={color} />,
           headerShown: true,
           headerRight: () => <HeaderBell />,
         }}

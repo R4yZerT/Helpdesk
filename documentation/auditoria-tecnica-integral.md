@@ -4,6 +4,25 @@
 > **Metodología:** Tree of Thoughts (4 ramas paralelas)
 > **Alcance:** Código fuente, arquitectura, documentación y flujos de HelpDesk (Expo + Supabase)
 
+## Revisión 2026-09-22 (verificada contra `main`)
+
+Hallazgos de la auditoría original re-verificados tras PRs #40–#44:
+
+| ID | Estado | Evidencia actual |
+|----|--------|------------------|
+| H1 | ✅ Resuelto | 30 archivos de tests en `shared/src`, 263 tests passing (`validation.test.ts`, `ia.test.ts` recuperado, `ia-metricas-dashboard.test.ts`, FSM/bandeja/SLA cubiertos) |
+| H2 | ✅ Resuelto | Dashboards web/mobile (194/199 líneas) son wrappers delgados sobre `shared/src/ui/dashboard/` (`KpiRow`, `ChartsSection`, `EstadoPrioridadRow`, `CargaAlertasSection`) |
+| H3 | ✅ Resuelto | `CreateTicketScreen` 570 → 377 líneas (`TicketForm`, `AdjuntoPicker`, `IaSugerenciaPanel` extraídos) |
+| H4 | ✅ Resuelto | `TicketDetailScreen` 546 → 366 líneas (`TicketHeader`, `FsmActions`, `TicketProgress`, `TicketTabs` extraídos) |
+| H5 | ✅ Resuelto (2026-09-22) | Dashboards tipados (`Kpis`, `StatsEstado`, `EvolucionPunto`, `AlertaIA`, etc., rama `fix/low-effort-h5-h6-h11`) |
+| H6 | ✅ Resuelto (2026-09-22) | `ErrorBoundary` compartido en `shared/src/ui/` + envoltorio en `RootNavigator` web/mobile |
+| H7 | ⚠️ Vigente | Sin Sentry/LogRocket; `console.warn` sigue como manejo de errores |
+| H11 | ✅ Resuelto (2026-09-22) | Tabs con `IconInbox`/`IconPlus`/`IconUser`/`IconGrid`/`IconSettings`/`IconMenu` de `shared/src/ui/icons.tsx`, sin emojis |
+| H14 | ✅ Resuelto | `TecnicoNavigator` extraído de `RootNavigator`; stack duplicado eliminado |
+| Nuevo | ✅ | Tarjeta `PrecisionIa` + `getMetricasIaFeedback` integradas vía `ChartsSection` (PR #40 + merge d249f03) |
+
+Pendiente de corto plazo: H5 (tipos `KpiData`/`AlertaIA`), H6 (boundaries por navigator), H7 (Sentry).
+
 ---
 
 ## 1. Exploración de Pensamientos (ToT)
@@ -175,4 +194,4 @@ Para medir la mejora de calidad, tracemos estas métricas:
 
 ---
 
-> **Próximo paso recomendado:** Crear tests unitarios de `validateCreateTicket`, `classifyLocal` y FSM transitions, luego refactory `CreateTicketScreen` en subcomponentes.
+> **Próximo paso recomendado (actualizado 2026-09-22):** H1–H6, H11, H14 cerrados. Siguiente: Sentry (H7), coverage 60% en shared y E2E Playwright.
