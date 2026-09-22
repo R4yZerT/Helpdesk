@@ -243,7 +243,7 @@ describe('createTicket', () => {
   it('rechaza input inválido sin tocar DB', async () => {
     const { client } = createTicketClient({}, {});
     await expect(createTicket(client, { ...baseCreate, asunto: 'x' })).rejects.toThrow();
-    expect(client.from).not.toHaveBeenCalled();
+    expect((client as unknown as { from: unknown }).from).not.toHaveBeenCalled();
   });
   it('resuelve prioridad por subcategoría (Eléctrica → critica)', async () => {
     const inserted: Record<string, unknown>[] = [];
@@ -251,7 +251,7 @@ describe('createTicket', () => {
       { data: { subcategoria: 'Eléctrica' }, error: null },
       { data: { id: 'nuevo', numero: 42 }, error: null },
     );
-    const fromSpy = client.from as unknown as ReturnType<typeof vi.fn>;
+    const fromSpy = (client as unknown as { from: unknown }).from as unknown as ReturnType<typeof vi.fn>;
     fromSpy.mockImplementation((table: string) => {
       if (table === 'ticket_categories') {
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn(async () => ({ data: { subcategoria: 'Eléctrica' }, error: null })) })) })) };

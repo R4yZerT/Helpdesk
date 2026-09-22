@@ -146,7 +146,7 @@ describe('ia-feedback gaps registrarSugerenciaIa (líneas 97-107)', () => {
     const client = { from } as never;
     await registrarSugerenciaIa(client, 't-new', sug);
     expect(insert).toHaveBeenCalledOnce();
-    expect(insert.mock.calls[0]?.[0]).toMatchObject({ ticket_id: 't-new' });
+    expect((insert.mock.calls as unknown[][])[0]?.[0]).toMatchObject({ ticket_id: 't-new' });
   });
 
   it('lanza si el insert falla (línea 107)', async () => {

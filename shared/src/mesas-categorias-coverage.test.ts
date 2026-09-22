@@ -26,7 +26,7 @@ import {
 
 // Crea un query-builder encadenable: ilike/eq/order/select devuelven el builder,
 // range/single devuelven promesa, y el builder es thenable para `await q`.
-function makeBuilder(result: { data: unknown; error: unknown; count?: number }) {
+function makeBuilder(result: { data: unknown; error: unknown; count?: number | null }) {
   const b: Record<string, unknown> = {};
   b.ilike = vi.fn(() => b);
   b.eq = vi.fn(() => b);

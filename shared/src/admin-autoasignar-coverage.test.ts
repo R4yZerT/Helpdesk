@@ -384,7 +384,6 @@ describe('autoasignar sugerirAsignacion', () => {
           };
         }
         // tickets: primera llamada es carga (in/in), segunda es recientes (in/gte)
-        let calls = 0;
         return {
           select: vi.fn(() => ({
             in: vi.fn(function (this: unknown) { return this; }),
@@ -538,6 +537,6 @@ describe('autoasignar sugerirAsignacion', () => {
       recientes: [],
     });
     // solo verifica que el helper existe y retorna estructura válida (no se usa en orquestador real)
-    expect(fake.from).toBeDefined();
+    expect((fake as unknown as { from: unknown }).from).toBeDefined();
   });
 });

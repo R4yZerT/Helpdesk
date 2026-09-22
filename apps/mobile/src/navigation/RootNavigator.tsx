@@ -8,7 +8,13 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
-import { theme, ErrorBoundary } from '@helpdesk/shared';
+import { theme, ErrorBoundary, useOnboarding, OnboardingCard, type RolOnboarding } from '@helpdesk/shared';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const mobileStorage = {
+  getItem: (key: string) => AsyncStorage.getItem(key),
+  setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+};
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
@@ -68,6 +74,8 @@ export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error, recoveryPending } = useAuth();
   // RF-23: suscripción realtime + refresh al volver a primer plano (no-op sin sesión)
   usePushNotificaciones();
+  // H12 — guía de primer uso por rol (una vez por versión)
+  const ob = useOnboarding(session && profile ? mobileStorage : null, (profile?.rol as RolOnboarding | undefined) ?? null);
   if (loading) {
     return (
       <View style={s.loading}>
@@ -101,6 +109,7 @@ export function RootNavigator() {
           {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
         </ErrorBoundary>
       </NavigationContainer>
+      {ob.visible ? <OnboardingCard pasos={ob.pasos} paso={ob.paso} onSiguiente={ob.siguiente} onOmitir={ob.cerrar} /> : null}
     </View>
   );
 }
