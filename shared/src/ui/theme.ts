@@ -96,3 +96,43 @@ export const theme = {
 } as const;
 
 export type Theme = typeof theme;
+
+export type ColorScheme = 'light' | 'dark';
+
+// H13 — Paleta oscura con el mismo SHAPE que `theme` (brand intacto,
+// superficies/textos adaptados a fondo oscuro). Sin `satisfies` porque
+// `theme` es `as const` (literales); la paridad la guarda theme-dark.test.ts.
+export const darkTheme = {
+  colors: {
+    primary: '#38A3F5',
+    primaryDark: '#7CC4FF',
+    primarySoft: '#0E2A45',
+    accent: '#FD7C06',
+    accentStrong: '#FF9A3D',
+    accentMuted: '#3A2200',
+    inkOnAccent: '#1A1000',
+    blue50: '#0E2A45',
+    orange50: '#3A2200',
+    success: '#34D399',
+    successSoft: '#06332A',
+    warning: '#FBBF24',
+    danger: '#F87171',
+    bg: '#0B1220',
+    surface: '#111C30',
+    surfaceAlt: '#182741',
+    border: '#24365A',
+    borderStrong: '#334B7A',
+    muted: '#9FB0C9',
+    mutedSoft: '#64748B',
+    text: '#EDF2FA',
+    textSoft: '#C3D0E4',
+  },
+  radius: theme.radius,
+  spacing: theme.spacing,
+  space: theme.space,
+  shadow: theme.shadow,
+  font: theme.font,
+  typography: theme.typography,
+};
+
+export const THEME_STORAGE_KEY = 'theme.scheme.v1';
