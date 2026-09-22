@@ -1,4 +1,5 @@
 // Entry — AuthProvider + navegacion por rol (RF-05)
+import './src/lib/sentry';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';

@@ -18,6 +18,7 @@
     "@react-navigation/bottom-tabs": "^7.4.7",
     "@react-navigation/native": "^7.3.17",
     "@react-navigation/native-stack": "^7.18.9",
+    "@sentry/react": "^10.75.2",
     "@supabase/supabase-js": "^2.112.3",
     "expo": "~57.0.19",
     "html2canvas": "^1.4.1",
