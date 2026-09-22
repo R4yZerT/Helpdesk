@@ -8,6 +8,7 @@
     "build": "expo export --platform web",
     "serve": "npx serve dist",
     "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix"
   },
@@ -32,6 +33,7 @@
     "react-native-web": "~0.21.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^26.2.0",
     "@types/react": "~19.2.18",
     "playwright": "^1.63.0",
