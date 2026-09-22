@@ -37,6 +37,7 @@ export * from './ui/charts/HeatmapCarga.js';
 export * from './ui/charts/TimelineAlertas.js';
 export * from './ui/charts/PrediccionPicos.js';
 export * from './ui/charts/PatronesCategoria.js';
+export * from './ui/charts/PrecisionIa.js';
 export * from './ui/ticket/TicketComments.js';
 export * from './ui/ticket/TicketHistory.js';
 export * from './ui/ticket/IaValidationCard.js';

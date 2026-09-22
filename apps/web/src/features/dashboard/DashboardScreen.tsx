@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, type DashboardFilters, type FilterRange, type PronosticoDia, useFeedback } from '@helpdesk/shared';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { KpiRow } from '@helpdesk/shared';
 import { EstadoPrioridadRow } from '@helpdesk/shared';
@@ -34,6 +34,8 @@ export function DashboardScreen() {
   const [picos, setPicos] = React.useState<any[]>([]);
   const [picosResumen, setPicosResumen] = React.useState<any[]>([]);
   const [pronosticoML, setPronosticoML] = React.useState<PronosticoDia[]>([]);
+  // Telemetría IA — precisión validada por fuente (vista metricas_ia_feedback)
+  const [metricasIa, setMetricasIa] = React.useState<MetricaIaFuente[]>([]);
   const [patrones, setPatrones] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
   const [generandoAlertas, setGenerandoAlertas] = React.useState(false);
@@ -58,7 +60,7 @@ export function DashboardScreen() {
 
   const load = React.useCallback(async () => {
     try {
-      const [k, e, p, ev, c, pp, pr, pat, a, ms, ml] = await Promise.all([
+      const [k, e, p, ev, c, pp, pr, pat, a, ms, ml, mia] = await Promise.all([
         getKPIs(supabase, filters),
         getStatsPorEstado(supabase, filters),
         getStatsPorPrioridad(supabase, filters),
@@ -70,8 +72,9 @@ export function DashboardScreen() {
         listAlertasIA(supabase, { estado: 'nueva' }),
         mesas.length ? Promise.resolve(mesas) : fetchMesas(supabase),
         getPronosticoSemanal(supabase),
+        getMetricasIaFeedback(supabase),
       ]);
-      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a); setPronosticoML(ml);
+      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
       if (!mesas.length) setMesas(ms as any);
     } catch (err) {
       console.warn('[Dashboard] load', err);
@@ -176,7 +179,7 @@ export function DashboardScreen() {
         <View nativeID="dashboard-export-root">
           <KpiRow kpis={kpis} isWide={isWide} />
           <EstadoPrioridadRow porEstado={porEstado} porPrioridad={porPrioridad} isWide={isWide} />
-          <ChartsSection evolucion={evolucion} mesas={mesas} picos={picos} picosResumen={picosResumen} pronosticoML={pronosticoML} patrones={patrones} />
+          <ChartsSection evolucion={evolucion} mesas={mesas} picos={picos} picosResumen={picosResumen} pronosticoML={pronosticoML} patrones={patrones} metricasIa={metricasIa} />
           <CargaAlertasSection carga={carga} alertas={alertas} generandoAlertas={generandoAlertas} onGenerarAlertas={onGenerarAlertas} onMarcarAlerta={onMarcarAlerta} />
         </View>
       </ScrollView>

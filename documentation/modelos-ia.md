@@ -128,7 +128,31 @@ La fuente ya se persiste por ticket en `ticket_ia_feedback`
   corregidas, `precision_validada` (confirmadas / validadas) y
   `confianza_promedio`. Ambas vistas con `security_invoker = true`: el
   jefe/admin ve el agregado global; el técnico solo el de sus tickets
-  (RLS del consultante).
+  (RLS del consultante). Tarjeta `PrecisionIa` en el Dashboard del jefe
+  (web/móvil) vía `getMetricasIaFeedback` (`shared/src/dashboard.ts`).
+
+### Reentrenamiento mensual (pipeline `retrain-beto.yml`)
+
+1. **Export:** `export_dataset_validado.py` → `dataset_validado.csv`
+   (solo `confirmada`/`corregida`).
+2. **Unión:** `build_retrain_dataset.py --clean tickets_clean.parquet
+   --validated dataset_validado.csv --out dataset_retrain.parquet`
+   (deduplica por texto+categoría, exige texto ≥ 5 chars; columna `fuente`).
+3. **Entrenamiento:** `train_beto.py --input dataset_retrain.parquet
+   --baseline-metrics ml/baseline_beto.json` — guarda `metrics.json` con
+   `promoted` (test macro-F1 ≥ baseline 0.7468 del notebook 02).
+4. **Publicación:** `publish_model.py --model-dir ... --version v<fecha>`
+   sube al bucket privado `modelos-ia` (migración `20261020000000`, solo
+   service_role) ÚNICAMENTE si `promoted=true` (o `--force`).
+5. **Despliegue:** descargar la versión del bucket a `/model` del servicio
+   `beto` y reiniciar (`serve.py` carga `BET0_MODEL_DIR` al arrancar).
+
+Workflow `.github/workflows/retrain-beto.yml`: mensual (día 1, 05:00 UTC)
++ `workflow_dispatch` con input `force_publish`. Al promover un modelo
+mejor, actualizar `ml/baseline_beto.json` con su test macro-F1.
+
+Guía operativa en lenguaje accesible (ciclo, roles, manual vs automático,
+cómo ver la mejora): `documentation/reentrenamiento-ia.md`.
 
 ---
 
