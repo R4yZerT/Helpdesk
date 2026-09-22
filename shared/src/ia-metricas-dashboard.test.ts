@@ -43,13 +43,15 @@ describe('tarjeta PrecisionIa cableada', () => {
     expect(c).toMatch(/sin validaciones|vac[ií]o|sin datos/i);
   });
 
-  it('dashboards web y móvil la consultan y renderizan', () => {
+  it('dashboards web y móvil la consultan y renderizan (vía ChartsSection)', () => {
     for (const f of ['apps/web/src/features/dashboard/DashboardScreen.tsx', 'apps/mobile/src/features/dashboard/DashboardScreen.tsx']) {
       const s = repo(f);
       expect(s, f).toContain('getMetricasIaFeedback');
       expect(s, f).toContain('setMetricasIa');
-      expect(s, f).toContain('<PrecisionIa data={metricasIa}');
+      expect(s, f).toContain('metricasIa={metricasIa}');
     }
+    const charts = repo('shared/src/ui/dashboard/ChartsSection.tsx');
+    expect(charts).toContain('<PrecisionIa data={metricasIa}');
   });
 
   it('PrecisionIa y getMetricasIaFeedback se exportan desde shared', () => {

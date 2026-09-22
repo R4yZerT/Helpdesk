@@ -4,7 +4,6 @@ import {
   classifyLocal,
   getMesaIdPorDominio,
   getMesaNombrePorDominio,
-  getPrioridadPorCategoria,
   predecirCategoria,
   resolverMesaId,
   type CatalogosPrediccion,

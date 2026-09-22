@@ -1,7 +1,7 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere dependencia + categoría → prioridad bloqueada
 // La IA no sugiere técnico: el ticket entra a la cola de la dependencia.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import {
   createTicket,
@@ -22,8 +22,11 @@ import {
   type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
-import { Card, Badge, Divider, FilterDropdown, useFeedback } from '@helpdesk/shared';
+import { Card, Divider, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { TicketForm } from './components/TicketForm';
+import { AdjuntoPicker } from './components/AdjuntoPicker';
+import { IaSugerenciaPanel } from './components/IaSugerenciaPanel';
 
 export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () => void; navigate: (s: string) => void } }) {
   const { width } = useWindowDimensions();
@@ -109,7 +112,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       })();
     }, 800);
     return () => { cancelado = true; if (debounceRef.current) clearTimeout(debounceRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Deps intencionales: solo re-evaluar IA al cambiar texto o catálogos (form/mesas completos causarían loops).
   }, [form.asunto, form.descripcion, categorias, mesas]);
 
   const humanizeError = (msg: string) => {
@@ -119,7 +122,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     return msg;
   };
 
-  // Limpia el formulario tras confirmar el modal (antes: showAlert con Alert/window.alert)
   const resetTrasCrear = () => {
     setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
     setAdjuntos([]); setErrors({}); setTouched({}); setSugerencia(null); eleccionManualRef.current = false; navigation?.goBack?.();
@@ -282,180 +284,48 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     );
   }
 
-  const prioridadTone = form.prioridad === 'critica' ? 'accent' : form.prioridad === 'alta' ? 'danger' : form.prioridad === 'media' ? 'warning' : 'muted';
-  const sugerenciaCat = sugerencia ? categorias.find(c => c.id === sugerencia.categoriaId) : null;
-  const isSugerenciaAplicada = sugerencia ? form.categoriaId === sugerencia.categoriaId : false;
-  const mesaOptions = mesas.map(m => ({ value: m.id, label: m.nombre }));
-  const categoriaOptions = (form.mesaId ? categorias.filter(c => resolverMesaId(c.dominio, mesas) === form.mesaId) : []).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
-  const iaFuente = sugerencia?.fuente === 'beto' ? 'modelo BETO' : 'reglas locales';
-  const tecnicoOptions = [
-    { value: '', label: 'Sin asignar (cola de mesa)' },
-    ...tecnicosMesa.map(t => ({ value: t.id, label: t.fullName })),
-  ];
-
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
       <View style={s.breadcrumb}><Text style={s.breadcrumbText}>Inicio / Mis Solicitudes / Nueva</Text></View>
 
       <View style={[s.formWrap, isWide && { maxWidth: 680, alignSelf: 'center', width: '100%' }]}>
         <Card style={s.formCard}>
-          {/* Paso 1: Asunto + Descripción primero */}
-          <Text style={s.label}>Asunto *</Text>
-          <TextInput
-            value={form.asunto}
-            onChangeText={(v) => setForm((f) => ({ ...f, asunto: v }))}
-            onBlur={() => setTouched((t) => ({ ...t, asunto: true }))}
-            placeholder="Ej: No enciende el equipo del aula 301"
-            placeholderTextColor={theme.colors.mutedSoft}
-            style={s.input}
-            maxLength={200}
+          <TicketForm
+            form={form}
+            errors={errors}
+            touched={touched}
+            categorias={categorias}
+            mesas={mesas}
+            tecnicosMesa={tecnicosMesa}
+            sugerencia={sugerencia}
+            iaLoading={iaLoading}
+            onChange={setForm}
+            onTouched={setTouched}
+            onSelectCategoria={onSelectCategoria}
+            onApplySugerencia={aplicarSugerencia}
           />
-          <Text style={s.hint}>{form.asunto.length}/200</Text>
-          {touched.asunto && errors.asunto ? <Text style={s.error}>{errors.asunto}</Text> : null}
 
-          <Text style={s.label}>Descripción *</Text>
-          <TextInput
-            value={form.descripcion}
-            onChangeText={(v) => setForm((f) => ({ ...f, descripcion: v }))}
-            onBlur={() => setTouched((t) => ({ ...t, descripcion: true }))}
-            placeholder="Describe el problema con detalle (mín. 20 caracteres para activar la IA). Ej: El wifi del bloque 3 se cae cada 10 min desde ayer"
-            placeholderTextColor={theme.colors.mutedSoft}
-            style={[s.input, s.textarea]}
-            multiline
-            numberOfLines={5}
-            maxLength={5000}
+          <IaSugerenciaPanel
+            sugerencia={sugerencia}
+            iaLoading={iaLoading}
+            sugerenciaCat={sugerencia ? categorias.find(c => c.id === sugerencia.categoriaId) : undefined}
+            isSugerenciaAplicada={sugerencia ? form.categoriaId === sugerencia.categoriaId : false}
+            iaFuente={sugerencia?.fuente === 'beto' ? 'modelo BETO' : 'reglas locales'}
+            onApply={aplicarSugerencia}
           />
-          <Text style={s.hint}>{form.descripcion.length}/5000 · {form.descripcion.trim().length < 20 ? `faltan ${20 - form.descripcion.trim().length} caracteres para IA` : 'listo para analizar'}</Text>
-          {touched.descripcion && errors.descripcion ? <Text style={s.error}>{errors.descripcion}</Text> : null}
-
-          {/* Bloque IA */}
-          <View style={s.iaBlock}>
-            {iaLoading ? (
-              <View style={s.iaLoading}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text style={s.iaLoadingText}>Analizando descripción...</Text>
-              </View>
-            ) : sugerencia && sugerenciaCat ? (
-              <View style={s.aiCard}>
-                <View style={s.aiHead}>
-                  <Text style={s.aiIcon}>✦</Text>
-                  <Text style={s.aiTitle}>IA sugiere</Text>
-                  <Text style={s.aiPct}>{Math.round(sugerencia.confianza * 100)}%</Text>
-                  {isSugerenciaAplicada ? <Badge label="aplicada" tone="success" /> : null}
-                </View>
-                <Text style={s.aiText}>{sugerenciaCat.subcategoria} · {sugerenciaCat.dominio} · Prioridad {sugerencia.prioridad} · {iaFuente}</Text>
-                <View style={s.aiRow}>
-                  {isSugerenciaAplicada ? (
-                    <Text style={s.aiApplied}>✓ Categoría y prioridad aplicadas</Text>
-                  ) : (
-                    <>
-                      <Pressable onPress={aplicarSugerencia} style={s.aiBtn}><Text style={s.aiBtnText}>Aplicar sugerencia</Text></Pressable>
-                      <Text style={s.aiHint}>o elige otra categoría abajo</Text>
-                    </>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <View style={s.iaIdle}>
-                <Text style={s.iaIdleText}>✦ Escribe al menos 20 caracteres: la IA sugerirá dependencia y categoría (sin técnico).</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Sin sugerencia de técnico: el ticket entra a la cola de la dependencia */}
 
           <Divider />
 
-          {/* Dependencia y Categoría — mismos desplegables que en mesas/dependencias */}
-          <View style={s.dropdownRow}>
-            <FilterDropdown<number>
-              label="Dependencia *"
-              value={form.mesaId ?? ''}
-              options={mesaOptions}
-              placeholder="Seleccionar dependencia"
-              onSelect={(v) => {
-                const id = v === '' ? null : Number(v);
-                eleccionManualRef.current = true;
-                setForm(f => {
-                  const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
-                  const keep = keepCat && resolverMesaId(keepCat.dominio, mesas) === id ? f.categoriaId : 0;
-                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep, categorias) : f.prioridad, tecnicoAsignadoId: null };
-                });
-                setTouched(t => ({ ...t, mesaId: true }));
-              }}
-            />
-            <FilterDropdown<number>
-              label="Categoría *"
-              value={form.categoriaId || ''}
-              options={categoriaOptions}
-              placeholder={form.mesaId ? 'Seleccionar categoría' : 'Elige dependencia primero'}
-              onSelect={(v) => {
-                eleccionManualRef.current = true;
-                if (v === '') { setForm(f => ({ ...f, categoriaId: 0 })); return; }
-                const cat = categorias.find(c => c.id === Number(v));
-                if (cat) onSelectCategoria(cat);
-                else setForm(f => ({ ...f, categoriaId: Number(v) }));
-                setTouched(t => ({ ...t, categoriaId: true }));
-              }}
-            />
-          </View>
-          <Text style={s.sectionHint}>La IA sugiere dependencia y categoría al escribir (auto-aplica solo si aún no elegiste). Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
-          <FilterDropdown<string>
-            label="Técnico (opcional)"
-            value={form.tecnicoAsignadoId ?? ''}
-            options={tecnicoOptions}
-            placeholder={form.mesaId ? 'Seleccionar técnico' : 'Elige dependencia primero'}
-            onSelect={(v) => {
-              setForm(f => ({ ...f, tecnicoAsignadoId: v === '' ? null : String(v) }));
-            }}
+          {/* Adjuntos */}
+          <AdjuntoPicker
+            adjuntos={adjuntos}
+            adjuntoError={adjuntoError}
+            fileInputRef={fileInputRef}
+            onPickFiles={onPickFiles}
+            onPickNative={onPickNative}
+            onRemove={(i) => setAdjuntos(prev => prev.filter((_, idx) => idx !== i))}
+            onAdjuntoError={setAdjuntoError}
           />
-          <Text style={s.sectionHint}>Vacío = cola de la dependencia. La IA no sugiere técnico: lo asigna el jefe de mesa.</Text>
-          {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
-          {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
-
-          <Divider />
-
-          {/* Prioridad bloqueada */}
-          <View style={s.prioLockedRow}>
-            <Text style={s.sectionTitle}>Prioridad</Text>
-            <Badge label={form.prioridad} tone={prioridadTone as any} />
-          </View>
-          <View style={s.prioLockedBox}>
-            <Text style={s.prioLockedText}>Asignada automáticamente por categoría</Text>
-            <Text style={s.prioLockedSub}>No editable · {form.prioridad === 'critica' ? 'SLA 60 min' : form.prioridad === 'alta' ? 'SLA 4 h' : form.prioridad === 'media' ? 'SLA 24 h' : 'SLA 72 h'} · Cambia la categoría para recalcular.</Text>
-          </View>
-          {touched.prioridad && errors.prioridad ? <Text style={s.error}>{errors.prioridad}</Text> : null}
-
-          {/* Adjuntos RF-07 imágenes + PDF/DOCX — web usa input oculto, nativo usa DocumentPicker (QA-C2) */}
-          <Pressable onPress={() => { if (Platform.OS === 'web') { (fileInputRef.current as unknown as HTMLInputElement | null)?.click?.(); } else { void onPickNative(); } }} style={s.dropZone} accessibilityRole="button" accessibilityLabel="Seleccionar adjuntos">
-            <Text style={s.dropIcon}>⤒</Text>
-            <Text style={s.dropTitle}>Adjuntos (opcional) — tocar para cargar</Text>
-            <Text style={s.dropSub}>Imágenes, PDF o Word (DOC/DOCX) · 10 MB máx · 5 máx {adjuntos.length ? `· ${adjuntos.length} seleccionado(s)` : ''}</Text>
-          </Pressable>
-          {/* input web nativo oculto (solo web; en nativo se usa DocumentPicker) */}
-          {Platform.OS === 'web' ? (
-          <View style={{ display: 'none' } as unknown as object}>
-            {/* @ts-ignore web only */}
-            <input
-              ref={fileInputRef as unknown as never}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.doc,.docx"
-              multiple
-              onChange={(e: { target: { files: FileList | null; value: string } }) => { onPickFiles(e.target.files); e.target.value = ''; }}
-            />
-          </View>
-          ) : null}
-          {adjuntoError ? <Text style={s.error}>{adjuntoError}</Text> : null}
-          {adjuntos.length ? (
-            <View style={s.adjList}>
-              {adjuntos.map((a, i) => (
-                <View key={`${a.name}-${i}`} style={s.adjRow}>
-                  <Text style={s.adjName} numberOfLines={1}>{a.name} · {(a.size/1024).toFixed(0)} KB</Text>
-                  <Pressable onPress={() => setAdjuntos(prev => prev.filter((_, idx) => idx !== i))} style={s.adjRemove}><Text style={s.adjRemoveText}>Quitar</Text></Pressable>
-                </View>
-              ))}
-            </View>
-          ) : null}
 
           {submitError ? <View style={s.alertErr}><Text style={s.alertErrText}>{submitError}</Text></View> : null}
           {/* Acciones */}
@@ -494,71 +364,9 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 17 },
   formWrap: { gap: 12 },
   formCard: { gap: 12, padding: 20, borderRadius: theme.radius.xl },
-  label: { fontSize: 12, fontWeight: '700', color: theme.colors.textSoft, letterSpacing: 0.2 },
-  input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 13, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt, minHeight: 44 },
-  textarea: { minHeight: 120, textAlignVertical: 'top', paddingTop: 11 },
-  hint: { fontSize: 10, color: theme.colors.mutedSoft, textAlign: 'right', fontWeight: '600' },
-  error: { fontSize: 11, color: theme.colors.danger, fontWeight: '600' },
-  iaBlock: { minHeight: 44 },
-  iaLoading: { flexDirection:'row', alignItems:'center', gap:8, backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor:theme.colors.border, borderRadius:12, padding:12 },
-  iaLoadingText: { fontSize:12, color:theme.colors.muted, fontWeight:'600' },
-  iaIdle: { backgroundColor:'#F8FAFC', borderWidth:1, borderColor:theme.colors.border, borderStyle:'dashed', borderRadius:12, padding:12 },
-  iaIdleText: { fontSize:11, color:theme.colors.muted, fontWeight:'600', lineHeight:16 },
-  aiCard: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#DBEAFE', borderRadius: 12, padding: 12, gap: 6 },
-  aiHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  aiIcon: { color: theme.colors.primary, fontWeight: '800' },
-  aiTitle: { fontSize: 11, fontWeight: '800', color: theme.colors.primaryDark, textTransform: 'uppercase', letterSpacing: 0.6, flex: 1 },
-  aiPct: { fontSize: 11, fontWeight: '800', color: theme.colors.primary, backgroundColor: '#DBEAFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' },
-  aiText: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '600' },
-  aiRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
-  aiBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
-  aiBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
-  aiApplied: { fontSize:11, color:theme.colors.success, fontWeight:'700' },
-  aiHint: { fontSize:11, color:theme.colors.muted, fontWeight:'600' },
-  asigCard: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12, gap: 6 },
-  asigTitle: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '700', lineHeight: 17 },
-  asigMotivo: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
-  asigGhost: { borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: theme.colors.surface },
-  asigGhostText: { color: theme.colors.textSoft, fontWeight: '800', fontSize: 11 },
-  asigConfirmed: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12 },
-  asigChange: { fontSize: 11, color: theme.colors.primary, fontWeight: '800', textDecorationLine: 'underline' },
-  dropdownRow: { flexDirection:'row', gap: 10, flexWrap:'wrap' as const },
   title: { fontSize: 14, fontWeight: '800', color: theme.colors.primary },
-  sectionTitle: { fontSize: 12, fontWeight: '800', color: theme.colors.text },
-  sectionHint: { fontSize: 11, color: theme.colors.muted, marginTop: -6 },
-  group: { gap: 6 },
-  groupTitle: { fontSize: 10, fontWeight: '700', color: theme.colors.mutedSoft, textTransform: 'uppercase', letterSpacing: 0.8 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { flexDirection:'row', alignItems:'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  chipSuggested: { borderColor: theme.colors.primary, borderStyle:'dashed' as const },
-  chipText: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '600' },
-  chipTextActive: { color: '#fff' },
-  chipSugBadge: { fontSize:9, fontWeight:'800', color: theme.colors.primary, marginLeft:4 },
-  mesaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  mesaCard: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, width: '31%' as unknown as number, minWidth: 140, flexGrow: 0, flexShrink: 0 },
-  mesaCardActive: { backgroundColor: '#EFF6FF', borderColor: theme.colors.primary, borderWidth: 2 },
-  mesaDot: { width: 28, height: 28, borderRadius: 8, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border },
-  mesaDotActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  mesaDotText: { fontSize: 10, color: theme.colors.muted },
-  mesaName: { fontSize: 12, fontWeight: '700', color: theme.colors.textSoft, flex: 1 },
-  mesaNameActive: { color: theme.colors.primaryDark },
-  mesaCheck: { color: theme.colors.primary, fontWeight: '800' },
-  prioLockedRow: { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
-  prioLockedBox: { backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor:theme.colors.border, borderRadius:12, padding:12, gap:2 },
-  prioLockedText: { fontSize:12, fontWeight:'700', color:theme.colors.textSoft },
-  prioLockedSub: { fontSize:11, color:theme.colors.muted, lineHeight:16 },
   alertErr: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, padding: 10 },
   alertErrText: { color: '#991B1B', fontSize: 12, fontWeight: '700' },
-  adjList: { gap: 6 },
-  adjRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
-  adjName: { fontSize: 11, color: theme.colors.textSoft, flex: 1, fontWeight: '600' },
-  adjRemove: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
-  adjRemoveText: { fontSize: 10, color: theme.colors.danger, fontWeight: '700' },
-  dropZone: { borderWidth: 2, borderColor: theme.colors.borderStrong, borderStyle: 'dashed', borderRadius: 12, backgroundColor: '#F8FAFC', padding: 18, alignItems: 'center', gap: 4 },
-  dropIcon: { fontSize: 18, color: theme.colors.mutedSoft },
-  dropTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.textSoft },
-  dropSub: { fontSize: 11, color: theme.colors.muted, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 6, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 14 },
   btnGhost: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
   btnGhostText: { color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 },
