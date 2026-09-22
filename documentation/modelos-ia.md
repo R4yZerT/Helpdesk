@@ -173,7 +173,17 @@ Pronostica el volumen diario de tickets a 7 días y genera **alertas preventivas
   `avg28` (la heurística SQL de RF-19). Se queda el de menor MAE en split
   temporal (últimos 30 días como test).
 - **Pronóstico**: recursivo a 7 días (el predicho alimenta el siguiente día).
-- **Niveles**: umbrales p60 (alta) / p85 (pico) calculados sobre días activos.
+- **Niveles**: umbrales p60 (alta) / p85 (pico) calculados sobre días activos
+  (`--umbral-pico-q` permite mover el umbral de pico, default 0.85).
+- **Rangos q10–q90** (lote B+C+A): cada día emite `forecast` (puntual) + banda
+  `lo`/`hi` calibrada con los residuos del modelo ganador en test (~80%
+  cobertura empírica; la métrica `cobertura_q10_q90` queda en `metrics.json`
+  por serie). El dashboard muestra el rango en "Peor día (rango)".
+- **Frescura** (lote B+C+A): el script escribe `forecast_meta.json`
+  (`generado_en` UTC); el upload lo persiste en la columna `generado_en` y la
+  UI muestra banner si el pronóstico está próximo a vencer (>5 días) o
+  vencido (>8 días, se saltó una corrida). `estadoFrescuraPronostico()` en
+  `shared/src/dashboard.ts` (puro y testeado).
 
 Últimas métricas (MAE test, modelo vs baseline):
 
@@ -211,7 +221,11 @@ forecast_7d.json ──upload-pronostico──▶ pronosticos_picos ──▶ ge
   `(fecha, serie, modelo_version)`.
 - **Alerta preventiva**: `pico_esperado` (valor añadido al enum `tipo_alerta_ia`;
   ojo: `ALTER TYPE ... ADD VALUE` no corre dentro de transacciones, aplicar
-  fuera). Severidad `critica` si forecast ≥ 100, si no `alta`. Dedup 24h.
+  fuera). Lote B+C+A (recall): la alerta dispara ante **cualquier día con
+  `es_pico`** (nivel `alta` o `pico`, no solo `pico`), para atrapar más picos
+  a costa de más avisos; severidad `critica` si forecast ≥ 100 o nivel `pico`,
+  `alta` si nivel `pico` con forecast < 100, y `media` si el disparo viene de
+  nivel `alta`. El mensaje incluye el rango q10–q90. Dedup 24h.
   Se dispara por cron diario 06:00 (requiere extensión `pg_cron`) y por la
   Edge Function `generate-alertas` (solo jefe/admin), que ahora invoca ambas
   generadoras (reactiva + preventiva).

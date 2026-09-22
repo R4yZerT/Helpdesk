@@ -119,9 +119,11 @@ describe('dashboard alertas IA', () => {
 });
 
 describe('dashboard pronóstico semanal', () => {
-  it('mapea filas y retorna [] sin datos o con error', async () => {
-    const ok = { from: () => mockQuery({ data: [{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1' }] }) } as never;
-    expect(await getPronosticoSemanal(ok)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1' }]);
+  it('mapea filas con lo/hi/generado_en y retorna [] sin datos o con error', async () => {
+    const ok = { from: () => mockQuery({ data: [{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1', lo: 9.1, hi: 16.2, generado_en: '2026-09-14T06:00:00Z' }] }) } as never;
+    expect(await getPronosticoSemanal(ok)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: 9.1, hi: 16.2, generadoEn: '2026-09-14T06:00:00Z' }]);
+    const legacy = { from: () => mockQuery({ data: [{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1' }] }) } as never;
+    expect(await getPronosticoSemanal(legacy)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: null, hi: null, generadoEn: null }]);
     const vacio = { from: () => mockQuery({ data: null }) } as never;
     expect(await getPronosticoSemanal(vacio)).toEqual([]);
   });

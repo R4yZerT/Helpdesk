@@ -13,6 +13,8 @@ export type PronosticoJsonDia = {
   nivel: string;
   es_pico?: boolean;
   dow?: number;
+  lo?: number;
+  hi?: number;
 };
 
 export type PronosticoUploadRow = {
@@ -22,6 +24,9 @@ export type PronosticoUploadRow = {
   nivel: NivelPronostico;
   es_pico: boolean;
   modelo_version: string;
+  lo: number;
+  hi: number;
+  generado_en: string | null;
 };
 
 const isFecha = (s: unknown): s is string =>
@@ -32,7 +37,7 @@ function esNivel(n: unknown): n is NivelPronostico {
 }
 
 /** Valida el JSON crudo y construye las filas a insertar. Lanza Error si hay algo mal. */
-export function buildPronosticoRows(data: unknown, version: string): PronosticoUploadRow[] {
+export function buildPronosticoRows(data: unknown, version: string, generadoEn?: string | null): PronosticoUploadRow[] {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     throw new Error('[pronostico] JSON raíz inválido: se esperaba objeto {serie: dias[]}');
   }
@@ -41,6 +46,11 @@ export function buildPronosticoRows(data: unknown, version: string): PronosticoU
     throw new Error('[pronostico] JSON vacío (0 series): regenera con pnpm forecast:refresh');
   }
   if (!version || !version.trim()) throw new Error('[pronostico] modelo_version vacío');
+  // generado_en (frescura): ISO válido o null (JSON viejo sin meta). Nunca inventa fecha.
+  const gen = generadoEn?.trim() ? generadoEn.trim() : null;
+  if (gen && Number.isNaN(Date.parse(gen))) {
+    throw new Error(`[pronostico] generado_en inválido: ${JSON.stringify(generadoEn)}`);
+  }
   const rows: PronosticoUploadRow[] = [];
   for (const [serie, dias] of series) {
     if (!Array.isArray(dias) || dias.length === 0) {
@@ -58,6 +68,9 @@ export function buildPronosticoRows(data: unknown, version: string): PronosticoU
           `[pronostico] nivel inválido en serie "${serie}" fecha ${d.fecha}: ${JSON.stringify(d?.nivel)} (CHECK bd: baja/media/alta/pico)`,
         );
       }
+      // Rango q10–q90: si el JSON no los trae (versión vieja), colapsa al puntual.
+      const lo = typeof d?.lo === 'number' && Number.isFinite(d.lo) ? d.lo : d.forecast;
+      const hi = typeof d?.hi === 'number' && Number.isFinite(d.hi) ? d.hi : d.forecast;
       rows.push({
         fecha: d.fecha,
         serie,
@@ -65,6 +78,9 @@ export function buildPronosticoRows(data: unknown, version: string): PronosticoU
         nivel: d.nivel,
         es_pico: d.es_pico === true,
         modelo_version: version.trim(),
+        lo,
+        hi,
+        generado_en: gen,
       });
     }
   }

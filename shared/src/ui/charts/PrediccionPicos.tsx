@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { Card } from '../components.js';
 import type { PicoPrediccion, PicosResumen, PronosticoDia } from '../../dashboard.js';
-import { resumirPronosticoML } from '../../dashboard.js';
+import { estadoFrescuraPronostico, resumirPronosticoML } from '../../dashboard.js';
 
 const DOW = ['Lun','Mar','Mié','Jue','Vie'];
 const NIVEL_COLOR: Record<string,string> = { baja:'#EEF2F7', media:'#A0CAFF', alta:theme.colors.primary, pico:theme.colors.accent };
@@ -14,6 +14,13 @@ export function PrediccionPicos({ picos, resumen, ml }: { picos: PicoPrediccion[
   // RF-19/B3 — pronóstico ML (tabla pronosticos_picos); ausente = pipeline sin correr
   const mlResumen = ml && ml.length ? resumirPronosticoML(ml) : [];
   const mlVersion = ml?.find(d=>d.modeloVersion)?.modeloVersion ?? null;
+  // C (forecast fresco) — banner según edad del generado_en más reciente
+  const frescura = ml ? estadoFrescuraPronostico(ml) : null;
+  const bannerFrescura = frescura && frescura.estado !== 'vigente' ? (() => {
+    if (frescura.estado === 'sin_datos') return 'Pronóstico sin fecha de generación — puede ser anterior al pipeline de rangos.';
+    if (frescura.estado === 'vencido') return `Pronóstico vencido (generado hace ${frescura.edadDias} días) — se saltó una corrida semanal.`;
+    return `Pronóstico próximo a vencer (generado hace ${frescura.edadDias} días) — se regenera los lunes 06:00 UTC.`;
+  })() : null;
   if (!picos.length && !resumen.length) return (
     <Card><Text style={s.title}>Predicción de picos (RF-19) — sin datos</Text><Text style={s.muted}>No hay historial suficiente (30d) para predecir.</Text></Card>
   );
@@ -53,18 +60,30 @@ export function PrediccionPicos({ picos, resumen, ml }: { picos: PicoPrediccion[
       {!top.length && <Text style={s.muted}>Sin franjas en nivel alta/pico — carga distribuida.</Text>}
       {/* RF-19/B3 — pronóstico ML 7 días (fuente: modelo, no heurística) */}
       <Text style={[s.title,{marginTop:4}]}>Pronóstico ML · próximos 7 días (RF-19)</Text>
+      {bannerFrescura ? (
+        <View style={s.bannerWarn} accessible accessibilityRole="alert" accessibilityLabel={bannerFrescura}>
+          <Text style={s.bannerWarnT}>{bannerFrescura}</Text>
+        </View>
+      ) : null}
       {mlResumen.length ? (
         <View style={{ gap: 4 }}>
-          <View style={[s.row,s.headerRow]}><Text style={[s.cellMesa,{fontWeight:'800'}]}>Serie</Text><Text style={s.cellVal}>7d</Text><Text style={s.cellVal}>Picos</Text><Text style={s.cellSlot}>Peor día</Text></View>
-          {mlResumen.slice(0,6).map((r)=>(
-            <View key={r.serie} style={[s.row,{backgroundColor:'#F8FAFC'}]}>
-              <Text style={s.cellMesa} numberOfLines={1}>{r.serie}</Text>
-              <Text style={s.cellVal}>{r.total7d}</Text>
-              <Text style={s.cellVal}>{r.diasPico}</Text>
-              <Text style={s.cellSlot}>{r.maxFecha ?? '—'} ({r.maxForecast})</Text>
-            </View>
-          ))}
-          <Text style={s.muted}>Fuente: modelo {mlVersion ?? 'desconocida'} (tabla pronosticos_picos).</Text>
+          <View style={[s.row,s.headerRow]}><Text style={[s.cellMesa,{fontWeight:'800'}]}>Serie</Text><Text style={s.cellVal}>7d</Text><Text style={s.cellVal}>Picos</Text><Text style={s.cellSlot}>Peor día (rango)</Text></View>
+          {mlResumen.slice(0,6).map((r)=>{
+            // B (rangos): banda q10–q90 del día pico; sin lo/hi (fila pre-migración) = puntual
+            const pico = ml?.find(d=>d.serie===r.serie && d.fecha===r.maxFecha);
+            const rango = pico?.lo != null && pico?.hi != null
+              ? `${r.maxFecha ?? '—'} (${pico.lo.toFixed(1)}–${pico.hi.toFixed(1)})`
+              : `${r.maxFecha ?? '—'} (${r.maxForecast})`;
+            return (
+              <View key={r.serie} style={[s.row,{backgroundColor:'#F8FAFC'}]}>
+                <Text style={s.cellMesa} numberOfLines={1}>{r.serie}</Text>
+                <Text style={s.cellVal}>{r.total7d}</Text>
+                <Text style={s.cellVal}>{r.diasPico}</Text>
+                <Text style={s.cellSlot}>{rango}</Text>
+              </View>
+            );
+          })}
+          <Text style={s.muted}>Rango q10–q90 calibrado en test (~80% cobertura). Fuente: modelo {mlVersion ?? 'desconocida'} (tabla pronosticos_picos).</Text>
         </View>
       ) : (
         <Text style={s.muted}>Sin pronóstico ML — corre `pnpm forecast:refresh` y `pnpm upload:pronostico:push`.</Text>
@@ -82,4 +101,6 @@ const s = StyleSheet.create({
   cellVal:{width:54,textAlign:'right',fontSize:11,fontWeight:'700',color:theme.colors.text},
   badge:{paddingHorizontal:6,paddingVertical:2,borderRadius:999},
   badgeT:{fontSize:9,fontWeight:'800',color:'#fff'},
+  bannerWarn:{backgroundColor:'#FFFBEB',borderWidth:1,borderColor:'#FDE68A',borderRadius:8,paddingVertical:6,paddingHorizontal:8},
+  bannerWarnT:{fontSize:11,fontWeight:'700',color:'#92400E'},
 });

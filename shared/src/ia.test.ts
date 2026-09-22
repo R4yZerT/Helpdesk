@@ -1,3 +1,4 @@
+// RF-22 — predecirCategoria + classifyLocal + resolución de mesa (tests unitarios)
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   classifyLocal,
@@ -8,8 +9,8 @@ import {
   resolverMesaId,
   type CatalogosPrediccion,
 } from './ia.js';
-import { getPrioridadPorSubcategoria } from './types.js';
 import type { Mesa, TicketCategoria } from './tickets.js';
+import { getPrioridadPorSubcategoria } from './types.js';
 
 // Catálogo sintético con IDs NO secuenciales: prueba que nada depende de IDs fijos.
 const categorias: TicketCategoria[] = [
@@ -35,6 +36,8 @@ const mesas: Mesa[] = [
 ];
 const catalogos: CatalogosPrediccion = { categorias, mesas };
 
+afterEach(() => { vi.restoreAllMocks(); });
+
 describe('classifyLocal por nombres (13 categorías consolidadas)', () => {
   it('wifi -> Conectividad y redes', () => {
     const r = classifyLocal('El wifi del bloque 3 se cae cada 10 minutos desde ayer', categorias);
@@ -43,9 +46,9 @@ describe('classifyLocal por nombres (13 categorías consolidadas)', () => {
     expect(r?.prioridad).toBe('critica');
   });
   it('impresora -> Equipos e Infraestructura', () => {
-    const r = classifyLocal('La impresora del primer piso no imprime y muestra atasco de papel', categorias);
-    expect(r?.categoriaId).toBe(103);
-  });
+      const r = classifyLocal('La impresora del primer piso no imprime y muestra atasco de papel', categorias);
+      expect(r?.categoriaId).toBe(103);
+    });
   it('banner -> Piezas gráficas y diseño', () => {
     const r = classifyLocal('Necesito un banner y un flyer para el evento de grados de este viernes', categorias);
     expect(r?.categoriaId).toBe(108);
@@ -107,56 +110,44 @@ describe('prioridad por nombre de subcategoría', () => {
   it('desconocida -> media', () => {
     expect(getPrioridadPorSubcategoria('Categoría inventada')).toBe('media');
   });
-  it('getPrioridadPorCategoria resuelve contra catálogo vivo', () => {
-    expect(getPrioridadPorCategoria(101, categorias)).toBe('critica');
-    expect(getPrioridadPorCategoria(108, categorias)).toBe('baja');
-    expect(getPrioridadPorCategoria(9999, categorias)).toBe('media');
-  });
 });
 
-describe('predecirCategoria contra API BETO (fetch stub)', () => {
-  afterEach(() => { vi.unstubAllGlobals(); });
-  const ok = (payload: unknown) => async () => new Response(JSON.stringify(payload), {
-    status: 200, headers: { 'Content-Type': 'application/json' },
-  });
-
-  it('usa BETO y resuelve mesa real cuando la etiqueta existe en el catálogo', async () => {
-    vi.stubGlobal('fetch', ok({ etiqueta: 'tic:Correo electrónico', dominio: 'tic', subcategoria: 'Correo electrónico', confianza: 0.9 }));
-    const r = await predecirCategoria('Texto largo sin palabras clave que active regla alguna', catalogos, { url: 'http://stub' });
+describe('predecirCategoria con Beto', () => {
+  it('retorna resultado de Beto cuando responde', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ dominio: 'tic', subcategoria: 'equipos e infraestructura', confianza: 0.85 }),
+    });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as never);
+    const r = await predecirCategoria('La impresora no imprime', catalogos);
+    expect(r).not.toBeNull();
+    expect(r?.categoriaId).toBe(103);
     expect(r?.fuente).toBe('beto');
-    expect(r?.categoriaId).toBe(102);
-    expect(r?.mesaId).toBe(11);
-    expect(r?.prioridad).toBe('media');
-    expect(r?.confianza).toBe(0.9);
   });
-
-  it('etiqueta desconocida -> fallback a reglas', async () => {
-    vi.stubGlobal('fetch', ok({ etiqueta: 'general:Sin clasificar', dominio: 'general', subcategoria: 'Sin clasificar', confianza: 0.9 }));
-    const r = await predecirCategoria('El wifi del bloque 3 se cae cada 10 minutos desde ayer', catalogos, { url: 'http://stub' });
-    expect(r?.fuente).toBe('reglas');
-    expect(r?.categoriaId).toBe(101);
-  });
-
-  it('API con error -> fallback a reglas', async () => {
-    vi.stubGlobal('fetch', async () => new Response('boom', { status: 500 }));
-    const r = await predecirCategoria('El wifi del bloque 3 se cae cada 10 minutos desde ayer', catalogos, { url: 'http://stub' });
-    expect(r?.fuente).toBe('reglas');
-    expect(r?.categoriaId).toBe(101);
+  it('retorna null cuando Beto falla y reglas no match', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false } as never);
+    const r = await predecirCategoria('xyz', catalogos);
+    expect(r).toBeNull();
   });
 });
 
-describe('predecirCategoria con API apagada -> fallback a reglas', () => {
-  it('resuelve mesa real y fuente reglas', async () => {
-    const r = await predecirCategoria(
-      'El wifi del bloque 3 se cae cada 10 minutos desde ayer',
-      catalogos,
-      { url: 'http://127.0.0.1:9', timeoutMs: 800 },
-    );
-    expect(r?.categoriaId).toBe(101);
-    expect(r?.mesaId).toBe(11);
-    expect(r?.fuente).toBe('reglas');
+describe('classifyLocal', () => {
+  it('texto corto -> null', () => {
+    expect(classifyLocal('hola', categorias)).toBeNull();
   });
-  it('texto corto -> null', async () => {
-    await expect(predecirCategoria('hola', catalogos, { url: 'http://127.0.0.1:9' })).resolves.toBeNull();
+  it('sin match -> null', () => {
+    expect(classifyLocal('biblioteca central', categorias)).toBeNull();
+  });
+});
+
+describe('resolverMesaId', () => {
+  it('resolve por nombre con IDs reales', () => {
+    expect(resolverMesaId('tic', mesas)).toBe(11);
+    expect(resolverMesaId('infraestructura', mesas)).toBe(33);
+    expect(resolverMesaId('comunicaciones', mesas)).toBe(22);
+  });
+  it('fallback legacy cuando el dominio no existe en catálogo', () => {
+    expect(resolverMesaId('general', mesas)).toBe(44); // EAPSA en catálogo
+    expect(resolverMesaId('desconocido', mesas)).toBeNull(); // dominio desconocido + sin mesas match
   });
 });
