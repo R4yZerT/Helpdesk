@@ -5,6 +5,7 @@ node_modules/
 # Builds
 dist/
 build/
+coverage/
 .expo/
 apps/*/web-build/
 
