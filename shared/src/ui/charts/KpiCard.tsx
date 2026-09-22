@@ -14,14 +14,14 @@ export function KpiCard({
   label: string;
   value: string;
   delta?: string;
-  deltaTone?: 'up' | 'down' | 'warn';
+  deltaTone?: 'up' | 'down' | 'warn' | 'danger';
   accent?: 'orange' | 'blue';
 }) {
   return (
     <Card style={[s.card, accent === 'orange' ? s.accentOrange : null as unknown as ViewStyle]}>
       <Text style={s.label}>{label}</Text>
       <Text style={s.value}>{value}</Text>
-      {delta ? <Text style={[s.delta, deltaTone === 'warn' && { color: theme.colors.accent }]}>{delta}</Text> : null}
+      {delta ? <Text style={[s.delta, deltaTone === 'warn' && { color: theme.colors.accent }, deltaTone === 'danger' && { color: theme.colors.danger }]}>{delta}</Text> : null}
       <View style={s.sparkWrap}>
         <View style={[s.spark, accent === 'orange' ? { backgroundColor: theme.colors.accent } : { backgroundColor: theme.colors.primary }]} />
         <View style={s.sparkBg} />

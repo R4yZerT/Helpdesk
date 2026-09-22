@@ -3,24 +3,20 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
-import { CreateTicketScreen } from '../features/tickets/CreateTicketScreen';
-import { BandejaTecnicoScreen } from '../features/tecnico/BandejaTecnicoScreen';
-import { DetalleTecnicoScreen } from '../features/tecnico/DetalleTecnicoScreen';
 import { theme } from '@helpdesk/shared';
-import { PerfilScreen } from '../features/perfil/PerfilScreen';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { HeaderBell } from '../components/HeaderBell';
 import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
 import { navigationRef } from './navigationRef';
-import type { AuthStackParamList, TecnicoStackParamList } from './types';
+import type { AuthStackParamList } from './types';
+import { TecnicoNavigator } from './TecnicoNavigator';
 
 const navTheme = {
   ...DefaultTheme,
@@ -28,16 +24,6 @@ const navTheme = {
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-const TecnicoStack = createNativeStackNavigator<TecnicoStackParamList>();
-const Tab = createBottomTabNavigator();
-
-const tabOpts = {
-  headerShown: false as const,
-  tabBarActiveTintColor: theme.colors.primary,
-  tabBarInactiveTintColor: theme.colors.muted,
-  tabBarStyle: { height: 62, paddingTop: 6, paddingBottom: 8, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
-};
 
 const screenOpts = {
   headerStyle: { backgroundColor: theme.colors.surface } as const,
@@ -78,25 +64,6 @@ function RolDesconocido() {
     </View>
   );
 }
-function TecnicoBandejaStack() {
-  return (
-    <TecnicoStack.Navigator screenOptions={screenOpts}>
-      <TecnicoStack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
-      <TecnicoStack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} />
-      <TecnicoStack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
-    </TecnicoStack.Navigator>
-  );
-}
-function TecnicoNavigator() {
-  return (
-    <Tab.Navigator screenOptions={tabOpts}>
-      <Tab.Screen name="TecnicoBandejaTab" options={{ tabBarLabel: 'Bandeja', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 18 }}>☰</Text> }} component={TecnicoBandejaStack} />
-      <Tab.Screen name="TecnicoCrearTab" options={{ tabBarLabel: 'Nueva', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>＋</Text>, headerShown: true, headerStyle: { backgroundColor: theme.colors.surface } as never, headerTintColor: theme.colors.primary, headerRight: () => <HeaderBell /> }} component={CreateTicketScreen} />
-      <Tab.Screen name="TecnicoPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>◉</Text>, headerShown: true, headerTitle: 'Mi perfil', headerRight: () => <HeaderBell /> }} component={PerfilScreen} />
-    </Tab.Navigator>
-  );
-}
-
 export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error, recoveryPending } = useAuth();
   // RF-23: suscripción realtime + refresh al volver a primer plano (no-op sin sesión)

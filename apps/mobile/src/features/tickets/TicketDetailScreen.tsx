@@ -1,57 +1,34 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, useFeedback } from '@helpdesk/shared';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { Card, theme, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { TicketHeader } from './components/TicketHeader';
+import { FsmActions } from './components/FsmActions';
+import { TicketProgress } from './components/TicketProgress';
+import { TicketTabs } from './components/TicketTabs';
 
 type Props = {
   route: { params: { id: string } };
-  navigation?: {
-    goBack?: () => void;
-    canGoBack?: () => boolean;
-    navigate?: (name: string, params?: object) => void;
-  };
-};
-
-const tonoEstado = (e: string) => {
-  if (e === 'abierto') return 'muted' as const;
-  if (e === 'en_proceso') return 'info' as const;
-  if (e === 'solucionado') return 'success' as const;
-  if (e === 'cerrado') return 'ink' as const;
-  if (e === 'devuelto') return 'danger' as const;
-  return 'muted' as const;
-};
-const tonoPrioridad = (p: string) => {
-  if (p === 'critica') return 'accent' as const;
-  if (p === 'alta') return 'danger' as const;
-  if (p === 'media') return 'warning' as const;
-  return 'muted' as const;
+  navigation?: { goBack?: () => void; canGoBack?: () => boolean; navigate?: (name: string, params?: object) => void };
 };
 
 export function TicketDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const fb = useFeedback();
-  // Volver a bandeja: pop del stack; fallback a MisSolicitudes si no hay historial
   const handleBack = () => {
     const nav = navigation as { canGoBack?: () => boolean; goBack?: () => void; navigate?: (name: string) => void } | undefined;
-    if (nav?.canGoBack?.()) {
-      nav.goBack?.();
-      return;
-    }
-    if (nav?.goBack) {
-      nav.goBack();
-      return;
-    }
-    nav?.navigate?.('MisSolicitudes');
+    if (nav?.canGoBack?.()) nav.goBack?.();
+    else if (nav?.goBack) nav.goBack();
+    else nav?.navigate?.('MisSolicitudes');
   };
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
   const { profile } = useAuth();
   const canComment = !!profile && ['usuario', 'tecnico', 'jefe'].includes(profile.rol);
   const canInternal = !!profile && ['tecnico', 'jefe', 'administrador'].includes(profile.rol);
-  // El solicitante nunca soluciona: solo confirma cierre o devuelve desde solucionado
   const isSolicitante = profile?.rol === 'usuario';
   const [detail, setDetail] = useState<TicketDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,25 +63,23 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     try {
       const d = await getTicketDetail(supabase, id);
       setDetail(d);
-      // resolver mesa nombre + mapas para el historial
       try {
         const ms = await fetchMesas(supabase);
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
-      } catch {}
+      } catch (e) { console.warn('[TicketDetail] fetch mesas', e); }
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
-      } catch {}
-      // resolver nombres de técnicos y actores vía RPC segura (respeta RLS de profiles)
+      } catch (e) { console.warn('[TicketDetail] fetch categorias', e); }
       try {
         const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length > 0) {
           const map = await fetchTecnicoNombres(supabase, ids);
           if (Object.keys(map).length > 0) setTecnicoNombres(map);
         }
-      } catch {}
+      } catch (e) { console.warn('[TicketDetail] fetch tecnico nombres', e); }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -168,13 +143,10 @@ export function TicketDetailScreen({ route, navigation }: Props) {
       message: '¿Seguro que quieres cerrar esta solicitud?',
       confirmText: 'Sí, cerrar',
       cancelText: 'No',
-      onConfirm: async () => {
-        try { await cancelTicket(supabase, id); await load(); } catch (e) { fb.show('Error', e instanceof Error ? e.message : String(e), 'error'); }
-      },
+      onConfirm: async () => { try { await cancelTicket(supabase, id); await load(); } catch (e) { fb.show('Error', e instanceof Error ? e.message : String(e), 'error'); } },
     });
   };
   const onTransition = async (estado: string) => {
-    // El solicitante confirma con la solución ya registrada por el técnico (no la escribe)
     const sol = isSolicitante ? (detail?.ticket.solucionAplicada ?? solucion) : solucion;
     if ((estado === 'solucionado' || estado === 'cerrado') && sol.trim().length < 5) {
       setTransError('Describe la solución aplicada (mín. 5 caracteres) — requerida para ' + formatEstado(estado as never));
@@ -213,42 +185,14 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   }
   if (!detail) return <View style={s.center}><Text style={s.muted}>Sin datos</Text></View>;
 
-  const { ticket, estados, comentarios, adjuntos = [] } = detail;
-  // Tiempos reales por etapa desde el historial (con el actor que ejecutó cada cambio)
+  const { ticket } = detail;
   const nombreActor = (id?: string | null) => (id ? (tecnicoNombres[id] ?? 'Usuario') : null);
-  const evAsignacion = estados.find((e) => e.tipoEvento === 'asignacion' && e.tecnicoPara != null);
-  const evDiagnostico = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'en_proceso');
-  const evSolucion = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'solucionado');
-  const evCierre = estados.find((e) => e.tipoEvento === 'estado' && e.estadoNuevo === 'cerrado');
-  const conActor = (iso: string | null | undefined, actorId?: string | null) =>
-    iso ? `${formatFechaHora(iso)}${actorId && nombreActor(actorId) ? ` · por ${nombreActor(actorId)}` : ''}` : undefined;
-  const tiempoAsignacion = conActor(evAsignacion?.creadoEn, evAsignacion?.usuarioId);
-  const tiempoDiagnostico = conActor(evDiagnostico?.creadoEn, evDiagnostico?.usuarioId);
-  const tiempoSolucion = conActor(ticket.fechaResolucion ?? evSolucion?.creadoEn, evSolucion?.usuarioId);
-  const tiempoCierre = conActor(evCierre?.creadoEn, evCierre?.usuarioId);
-  // Etiqueta corta para adjuntos no-imagen (el thumb <Image> salía roto en PDF/DOC/XLS)
-  const etiquetaAdjunto = (mime?: string | null) => {
-    const m = String(mime ?? '');
-    if (m === 'application/pdf') return 'PDF';
-    if (m.includes('word')) return 'DOC';
-    if (m.includes('sheet') || m.includes('excel')) return 'XLS';
-    if (m === 'text/plain') return 'TXT';
-    return 'FILE';
-  };
-  const onOpenAdjunto = async (a: { storagePath: string }) => {
-    try {
-      const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
-      const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl;
-      if (url) await Linking.openURL(url);
-    } catch {}
-  };
   const isOwner = profile?.id === ticket.usuarioId;
   const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;
   const canCancel = canEdit;
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
-  // Ciclo de vida visible según rol: el solicitante solo confirma/deuelve desde solucionado
   const nextEstados = nextEstadosParaRol(profile?.rol, ticket.estado as any, ESTADOS);
   const slaVence = (ticket as any).slaVenceEn ? new Date((ticket as any).slaVenceEn) : getSlaVencimiento(ticket.creadoEn, ticket.prioridad as any);
   const slaEstado = getSlaEstado({ creadoEn: ticket.creadoEn, prioridad: ticket.prioridad as any, estado: ticket.estado, venceEn: slaVence.toISOString(), fechaResolucion: ticket.fechaResolucion });
@@ -257,193 +201,97 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const slaFillColor = slaEstado === 'vencido' || slaEstado === 'vencido_tarde' ? theme.colors.danger : slaEstado === 'por_vencer' ? theme.colors.accent : slaEstado === 'cumplido' || slaEstado === 'vigente' ? theme.colors.success : theme.colors.muted;
   const slaBigLabel = ticket.estado === 'cerrado' || ticket.estado === 'solucionado' ? slaEstadoLabel(slaEstado) : slaRest;
 
-  const header = (
-    <View style={s.header}>
-      <View style={s.kickerRow}><Pressable onPress={handleBack} accessibilityRole="button" accessibilityLabel="Volver a bandeja" hitSlop={8} style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}><Text style={s.backLink}>← Volver a bandeja</Text></Pressable><View style={s.kickerDot} /><Text style={s.kicker}>Expediente · #{String(ticket.numero).padStart(4, '0')}</Text></View>
-      <View style={s.pillsRow}>
-        <Badge label={formatPrioridad(ticket.prioridad as never)} tone={tonoPrioridad(ticket.prioridad)} />
-        <Badge label={formatEstado(ticket.estado as never)} tone={tonoEstado(ticket.estado)} />
-        <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
-      </View>
-      {editing ? (
-        <View style={{ gap: 8 }}>
-          <TextInput value={editAsunto} onChangeText={setEditAsunto} style={s.editInput} placeholder="Asunto (5-200)" maxLength={200} />
-          <TextInput value={editDesc} onChangeText={setEditDesc} style={[s.editInput, { minHeight: 80, textAlignVertical: 'top' }]} placeholder="Descripción (10-5000)" multiline maxLength={5000} />
-          {editError ? <Text style={s.error}>{editError}</Text> : null}
-          <View style={s.actionRow}>
-            <Pressable onPress={() => setEditing(false)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-            <Pressable onPress={onSaveEdit} disabled={editSaving} style={[s.btn, s.btnPrimary, editSaving && { opacity: 0.6 }]}>{editSaving ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Guardar</Text>}</Pressable>
-          </View>
-        </View>
-      ) : (
-        <>
-          <Text style={s.asunto}>{ticket.asunto}</Text>
-          <Text style={s.meta}>{mesaNombre || `Mesa ${ticket.mesaId ?? '—'}`} · Cat {ticket.categoriaId} · Reportado {new Date(ticket.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
-        </>
-      )}
-    </View>
-  );
-
-  const left = (
-    <View style={{ gap: 12, flex: isWide ? 8 : undefined }}>
-      <Card style={{ gap: 12 }}>
-        <Text style={s.section}>Descripción</Text>
-        {!editing ? <Text style={s.desc}>{ticket.descripcion}</Text> : null}
-        {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
-          <View style={s.solBox}>
-            <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
-            {ticket.solucionAplicada ? <Text style={s.solText}>{ticket.solucionAplicada}</Text> : <Text style={s.solTextMuted}>Sin detalle de solución — registra el procedimiento aplicado.</Text>}
-          </View>
-        ) : null}
-        {canEdit && !editing ? (
-          <View style={s.actionRow}>
-            <Pressable onPress={startEdit} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Editar</Text></Pressable>
-            <Pressable onPress={onCancelTicket} style={[s.btn, s.btnDanger]}><Text style={s.btnDangerText}>Cancelar solicitud</Text></Pressable>
-          </View>
-        ) : null}
-      </Card>
-
-      {/* Tabs */}
-      <Card style={{ gap: 0, padding: 0, overflow: 'hidden' } as any}>
-        <View style={s.tabs}>
-          {(['comentarios', 'historial', 'archivos'] as const).map((t) => (
-            <Pressable key={t} onPress={() => setActiveTab(t)} style={[s.tab, activeTab === t && s.tabActive]}>
-              <Text style={[s.tabText, activeTab === t && s.tabTextActive]}>{t === 'comentarios' ? `Comentarios (${comentarios.length})` : t === 'historial' ? `Historial (${estados.length + 1})` : `Archivos (${adjuntos.length})`}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <View style={{ padding: 14, gap: 10 }}>
-          {activeTab === 'comentarios' ? <TicketCommentList comentarios={comentarios} /> : activeTab === 'historial' ? (
-            <TicketHistoryList
-              creadoEn={ticket.creadoEn}
-              creadorId={ticket.usuarioId}
-              estados={estados}
-              nombres={{ usuarios: tecnicoNombres, mesas, categorias }}
-              currentUserId={profile?.id}
-            />
-          ) : adjuntos.length === 0 ? (
-            <View style={s.emptyFiles}><Text style={s.muted}>Sin archivos adjuntos.</Text></View>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {adjuntos.map((a) => (
-                <Pressable key={a.id} onPress={() => onOpenAdjunto(a)} style={s.adjRow}>
-                  {String(a.mime ?? '').startsWith('image/') ? (
-                    <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={s.adjThumb} />
-                  ) : (
-                    <View style={s.adjBadge}><Text style={s.adjBadgeText}>{etiquetaAdjunto(a.mime)}</Text></View>
-                  )}
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Text style={s.adjName}>{a.nombre}</Text>
-                    <Text style={s.mutedSmall}>{(a.size / 1024).toFixed(0)} KB · {a.mime}</Text>
-                  </View>
-                  <Text style={s.adjLink}>{a.mime === 'application/pdf' ? 'Ver PDF' : 'Ver'}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-        </View>
-      </Card>
-
-      <View style={s.composer}>
-        <TicketCommentComposer mensaje={mensaje} onChange={setMensaje} interno={interno} onInternoChange={setInterno} canInternal={canInternal} sending={sending} error={sendError} onSend={onSend} canComment={canComment} />
-      </View>
-    </View>
-  );
-
-  const right = (
-    <View style={{ gap: 12, flex: isWide ? 4 : undefined }}>
-      <Card style={{ gap: 10 }}>
-        <Text style={s.section}>Acciones de Ciclo de Vida</Text>
-        {isSolicitante ? (
-          // Solicitante: solo confirma el cierre o devuelve al técnico cuando está solucionado
-          nextEstados.length > 0 ? (
-            <View style={{ gap: 8 }}>
-              {transError ? <Text style={s.error}>{transError}</Text> : null}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {nextEstados.map((e) => (
-                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
-                    {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : 'Devolver al técnico'}</Text>}
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <Text style={s.mutedSmall}>{ticket.estado === 'solucionado' ? 'Cargando acciones…' : 'Sin acciones disponibles — el equipo técnico gestiona este ticket'}</Text>
-          )
-        ) : (
-        <>
-        <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnAccent]}><Text style={s.btnAccentText}>{showTrans ? 'Ocultar' : 'Solucionar Incidente'}</Text></Pressable>
-        {showTrans && nextEstados.length > 0 ? (
-          <View style={{ gap: 8 }}>
-            <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución" style={s.input} multiline maxLength={5000} />
-            {transError ? <Text style={s.error}>{transError}</Text> : null}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {nextEstados.map((e) => (
-                <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
-                  {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-        <View style={s.ghostStack}>
-          <Pressable onPress={() => setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir Información</Text></Pressable>
-          {(canReassign) ? <Pressable onPress={() => setShowReassign((v) => !v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
-        </View>
-        </>
-        )}
-        {showReassign ? (
-          <View style={{ gap: 8 }}>
-            <TextInput value={reassignTecnico} onChangeText={setReassignTecnico} placeholder="UUID técnico (o 'null')" style={s.input} autoCapitalize="none" />
-            <TextInput value={reassignMesa} onChangeText={setReassignMesa} placeholder="ID mesa (número)" style={s.input} keyboardType="numeric" />
-            {reassignError ? <Text style={s.error}>{reassignError}</Text> : null}
-            <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && { opacity: 0.6 }]}>{reassignLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Confirmar reasignación</Text>}</Pressable>
-          </View>
-        ) : null}
-        {nextEstados.length === 0 && !canReassign && !showTrans ? <Text style={s.mutedSmall}>Sin acciones disponibles</Text> : null}
-      </Card>
-
-      <Card style={{ gap: 10 }}>
-        <Text style={s.section}>Progreso del Ticket</Text>
-        <View style={s.progressWrap}>
-          {[
-            { label: 'Ticket Creado', done: true, time: formatFechaHora(ticket.creadoEn) },
-            { label: ticket.tecnicoAsignadoId ? `Asignado — ${tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado'}` : 'Asignado', done: !!ticket.tecnicoAsignadoId || !!evAsignacion, time: tiempoAsignacion },
-            { label: 'En Diagnóstico', done: !!evDiagnostico || ['en_proceso', 'solucionado', 'cerrado'].includes(ticket.estado), pulse: ticket.estado === 'en_proceso', time: tiempoDiagnostico },
-            { label: 'Solución Propuesta', done: !!evSolucion || !!ticket.fechaResolucion || ['solucionado', 'cerrado'].includes(ticket.estado), time: tiempoSolucion },
-            { label: 'Cierre CSAT', done: ticket.estado === 'cerrado', time: tiempoCierre },
-          ].map((n, i) => (
-            <View key={n.label} style={s.progressRow}>
-              <View style={s.progressDotCol}><View style={[s.progressDot, n.done ? s.progressDotDone : s.progressDotTodo, n.pulse && s.progressDotPulse]} /><View style={s.progressLine} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.progressLabel, !n.done && { color: theme.colors.mutedSoft }]}>{n.label}</Text>
-                {n.done ? <Text style={s.mutedSmall}>{n.time ?? ''}</Text> : null}
-              </View>
-            </View>
-          ))}
-        </View>
-      </Card>
-
-      <Card style={{ gap: 8 }}>
-        <Text style={s.section}>Control Compromiso SLA</Text>
-        <Text style={[s.slaBig, slaEstado === 'vencido' ? { color: theme.colors.danger } : slaEstado === 'por_vencer' ? { color: '#B45309' } : slaEstado === 'cumplido' ? { color: theme.colors.success } : {}]}>{slaBigLabel}</Text>
-        <Text style={s.mutedSmall}>Vence {slaVence.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {slaEstadoLabel(slaEstado)} · {slaPct}%</Text>
-        <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: slaFillColor }]} /></View>
-        <View style={[s.slaAlert, slaEstado === 'vencido' ? { backgroundColor: '#FEF2F2', borderColor: '#FECACA' } : slaEstado === 'por_vencer' ? { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' } : slaEstado === 'vigente' || slaEstado === 'cumplido' ? { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' } : {}]}><Text style={s.slaAlertText}>{slaEstado === 'vencido' ? 'Fuera de compromiso — requiere acción inmediata' : slaEstado === 'por_vencer' ? `Por vencer — quedan ~${getSlaMinutosRestantes(slaVence)} min` : slaEstado === 'cumplido' ? 'Cerrado dentro de compromiso ✓' : slaEstado === 'vencido_tarde' ? 'Cerrado fuera de compromiso' : 'Dentro de compromiso'}</Text></View>
-        <View style={s.attrGrid}>
-          <Text style={s.attrLabel}>Vence</Text><Text style={s.attrValue}>{slaVence.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
-          <Text style={s.attrLabel}>Técnico</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
-        </View>
-      </Card>
-    </View>
-  );
-
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={{ backgroundColor: theme.colors.bg }}>
-      {header}
-      <View style={[isWide ? { flexDirection: 'row', gap: 16, alignItems: 'flex-start' } : { gap: 12 }]}>
-        {left}
-        {right}
+      <TicketHeader
+        detail={detail}
+        tecnicoNombres={tecnicoNombres}
+        mesas={mesas}
+        categorias={categorias}
+        editing={editing}
+        editAsunto={editAsunto}
+        editDesc={editDesc}
+        editSaving={editSaving}
+        editError={editError}
+        isWide={isWide}
+        onBack={handleBack}
+        onEdit={startEdit}
+        onSaveEdit={onSaveEdit}
+        onCancelEdit={() => setEditing(false)}
+        onEditAsunto={setEditAsunto}
+        onEditDesc={setEditDesc}
+      />
+
+      <View style={isWide ? { flexDirection: 'row', gap: 16, alignItems: 'flex-start' } : { gap: 12 }}>
+        {/* Left column */}
+        <View style={{ gap: 12, flex: isWide ? 8 : undefined }}>
+          <Card style={{ gap: 12 }}>
+            {/* Description / edit handled in TicketHeader */}
+            {canEdit && !editing ? (
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                <Pressable onPress={startEdit} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface }}><Text style={{ color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 }}>Editar</Text></Pressable>
+                <Pressable onPress={onCancelTicket} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, backgroundColor: theme.colors.danger, borderWidth: 1, borderColor: '#FECACA' }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Cancelar solicitud</Text></Pressable>
+              </View>
+            ) : null}
+          </Card>
+          <TicketTabs
+            detail={detail}
+            activeTab={activeTab}
+            tecnicoNombres={tecnicoNombres}
+            mesas={mesas}
+            categorias={categorias}
+            profileId={profile?.id}
+            canComment={canComment}
+            canInternal={canInternal}
+            interno={interno}
+            mensaje={mensaje}
+            sending={sending}
+            sendError={sendError}
+            onTabChange={setActiveTab}
+            onMensajeChange={setMensaje}
+            onInternoChange={setInterno}
+            onSend={onSend}
+          />
+        </View>
+
+        {/* Right column */}
+        <View style={{ gap: 12, flex: isWide ? 4 : undefined }}>
+          <FsmActions
+            detail={detail}
+            tecnicoNombres={tecnicoNombres}
+            profileRol={profile?.rol}
+            canReassign={canReassign}
+            showTrans={showTrans}
+            showReassign={showReassign}
+            solucion={solucion}
+            reassignTecnico={reassignTecnico}
+            reassignMesa={reassignMesa}
+            transLoading={transLoading}
+            transError={transError}
+            reassignError={reassignError}
+            isSolicitante={isSolicitante}
+            nextEstados={nextEstados}
+            onTransition={onTransition}
+            onReassign={onReassign}
+            onCancelTicket={onCancelTicket}
+            onSetShowTrans={setShowTrans}
+            onSetShowReassign={setShowReassign}
+            onSolucion={setSolucion}
+            onReassignTecnico={setReassignTecnico}
+            onReassignMesa={setReassignMesa}
+          />
+          <TicketProgress
+            detail={detail}
+            tecnicoNombres={tecnicoNombres}
+            slaEstado={slaEstado}
+            slaPct={slaPct}
+            slaRest={slaRest}
+            slaBigLabel={slaBigLabel}
+            slaFillColor={slaFillColor}
+            slaVence={slaVence}
+            isWide={isWide}
+          />
+        </View>
       </View>
       {fb.modal}
     </ScrollView>
@@ -454,10 +302,9 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24, backgroundColor: theme.colors.bg },
   loadingDot: { width: 36, height: 3, borderRadius: 999, backgroundColor: theme.colors.primary, opacity: 0.9 },
   muted: { color: theme.colors.muted, fontSize: 12, lineHeight: 16 },
-  mutedSmall: { color: theme.colors.mutedSoft, fontSize: 11 },
-  metaSmall: { fontSize: 11, color: theme.colors.textSoft, marginTop: 4 },
   error: { color: theme.colors.danger, fontSize: 12, fontWeight: '600' },
-  errorBox: { backgroundColor: '#FDF1F0', borderWidth: 1, borderColor: '#F4C7C3', borderRadius: 12, padding: 10 },
+  retryBtn: { marginTop: 10, backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignSelf: 'flex-start' },
+  retryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   container: { padding: 16, gap: 16, paddingBottom: 28 },
   header: { gap: 10, paddingHorizontal: 2 },
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -465,29 +312,12 @@ const s = StyleSheet.create({
   kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.2, color: theme.colors.muted, textTransform: 'uppercase' },
   backLink: { fontSize: 11, fontWeight: '700', color: theme.colors.primary },
   pillsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  codePillText: { fontSize: 11, fontWeight: '800', color: theme.colors.text, fontFamily: theme.font.mono },
   slaBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
   slaBadgeText: { fontSize: 10, fontWeight: '800', color: '#991B1B', textTransform: 'uppercase', letterSpacing: 0.6 },
-  slaPulse: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.danger },
   asunto: { fontSize: 20, fontWeight: '800', color: theme.colors.text, lineHeight: 26, letterSpacing: -0.3 },
-  meta: { fontSize: 11, color: theme.colors.muted, fontWeight: '600' },
   desc: { fontSize: 13, color: theme.colors.textSoft, lineHeight: 19 },
-  badges: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  metaGrid: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  metaDot: { color: theme.colors.borderStrong, fontSize: 11 },
-  metaSoft: { fontSize: 11, color: theme.colors.mutedSoft },
   section: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.text, marginBottom: 2 },
-  timelineRow: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
-  dotCol: { alignItems: 'center', width: 12 },
-  dot: { width: 8, height: 8, borderRadius: 999, backgroundColor: theme.colors.primary, marginTop: 4 },
-  line: { flex: 1, width: 1, backgroundColor: theme.colors.border, marginTop: 6, opacity: 0.8 },
-  timelineBody: { flex: 1, gap: 2, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  comment: { gap: 6, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: theme.colors.border, borderStyle: 'dashed' },
-  commentInternal: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA', borderRadius: 12, padding: 10, borderStyle: 'solid' },
-  rowHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  rowTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
-  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 10, ...theme.shadow.soft },
+  composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 10 },
   input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 13, color: theme.colors.text, minHeight: 44, textAlignVertical: 'top', backgroundColor: theme.colors.surfaceAlt },
   editInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt },
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.colors.border, gap: 4 },
@@ -509,15 +339,6 @@ const s = StyleSheet.create({
   btnDanger: { backgroundColor: theme.colors.danger },
   btnDangerText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   actionRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  retryBtn: { marginTop: 10, backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 12, alignSelf: 'flex-start' },
-  retryText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  tabs: { flexDirection: 'row', gap: 0, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabActive: { borderBottomColor: theme.colors.primary },
-  tabText: { fontSize: 11, fontWeight: '700', color: theme.colors.muted },
-  tabTextActive: { color: theme.colors.primary },
-  terminal: { backgroundColor: theme.colors.text, borderRadius: 10, padding: 12 },
-  terminalText: { color: '#A7F3D0', fontSize: 11, fontFamily: theme.font.mono, fontWeight: '600' },
   ghostStack: { gap: 8, marginTop: 4 },
   progressWrap: { gap: 2, position: 'relative', paddingLeft: 6 },
   progressRow: { flexDirection: 'row', gap: 10, paddingVertical: 6 },
@@ -538,7 +359,7 @@ const s = StyleSheet.create({
   attrLabel: { fontSize: 10, color: theme.colors.mutedSoft, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, width: 90 },
   attrValue: { fontSize: 11, color: theme.colors.textSoft, fontWeight: '600', flex: 1 },
   adjRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 8 },
-  adjThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.border } as any,
+  adjThumb: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.border },
   adjBadge: { width: 56, height: 56, borderRadius: 8, backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center' },
   adjBadgeText: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
   adjName: { fontSize: 12, fontWeight: '700', color: theme.colors.text, flex: 1 },

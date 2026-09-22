@@ -1,14 +1,18 @@
-// Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
+// Dashboard mobile — wrapper delgado, lógica en shared
 import * as React from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getMesaIdPorDominio, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, fetchTicketsFiltrados, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas, PrediccionPicos, PatronesCategoria, type DashboardFilters, type FilterRange, type PronosticoDia, ticketsToRows, toCsvWithMeta, downloadCsv, buildExportFilename, useFeedback } from '@helpdesk/shared';
+import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, type DashboardFilters, type FilterRange, type PronosticoDia, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { shareCsvNativo } from '../../lib/share-csv';
+import { KpiRow } from '@helpdesk/shared/ui/dashboard/KpiRow.js';
+import { EstadoPrioridadRow } from '@helpdesk/shared/ui/dashboard/EstadoPrioridadRow.js';
+import { ChartsSection } from '@helpdesk/shared/ui/dashboard/ChartsSection.js';
+import { CargaAlertasSection } from '@helpdesk/shared/ui/dashboard/CargaAlertasSection.js';
 
 export function DashboardScreen() {
+  const fb = useFeedback();
   const { width } = useWindowDimensions();
   const isWide = width >= 1024;
-  const fb = useFeedback();
 
   const [range, setRange] = React.useState<FilterRange>('30d');
   const [customDesde, setCustomDesde] = React.useState('');
@@ -30,7 +34,6 @@ export function DashboardScreen() {
   const [carga, setCarga] = React.useState<any[]>([]);
   const [picos, setPicos] = React.useState<any[]>([]);
   const [picosResumen, setPicosResumen] = React.useState<any[]>([]);
-  // RF-19/B3 — pronóstico ML (tabla pronosticos_picos; [] si el pipeline no se corrió)
   const [pronosticoML, setPronosticoML] = React.useState<PronosticoDia[]>([]);
   const [patrones, setPatrones] = React.useState<any[]>([]);
   const [alertas, setAlertas] = React.useState<any[]>([]);
@@ -78,11 +81,10 @@ export function DashboardScreen() {
 
   React.useEffect(() => { setLoading(true); load(); }, [load]);
   React.useEffect(() => {
-    // RF-24: tiempo real — recargar tablero ante cambios en tickets
     const ch = supabase.channel('dashboard-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => load()).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [load]);
-  React.useEffect(() => { // initial mesas + categorías + técnicos
+  React.useEffect(() => {
     fetchMesas(supabase).then(setMesas).catch(() => {});
     (supabase.from('ticket_categories').select('id,subcategoria,dominio').eq('activa', true).order('subcategoria') as any).then(({ data }: any) => {
       if (data) setCategorias(data.map((c: any) => ({ id: c.id, nombre: c.subcategoria ?? String(c.id), dominio: c.dominio })));
@@ -96,9 +98,12 @@ export function DashboardScreen() {
   React.useEffect(() => {
     if (categoriaId !== '' && mesaIds.length) {
       const cat = categorias.find((c) => c.id === categoriaId);
-      if (cat && getMesaIdPorDominio(cat.dominio) !== mesaIds[0]) setCategoriaId('');
+      if (cat && (cat as any).dominio && typeof (cat as any).dominio === 'string') {
+        if (getMesaIdPorDominio(cat.dominio) !== mesaIds[0]) setCategoriaId('');
+      }
     }
   }, [mesaIds, categorias, categoriaId]);
+
   const onExport = React.useCallback(async () => {
     try {
       const data = await fetchTicketsFiltrados(supabase as any, filters, 2000);
@@ -109,7 +114,6 @@ export function DashboardScreen() {
       const csv = toCsvWithMeta(rows, filters, { mesaName, categoriaName, tecnicoName });
       const filename = buildExportFilename('dashboard', 'csv');
       if (Platform.OS !== 'web') {
-        // Nativo: hoja de compartir del sistema (expo-sharing + archivo en caché)
         const shared = await shareCsvNativo(filename, csv);
         fb.show(shared ? 'CSV listo' : 'Compartir no disponible', shared ? `CSV listo para compartir: ${rows.length} filas.` : 'Compartir no disponible en este dispositivo', shared ? 'success' : 'warning');
         return;
@@ -118,15 +122,16 @@ export function DashboardScreen() {
       fb.show('CSV descargado', `CSV generado (${rows.length} filas).`, 'success');
     } catch (e: any) { console.warn('[Dashboard] export', e); fb.show('Error al exportar', e?.message ?? 'Error al exportar CSV', 'error'); }
   }, [filters, mesas, categorias, tecnicos]);
+
   const onExportPng = React.useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('Solo en web', 'PNG de gráficas solo en web — en móvil usa CSV', 'info'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
       if (!el) { fb.show('Sin gráficas', 'No se encontró el contenedor de gráficas', 'warning'); return; }
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const html2canvas = await import('html2canvas');
+      const canvas = await (html2canvas.default as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('dashboard', 'png'); a.click();
+      const a = document.createElement('a'); a.href = url; a.download = (await import('@helpdesk/shared')).buildExportFilename('dashboard', 'png'); a.click();
     } catch (e) { console.warn('[Dashboard] export png', e); fb.show('Error al exportar', 'Error al exportar PNG', 'error'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
@@ -134,15 +139,16 @@ export function DashboardScreen() {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('Solo en web', 'PDF de gráficas solo en web — en móvil usa CSV', 'info'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
       if (!el) { fb.show('Sin gráficas', 'No se encontró el contenedor de gráficas', 'warning'); return; }
-      const html2canvas = (await import('html2canvas')).default;
+      const html2canvas = await import('html2canvas');
       const { jsPDF } = await import('jspdf');
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const canvas = await (html2canvas.default as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('dashboard', 'pdf'));
+      pdf.save((await import('@helpdesk/shared')).buildExportFilename('dashboard', 'pdf'));
     } catch (e) { console.warn('[Dashboard] export pdf', e); fb.show('Error al exportar', 'Error al exportar PDF', 'error'); }
   }, []);
+
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
     try { await generarAlertasIA(supabase as any); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e){ console.warn('[Dashboard] generar alertas', e); } finally { setGenerandoAlertas(false); }
@@ -157,33 +163,6 @@ export function DashboardScreen() {
       </View>
     );
   }
-
-  const slaDelta = kpis ? (kpis.slaVencidos != null ? `${kpis.slaVencidos} vencidos · ${kpis.slaPorVencer ?? 0} por vencer` : kpis.slaRiesgo > 0 ? `${kpis.slaRiesgo} en riesgo` : 'Dentro de compromiso') : '<45 min';
-  const kpiGrid = (
-    <View style={[s.kpiGrid, !isWide && { flexDirection: 'column' }]}>
-      <KpiCard label="Tickets abiertos" value={String(kpis?.abiertos ?? 0)} delta="+12% vs ayer" />
-      <KpiCard label="SLA en riesgo" value={String(kpis?.slaRiesgo ?? 0)} delta={slaDelta} deltaTone={(kpis?.slaVencidos ?? 0) > 0 ? 'danger' as any : (kpis?.slaRiesgo ?? 0) > 0 ? 'warn' as any : undefined} accent="orange" />
-      <KpiCard label="Tiempo medio" value={`${kpis?.ttrHoras ?? 4.2}h`} delta="-0.3h" />
-      <KpiCard label="Ingresados hoy" value={String(kpis?.ingresadosHoy ?? 0)} delta={`${kpis?.total ?? 0} total`} />
-    </View>
-  );
-
-  const content = (
-    <View nativeID="dashboard-export-root" style={s.content}>
-      {kpiGrid}
-      <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
-        <View style={{ flex: 7 }}><DonutEstado data={porEstado} /></View>
-        <View style={{ flex: 5 }}><BarsPrioridad data={porPrioridad} /></View>
-      </View>
-      <AreaEvolucion data={evolucion} mesas={mesas} />
-      <PrediccionPicos picos={picos} resumen={picosResumen} ml={pronosticoML} />
-      <PatronesCategoria data={patrones} />
-      <View style={[s.twoCol, !isWide && { flexDirection: 'column' }]}>
-        <View style={{ flex: 7 }}><HeatmapCarga data={carga} /></View>
-        <View style={{ flex: 5 }}><Pressable onPress={onGenerarAlertas} disabled={generandoAlertas} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingVertical: 8, alignItems: 'center', marginBottom: 8, opacity: generandoAlertas?0.6:1 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{generandoAlertas ? 'Generando…' : 'Generar alertas (IA)'}</Text></Pressable><TimelineAlertas alertas={alertas} onVista={(id)=>onMarcarAlerta(id,'vista')} onResuelta={(id)=>onMarcarAlerta(id,'resuelta')} /></View>
-      </View>
-    </View>
-  );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
@@ -200,7 +179,12 @@ export function DashboardScreen() {
         onExportPdf={onExportPdf}
       />
       <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={theme.colors.primary} />} contentContainerStyle={{ padding: 16 }} style={{ flex: 1 }}>
-        {content}
+        <View nativeID="dashboard-export-root">
+          <KpiRow kpis={kpis} isWide={isWide} />
+          <EstadoPrioridadRow porEstado={porEstado} porPrioridad={porPrioridad} isWide={isWide} />
+          <ChartsSection evolucion={evolucion} mesas={mesas} picos={picos} picosResumen={picosResumen} pronosticoML={pronosticoML} patrones={patrones} />
+          <CargaAlertasSection carga={carga} alertas={alertas} generandoAlertas={generandoAlertas} onGenerarAlertas={onGenerarAlertas} onMarcarAlerta={onMarcarAlerta} />
+        </View>
       </ScrollView>
       {fb.modal}
     </View>
@@ -210,8 +194,4 @@ export function DashboardScreen() {
 const s = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg },
   loadingText: { color: theme.colors.muted, fontSize: 12 },
-  kpiGrid: { flexDirection: 'row', gap: 12 },
-  twoCol: { flexDirection: 'row', gap: 12 },
-  content: { gap: 12 },
-  footerLink: { fontSize: 11, color: theme.colors.muted, textAlign: 'center', marginTop: 12, textDecorationLine: 'underline' },
 });
