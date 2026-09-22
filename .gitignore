@@ -6,6 +6,9 @@ node_modules/
 dist/
 build/
 coverage/
+junit*.xml
+test-results/
+playwright-report/
 .expo/
 apps/*/web-build/
 
