@@ -117,7 +117,7 @@ Pendiente de corto plazo: H5 (tipos `KpiData`/`AlertaIA`), H6 (boundaries por na
 | H12 | UX | Sin onboarding ni tooltips contextuales | 🟠 Baja | Global |
 | H13 | UX | Sin modo oscuro | 🟠 Baja | theme compartido |
 | H14 | Consistencia | RootNavigator web vs mobile — 50% código duplicado con divergencias | 🟡 Media | `RootNavigator.tsx` ambas plataformas |
-| H15 | DevOps | Docker web falla en build (según README) | 🔴 Alta | README línea 29 |
+| H15 | DevOps | Docker web build + runtime verificados OK (2026-09-22) | 🟢 Resuelto | `docker compose up --build` (web :3000, beto :8001) |
 | H16 | DevOps | Sin tests E2E en pipeline Jenkins | 🟡 Media | Jenkinsfile etapa Test |
 
 ---
