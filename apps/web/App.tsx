@@ -5,6 +5,24 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { supabaseConfigError } from './src/lib/supabase';
+import { ThemeProvider } from '@helpdesk/shared';
+
+const webThemeStorage = {
+  getItem: (key: string) => {
+    try {
+      return typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+    } catch {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string) => {
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+    } catch {
+      // Sin almacenamiento: el esquema vive solo en memoria
+    }
+  },
+};
 
 export default function App() {
   if (supabaseConfigError) {
@@ -22,9 +40,11 @@ export default function App() {
   }
   return (
     <SafeAreaProvider>
+      <ThemeProvider storage={webThemeStorage}>
       <AuthProvider>
         <RootNavigator />
       </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

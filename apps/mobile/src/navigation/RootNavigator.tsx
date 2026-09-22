@@ -8,8 +8,13 @@ import { LoginScreen } from '../features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '../features/auth/ForgotPasswordScreen';
 import { UpdatePasswordScreen } from '../features/auth/UpdatePasswordScreen';
 import { ChangePasswordScreen } from '../features/auth/ChangePasswordScreen';
-import { theme, ErrorBoundary } from '@helpdesk/shared';
-import { reportError } from '../lib/sentry';
+import { theme, ErrorBoundary, useOnboarding, OnboardingCard, useTheme, type RolOnboarding } from '@helpdesk/shared';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const mobileStorage = {
+  getItem: (key: string) => AsyncStorage.getItem(key),
+  setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+};
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
@@ -18,11 +23,6 @@ import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
 import { navigationRef } from './navigationRef';
 import type { AuthStackParamList } from './types';
 import { TecnicoNavigator } from './TecnicoNavigator';
-
-const navTheme = {
-  ...DefaultTheme,
-  colors: { ...DefaultTheme.colors, background: theme.colors.bg, card: theme.colors.surface, text: theme.colors.text, border: theme.colors.border, primary: theme.colors.primary },
-};
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 
@@ -69,6 +69,14 @@ export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error, recoveryPending } = useAuth();
   // RF-23: suscripción realtime + refresh al volver a primer plano (no-op sin sesión)
   usePushNotificaciones();
+  // H12 — guía de primer uso por rol (una vez por versión)
+  const ob = useOnboarding(session && profile ? mobileStorage : null, (profile?.rol as RolOnboarding | undefined) ?? null);
+  // H13 — chrome de navegación reactivo al esquema (resto de pantallas: seguimiento)
+  const { theme: t } = useTheme();
+  const navTheme = {
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, background: t.colors.bg, card: t.colors.surface, text: t.colors.text, border: t.colors.border, primary: t.colors.primary },
+  };
   if (loading) {
     return (
       <View style={s.loading}>
@@ -79,7 +87,7 @@ export function RootNavigator() {
     );
   }
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.bg }} onTouchStart={resetIdle}>
+    <View style={{ flex: 1, backgroundColor: t.colors.bg }} onTouchStart={resetIdle}>
       {idleWarning ? (
         <View style={s.idleBar}>
           <Text style={s.idleText}>{idleWarning}</Text>
@@ -102,6 +110,7 @@ export function RootNavigator() {
           {!session || !profile || recoveryPending ? <AuthNavigator /> : profile.rol === 'usuario' ? <EmpleadoNavigator /> : profile.rol === 'tecnico' ? <TecnicoNavigator /> : profile.rol === 'jefe' ? <JefeNavigator /> : profile.rol === 'administrador' ? <AdminNavigator /> : <RolDesconocido />}
         </ErrorBoundary>
       </NavigationContainer>
+      {ob.visible ? <OnboardingCard pasos={ob.pasos} paso={ob.paso} onSiguiente={ob.siguiente} onOmitir={ob.cerrar} /> : null}
     </View>
   );
 }
