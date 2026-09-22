@@ -15,7 +15,7 @@ import { JefeNavigator } from '../features/jefe/JefeNavigator';
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import type { AuthStackParamList } from './types';
-import { ErrorBoundary, useOnboarding, OnboardingCard, type RolOnboarding } from '@helpdesk/shared';
+import { ErrorBoundary, useOnboarding, OnboardingCard, useTheme, type RolOnboarding } from '@helpdesk/shared';
 
 const webStorage = {
   getItem: (key: string) => {
@@ -72,6 +72,8 @@ export function RootNavigator() {
   const { session, profile, loading, idleWarning, resetIdle, error } = useAuth();
   // H12 — guía de primer uso por rol (una vez por versión)
   const ob = useOnboarding(session && profile ? webStorage : null, (profile?.rol as RolOnboarding | undefined) ?? null);
+  // H13 — fondo raíz reactivo al esquema (resto de pantallas: seguimiento)
+  const { theme: t } = useTheme();
 
   if (loading) {
     return (
@@ -83,7 +85,7 @@ export function RootNavigator() {
   }
 
   return (
-    <View style={{ flex: 1 }} onTouchStart={resetIdle}>
+    <View style={{ flex: 1, backgroundColor: t.colors.bg }} onTouchStart={resetIdle}>
       {idleWarning ? (
         <View style={s.idleBar}>
           <Text style={s.idleText}>{idleWarning}</Text>
