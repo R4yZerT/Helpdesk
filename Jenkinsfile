@@ -111,6 +111,27 @@ pipeline {
       }
     }
 
+    stage('E2E web') {
+      steps {
+        withCredentials([
+          string(credentialsId: 'supabase-url', variable: 'EXPO_PUBLIC_SUPABASE_URL'),
+          string(credentialsId: 'supabase-anon-key', variable: 'EXPO_PUBLIC_SUPABASE_ANON_KEY')
+        ]) {
+          sh '''
+            set -e
+            cd apps/web
+            npx playwright install chromium
+            npx playwright test
+          '''
+        }
+      }
+      post {
+        always {
+          junit allowEmptyResults: true, testResults: 'apps/web/junit-e2e.xml'
+        }
+      }
+    }
+
     stage('EAS build (opt-in)') {
       when { expression { return params.EAS_BUILD != 'none' } }
       steps {
