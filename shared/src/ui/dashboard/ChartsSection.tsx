@@ -5,15 +5,17 @@ import { AreaEvolucion } from '../charts/AreaEvolucion.js';
 import { PrediccionPicos } from '../charts/PrediccionPicos.js';
 import { PatronesCategoria } from '../charts/PatronesCategoria.js';
 import { PrecisionIa } from '../charts/PrecisionIa.js';
-import type { PronosticoDia, MetricaIaFuente } from '../../dashboard.js';
+import type { PronosticoDia, MetricaIaFuente, EvolucionPunto, PicoPrediccion, PicosResumen, PatronCategoria } from '../../dashboard.js';
+
+type MesaOption = { id: number; nombre: string };
 
 type Props = {
-  evolucion: { dia: string; mesaId: number; count: number }[];
-  mesas: { id: number; nombre: string }[];
-  picos: any[];
-  picosResumen: any[];
+  evolucion: EvolucionPunto[];
+  mesas: MesaOption[];
+  picos: PicoPrediccion[];
+  picosResumen: PicosResumen[];
   pronosticoML: PronosticoDia[];
-  patrones: any[];
+  patrones: PatronCategoria[];
   metricasIa: MetricaIaFuente[];
 };
 

@@ -16,6 +16,7 @@ import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import type { AuthStackParamList } from './types';
 import { ErrorBoundary, useOnboarding, OnboardingCard, useTheme, type RolOnboarding } from '@helpdesk/shared';
+import { reportError } from '../lib/sentry';
 
 const webStorage = {
   getItem: (key: string) => {

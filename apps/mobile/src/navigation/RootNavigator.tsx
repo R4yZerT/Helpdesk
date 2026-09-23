@@ -23,6 +23,7 @@ import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
 import { navigationRef } from './navigationRef';
 import type { AuthStackParamList } from './types';
 import { TecnicoNavigator } from './TecnicoNavigator';
+import { reportError } from '../lib/sentry';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 

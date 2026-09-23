@@ -22,7 +22,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.warn('[ErrorBoundary]', error, info.componentStack);
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // eslint-disable-next-line no-console
+      console.error('[ErrorBoundary]', error, info.componentStack);
+    }
     try {
       this.props.onError?.(error, info.componentStack ?? '');
     } catch {
