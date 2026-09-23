@@ -8,6 +8,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EmpleadoStackParamList } from '../../navigation/types';
 import { TicketRow } from './components/TicketRow';
 import { TicketFilters } from './components/TicketFilters';
+import { PaletteHost, type ComandoNav, type TicketResultado } from '@helpdesk/shared';
 
 const PAGE_SIZE = 20;
 
@@ -28,6 +29,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
   const [prioridad, setPrioridad] = useState<PrioridadTicket | ''>('');
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
+  const [paletteVisible, setPaletteVisible] = useState(false);
   const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,6 +96,21 @@ export function MisSolicitudesScreen({ navigation }: Props) {
 
   const activos = tickets.filter((t) => t.estado !== 'cerrado' && t.estado !== 'solucionado').length;
 
+  // Command palette (⌘K en web): comandos + búsqueda full-text de mis tickets
+  const paletteNav = { navigate: (pantalla: string, params?: Record<string, unknown>) => (navigation as unknown as { navigate: (p: string, pr?: object) => void }).navigate(pantalla, params) };
+  const paletteComandos: ComandoNav[] = [
+    { id: 'nueva', titulo: 'Nueva solicitud', keywords: ['crear', 'ticket', 'nuevo'], roles: ['usuario'], pantalla: 'CrearTicket', atajo: 'N' },
+    { id: 'mias', titulo: 'Ver mis solicitudes', keywords: ['lista', 'bandeja', 'mias'], roles: ['usuario'], pantalla: 'MisSolicitudes' },
+  ];
+  const buscarTicketsPalette = useCallback(async (texto: string): Promise<TicketResultado[]> => {
+    try {
+      const res = await listMyTickets(supabase, { q: texto, page: 0, pageSize: 8 });
+      return res.data.map((t) => ({ id: t.id, titulo: `#${t.numero} ${t.asunto}`, subtitulo: t.estado }));
+    } catch {
+      return [];
+    }
+  }, []);
+
   if (loading) {
     return (
       <View style={s.center}>
@@ -159,6 +176,17 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         <Text style={s.fabIcon}>＋</Text>
         <Text style={s.fabText}>Nuevo Ticket</Text>
       </Pressable>
+      <Pressable onPress={() => setPaletteVisible(true)} style={s.paletteBtn} accessibilityRole="button" accessibilityLabel="Abrir buscador de comandos">
+        <Text style={s.paletteBtnText}>⌕</Text>
+      </Pressable>
+      <PaletteHost
+        visible={paletteVisible}
+        onCerrar={() => setPaletteVisible(false)}
+        rol="usuario"
+        nav={paletteNav}
+        comandos={paletteComandos}
+        buscarTickets={buscarTicketsPalette}
+      />
     </View>
   );
 }
@@ -180,4 +208,6 @@ const s = StyleSheet.create({
   fab: { position: 'absolute', right: 20, bottom: 20, backgroundColor: theme.colors.accent, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 999, borderWidth: 1, borderColor: '#FED7AA', alignItems: 'center', gap: 4, ...theme.shadow.soft as object },
   fabIcon: { color: '#fff', fontSize: 22, fontWeight: '800' },
   fabText: { color: '#fff', fontWeight: '800', fontSize: 11 },
+  paletteBtn: { position: 'absolute', left: 20, bottom: 20, width: 48, height: 48, borderRadius: 24, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, alignItems: 'center', justifyContent: 'center', ...theme.shadow.soft as object },
+  paletteBtnText: { color: theme.colors.primary, fontSize: 20, fontWeight: '800' },
 });

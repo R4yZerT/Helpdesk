@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } f
 import { listAssignedTickets, fetchMesas, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { TecnicoStackParamList } from '../../navigation/types';
 import { TicketRow } from '../tickets/components/TicketRow';
@@ -50,7 +51,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
       setPage(targetPage);
       setTickets((prev) => (opts.reset || isFirst ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      console.warn('[Bandeja] listAssignedTickets', e);
+      reportError(e, { flujo: 'bandeja-list' });
     } finally {
       setLoading(false);
       setLoadingMore(false);

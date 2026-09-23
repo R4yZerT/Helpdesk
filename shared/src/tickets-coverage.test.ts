@@ -33,7 +33,7 @@ import {
 // Eslabón encadenable estilo Supabase: cada filtro retorna el mismo objeto y `await` resuelve `result`.
 function chainable(result: unknown) {
   const q: Record<string, unknown> = {};
-  for (const m of ['eq', 'order', 'range', 'ilike', 'or', 'is', 'not', 'in', 'neq']) {
+  for (const m of ['eq', 'order', 'range', 'ilike', 'or', 'is', 'not', 'in', 'neq', 'textSearch']) {
     q[m] = vi.fn(() => q);
   }
   q['select'] = vi.fn(() => q);
@@ -46,6 +46,7 @@ function chainable(result: unknown) {
     order: ReturnType<typeof vi.fn>;
     range: ReturnType<typeof vi.fn>;
     ilike: ReturnType<typeof vi.fn>;
+    textSearch: ReturnType<typeof vi.fn>;
     or: ReturnType<typeof vi.fn>;
     is: ReturnType<typeof vi.fn>;
     not: ReturnType<typeof vi.fn>;
@@ -316,7 +317,7 @@ describe('listMyTickets', () => {
     expect(n2.query.or).toHaveBeenCalled();
     const n3 = selectClient({ data: [], error: null, count: 0 });
     await listMyTickets(n3.client, { q: 'impresora', tecnicoId: '__assigned' });
-    expect(n3.query.ilike).toHaveBeenCalledWith('asunto', '%impresora%');
+    expect(n3.query.textSearch).toHaveBeenCalledWith('search_vector', 'impresora', { type: 'websearch', config: 'spanish' });
     expect(n3.query.not).toHaveBeenCalled();
     const n4 = selectClient({ data: [], error: null, count: 0 });
     await listMyTickets(n4.client, { tecnicoId: 'tec-1' });
@@ -506,7 +507,7 @@ describe('listAssignedTickets', () => {
     expect(out.total).toBe(1);
     expect(out.data[0].tecnicoAsignadoId).toBe('u-tec');
     expect(q.eq).toHaveBeenCalledWith('tecnico_asignado_id', 'u-tec');
-    expect(q.ilike).toHaveBeenCalled();
+    expect(q.textSearch).toHaveBeenCalledWith('search_vector', 'impresora', { type: 'websearch', config: 'spanish' });
     const badQ = chainable({ data: null, error: { message: 'asg mal' }, count: 0 });
     const bad = {
       auth: { getUser: vi.fn(async () => ({ data: { user: null } })) },

@@ -1,8 +1,9 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
+import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, isEstadoTicket, isPrioridadTicket, type Mesa, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { KpiRow } from '@helpdesk/shared';
 import { EstadoPrioridadRow } from '@helpdesk/shared';
 import { ChartsSection } from '@helpdesk/shared';
@@ -17,7 +18,7 @@ export function DashboardScreen() {
   const [customDesde, setCustomDesde] = React.useState('');
   const [customHasta, setCustomHasta] = React.useState('');
   const [mesaIds, setMesaIds] = React.useState<number[]>([]);
-  const [mesas, setMesas] = React.useState<{ id: number; nombre: string }[]>([]);
+  const [mesas, setMesas] = React.useState<Mesa[]>([]);
   const [categorias, setCategorias] = React.useState<{ id: number; nombre: string; dominio: string }[]>([]);
   const [tecnicos, setTecnicos] = React.useState<{ id: string; nombre: string }[]>([]);
   const [estado, setEstado] = React.useState('');
@@ -43,9 +44,9 @@ export function DashboardScreen() {
   const filters: DashboardFilters = React.useMemo(() => {
     const f: DashboardFilters = {};
     if (mesaIds.length) f.mesaIds = mesaIds;
-    if (categoriaId !== '') f.categoriaId = categoriaId as number;
-    if (estado) f.estado = estado as any;
-    if (prioridad) f.prioridad = prioridad as any;
+    if (categoriaId !== '') f.categoriaId = categoriaId;
+    if (estado && isEstadoTicket(estado)) f.estado = estado;
+    if (prioridad && isPrioridadTicket(prioridad)) f.prioridad = prioridad;
     if (tecnicoId) f.tecnicoId = tecnicoId;
     const now = new Date();
     if (range === 'hoy') f.desde = new Date(now.setHours(0, 0, 0, 0)).toISOString();
@@ -74,10 +75,10 @@ export function DashboardScreen() {
         getPronosticoSemanal(supabase),
         getMetricasIaFeedback(supabase),
       ]);
-      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat as any); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
-      if (!mesas.length) setMesas(ms as any);
+      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
+      if (!mesas.length) setMesas(ms);
     } catch (err) {
-      console.warn('[Dashboard] load', err);
+      reportError(err, { flujo: 'dashboard-load' });
     } finally { setLoading(false); setRefreshing(false); }
   }, [filters, mesas.length]);
 
@@ -87,38 +88,45 @@ export function DashboardScreen() {
     return () => { supabase.removeChannel(ch); };
   }, [load]);
   React.useEffect(() => {
-    fetchMesas(supabase).then(setMesas).catch(() => {});
-    (supabase.from('ticket_categories').select('id,subcategoria,dominio').eq('activa', true).order('subcategoria') as any).then(({ data }: any) => {
-      if (data) setCategorias(data.map((c: any) => ({ id: c.id, nombre: c.subcategoria ?? String(c.id), dominio: c.dominio })));
-    }).catch(() => {});
-    (supabase.from('profiles').select('id,full_name,rol').in('rol', ['tecnico', 'jefe']).eq('activo', true).order('full_name') as any).then(({ data }: any) => {
-      if (data) setTecnicos(data.map((u: any) => ({ id: u.id, nombre: u.full_name ?? u.email ?? u.id })));
-    }).catch(() => {});
+    fetchMesas(supabase).then(setMesas).catch((err) => reportError(err, { flujo: 'dashboard-mesas' }));
+    type CategoriaRow = { id: number; subcategoria: string | null; dominio: string };
+    type PerfilRow = { id: string; full_name: string | null; email?: string | null };
+    supabase.from('ticket_categories').select('id,subcategoria,dominio').eq('activa', true).order('subcategoria').then(({ data, error }) => {
+      if (error) { reportError(error, { flujo: 'dashboard-categorias' }); return; }
+      const rows = (data ?? []) as unknown as CategoriaRow[];
+      setCategorias(rows.map((c) => ({ id: c.id, nombre: c.subcategoria ?? String(c.id), dominio: c.dominio })));
+    });
+    supabase.from('profiles').select('id,full_name,rol').in('rol', ['tecnico', 'jefe']).eq('activo', true).order('full_name').then(({ data, error }) => {
+      if (error) { reportError(error, { flujo: 'dashboard-tecnicos' }); return; }
+      const rows = (data ?? []) as unknown as PerfilRow[];
+      setTecnicos(rows.map((u) => ({ id: u.id, nombre: u.full_name ?? u.email ?? u.id })));
+    });
   }, []);
 
   const onToggleMesa = (id: number) => setMesaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   React.useEffect(() => {
     if (categoriaId !== '' && mesaIds.length) {
       const cat = categorias.find((c) => c.id === categoriaId);
-      if (cat && (cat as any).dominio && typeof (cat as any).dominio === 'string') {
+      if (cat && cat.dominio && typeof cat.dominio === 'string') {
         if (getMesaIdPorDominio(cat.dominio) !== mesaIds[0]) setCategoriaId('');
       }
     }
   }, [mesaIds, categorias, categoriaId]);
   const onExport = React.useCallback(async () => {
     try {
-      const data = await fetchTicketsFiltrados(supabase as any, filters, 2000);
+      const data = await fetchTicketsFiltrados(supabase, filters, 2000);
       const mesaName = (id: number | null) => mesas.find((m) => m.id === id)?.nombre ?? String(id ?? '—');
       const categoriaName = (id: number) => categorias.find((c) => c.id === id)?.nombre ?? String(id);
       const tecnicoName = (id: string) => tecnicos.find((t) => t.id === id)?.nombre ?? id;
-      const rows = ticketsToRows((data as any) ?? [], mesaName);
+      const rows = ticketsToRows(data ?? [], mesaName);
       const csv = toCsvWithMeta(rows, filters, { mesaName, categoriaName, tecnicoName });
       const ok = downloadCsv(buildExportFilename('dashboard', 'csv'), csv);
       if (ok) fb.show('CSV listo', `Se generaron ${rows.length} filas.`, 'success');
       else if (typeof window !== 'undefined') fb.show('CSV generado', `Se generaron ${rows.length} filas. Copia desde consola.`, 'info');
-    } catch (e: any) {
-      console.warn('[Dashboard] export', e);
-      fb.show('Error al exportar', e?.message ?? 'Error al exportar CSV', 'error');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Error al exportar CSV';
+      reportError(e, { flujo: 'dashboard-export-csv' });
+      fb.show('Error al exportar', msg, 'error');
     }
   }, [filters, mesas, categorias, tecnicos]);
   const onExportPng = React.useCallback(async () => {
@@ -127,10 +135,11 @@ export function DashboardScreen() {
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
       if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       const html2canvas = await import('html2canvas');
-      const canvas = await (html2canvas.default as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const render = html2canvas.default as unknown as (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
+      const canvas = await render(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = (await import('@helpdesk/shared')).buildExportFilename('dashboard', 'png'); a.click();
-    } catch (e: any) { console.warn('[Dashboard] export png', e); fb.show('Error al exportar', 'Error al exportar PNG', 'error'); }
+    } catch (e: unknown) { reportError(e, { flujo: 'dashboard-export-png' }); fb.show('Error al exportar', 'Error al exportar PNG', 'error'); }
   }, []);
   const onExportPdf = React.useCallback(async () => {
     try {
@@ -139,18 +148,19 @@ export function DashboardScreen() {
       if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
       const html2canvas = await import('html2canvas');
       const { jsPDF } = await import('jspdf');
-      const canvas = await (html2canvas.default as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const render = html2canvas.default as unknown as (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
+      const canvas = await render(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save((await import('@helpdesk/shared')).buildExportFilename('dashboard', 'pdf'));
-    } catch (e: any) { console.warn('[Dashboard] export pdf', e); fb.show('Error al exportar', 'Error al exportar PDF', 'error'); }
+    } catch (e: unknown) { reportError(e, { flujo: 'dashboard-export-pdf' }); fb.show('Error al exportar', 'Error al exportar PDF', 'error'); }
   }, []);
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
-    try { await generarAlertasIA(supabase as any); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e){ console.warn('[Dashboard] generar alertas', e); } finally { setGenerandoAlertas(false); }
+    try { await generarAlertasIA(supabase); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e: unknown){ reportError(e, { flujo: 'dashboard-generar-alertas' }); } finally { setGenerandoAlertas(false); }
   }, []);
-  const onMarcarAlerta = React.useCallback(async (id:number, estado:'vista'|'resuelta')=>{ try{ await marcarAlertaIA(supabase as any, id, estado); setAlertas(prev=>prev.filter(a=>a.id!==id)); }catch(e){ console.warn('[Dashboard] marcar alerta', e);} },[]);
+  const onMarcarAlerta = React.useCallback(async (id:number, estado:'vista'|'resuelta')=>{ try{ await marcarAlertaIA(supabase, id, estado); setAlertas(prev=>prev.filter(a=>a.id!==id)); }catch(e: unknown){ reportError(e, { flujo: 'dashboard-marcar-alerta' });} },[]);
 
   if (loading) {
     return (
