@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, AppShell, IconInbox, IconPlus, IconUser, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconInbox, IconPlus, IconUser, NotificationBell, PaletteHost, listMyTickets, type ComandoNav, type TicketResultado } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
@@ -50,6 +50,19 @@ function UsuarioWeb() {
 
 function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { activeName: string; setActiveName: (n: string) => void; profile: Profile | null; signOut: () => void }) {
   const [nav, setNav] = React.useState<import('@react-navigation/native').NavigationProp<UsuarioStackParamList> | null>(null);
+  const [paletteVisible, setPaletteVisible] = React.useState(false);
+  // ⌘K / Ctrl+K abre la paleta (solo web)
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteVisible((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const isActive = (id: string) => {
     if (id === 'mis') return activeName === 'MisSolicitudes' || activeName === 'DetalleTicket' || activeName === 'MisStack';
     if (id === 'crear') return activeName === 'CrearTicket';
@@ -81,7 +94,27 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
     { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigate('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
   ];
 
+  // Command palette: comandos del rol + búsqueda full-text de mis tickets
+  const paletteNav = {
+    navigate: (pantalla: string, params?: Record<string, unknown>) =>
+      (nav as unknown as { navigate: (p: string, pr?: object) => void } | null)?.navigate(pantalla, params),
+  };
+  const paletteComandos: ComandoNav[] = [
+    { id: 'nueva', titulo: 'Nueva solicitud', keywords: ['crear', 'ticket', 'nuevo'], roles: ['usuario'], pantalla: 'CrearTicket', atajo: 'N' },
+    { id: 'mias', titulo: 'Ver mis solicitudes', keywords: ['lista', 'bandeja', 'mias'], roles: ['usuario'], pantalla: 'MisSolicitudes' },
+    { id: 'perfil', titulo: 'Mi perfil', keywords: ['cuenta', 'usuario', 'perfil'], roles: ['usuario'], pantalla: 'Perfil' },
+  ];
+  const buscarTicketsPalette = React.useCallback(async (texto: string): Promise<TicketResultado[]> => {
+    try {
+      const res = await listMyTickets(supabase, { q: texto, page: 0, pageSize: 8 });
+      return res.data.map((t) => ({ id: t.id, titulo: `#${t.numero} ${t.asunto}`, subtitulo: t.estado }));
+    } catch {
+      return [];
+    }
+  }, []);
+
   return (
+    <View style={{ flex: 1 }}>
     <AppShell
       items={items}
       user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol, avatarUrl: profile.avatar_url } : undefined}
@@ -97,6 +130,15 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
         <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
       </Stack.Navigator>
     </AppShell>
+    <PaletteHost
+      visible={paletteVisible}
+      onCerrar={() => setPaletteVisible(false)}
+      rol="usuario"
+      nav={paletteNav}
+      comandos={paletteComandos}
+      buscarTickets={buscarTicketsPalette}
+    />
+    </View>
   );
 }
 
