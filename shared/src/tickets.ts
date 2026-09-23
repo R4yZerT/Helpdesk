@@ -285,14 +285,15 @@ export function validateAdjuntos(files: { name: string; size: number; type: stri
   return null;
 }
 
+// H8 — Columnas canónicas de ticket_adjuntos (schema_inicial): sin fallbacks legacy.
 function mapAdjunto(row: Record<string, unknown>): TicketAdjunto {
   return {
     id: row.id as number,
     ticketId: (row.ticket_id as string) ?? '',
-    storagePath: (row.storage_path as string) ?? (row.ruta as string) ?? '',
-    nombre: (row.nombre_original as string) ?? (row.nombre as string) ?? (row.filename as string) ?? '',
-    mime: (row.mime as string) ?? (row.mime_type as string) ?? '',
-    size: (row.tamano_bytes as number) ?? (row.size as number) ?? (row.bytes as number) ?? 0,
+    storagePath: (row.storage_path as string) ?? '',
+    nombre: (row.nombre_original as string) ?? '',
+    mime: (row.mime as string) ?? '',
+    size: (row.tamano_bytes as number) ?? 0,
     creadoEn: (row.creado_en as string) ?? '',
   };
 }

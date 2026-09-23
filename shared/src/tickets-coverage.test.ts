@@ -206,9 +206,9 @@ describe('fetchCategorias / fetchMesas', () => {
 });
 
 describe('fetchAdjuntos', () => {
-  it('mapea nombres alternos de columnas y lanza ante error', async () => {
+  it('mapea columnas canónicas y lanza ante error', async () => {
     const { client } = selectClient({
-      data: [{ id: 1, ticket_id: 't1', ruta: '/p/a.png', filename: 'a.png', mime_type: 'image/png', bytes: 10, creado_en: ' hoy ' }],
+      data: [{ id: 1, ticket_id: 't1', storage_path: '/p/a.png', nombre_original: 'a.png', mime: 'image/png', tamano_bytes: 10, creado_en: ' hoy ' }],
       error: null,
     });
     const out = await fetchAdjuntos(client, 't1');

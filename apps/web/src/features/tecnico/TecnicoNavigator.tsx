@@ -2,16 +2,23 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, IconInbox, IconPlus, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconInbox, IconPlus, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { TecnicoStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 const Stack = createNativeStackNavigator<TecnicoStackParamList>();
+
+// H6 — cada pantalla aislada: si una rompe, el resto del navigator sigue vivo
+const BandejaAislada = withScreenBoundary(BandejaTecnicoScreen, { titulo: 'La bandeja no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-bandeja' }) });
+const CrearAislado = withScreenBoundary(CreateTicketScreen, { titulo: 'La creación no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-crear' }) });
+const DetalleAislado = withScreenBoundary(DetalleTecnicoScreen, { titulo: 'El detalle no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-detalle' }) });
+const PerfilAislado = withScreenBoundary(PerfilScreen, { titulo: 'El perfil no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-perfil' }) });
 
 const screenOpts = {
   headerStyle: { backgroundColor: theme.colors.surface } as const,
@@ -74,10 +81,10 @@ function TecnicoWeb() {
       headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
     >
       <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
-        <Stack.Screen name="Bandeja" component={BandejaTecnicoScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
-        <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-        <Stack.Screen name="DetalleTicket" component={DetalleTecnicoScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
-        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+        <Stack.Screen name="Bandeja" component={BandejaAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
+        <Stack.Screen name="CrearTicket" component={CrearAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
+        <Stack.Screen name="DetalleTicket" component={DetalleAislado} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+        <Stack.Screen name="Perfil" component={PerfilAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
       </Stack.Navigator>
     </AppShell>
   );
@@ -88,9 +95,9 @@ export function TecnicoNavigator() {
   // native: stack simple (tabs previstos)
   return (
     <Stack.Navigator screenOptions={screenOpts}>
-      <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaTecnicoScreen} />
-      <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CreateTicketScreen} />
-      <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleTecnicoScreen} />
+      <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaAislada} />
+      <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CrearAislado} />
+      <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleAislado} />
     </Stack.Navigator>
   );
 }
