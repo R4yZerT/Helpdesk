@@ -6,6 +6,7 @@ import { Badge, Card, Divider, TecnicoChip } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { FilterDropdown, ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EmpleadoStackParamList } from '../../navigation/types';
 
@@ -52,6 +53,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         q: qDebounced || undefined,
         page: targetPage,
         pageSize: PAGE_SIZE,
+        onFallbackFulltext: (info) => reportError(new Error(info.motivo), { flujo: 'mis-fallback-ft', consulta: info.consulta }),
       });
       setTotal(res.total);
       setHasMore(res.hasMore);

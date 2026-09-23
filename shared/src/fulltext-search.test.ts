@@ -73,6 +73,22 @@ describe('listMyTickets con full-text', () => {
     expect(llamadas.or[0]).toContain('numero.eq.7');
     expect(llamadas.textSearch).toBeUndefined();
   });
+
+  it('avisa vía onFallbackFulltext al caer a ILIKE', async () => {
+    const { q } = mockQuery({ data: [], error: null, count: 0 });
+    let n = 0;
+    q.then = (res: any, rej: any) => {
+      n += 1;
+      if (n === 1) return Promise.resolve({ data: null, error: { message: 'column "search_vector" does not exist' }, count: null }).then(res, rej);
+      return Promise.resolve({ data: [fila], error: null, count: 1 }).then(res, rej);
+    };
+    const client: any = { from: vi.fn(() => q) };
+    const avisos: { consulta: string; motivo: string }[] = [];
+    await listMyTickets(client, { q: 'impresora', onFallbackFulltext: (i) => avisos.push(i) });
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0].consulta).toBe('impresora');
+    expect(avisos[0].motivo).toContain('search_vector');
+  });
 });
 
 describe('listAssignedTickets con full-text', () => {

@@ -20,13 +20,18 @@ export function isEstadoTicket(v: string): v is EstadoTicket {
 type RespuestaLista<F> = { data: F | null; error: { message: string } | null; count: number | null };
 
 // H9 — Ejecuta la búsqueda full-text en español; si la migración aún no aplicó
-// (columna search_vector ausente), reintenta con ILIKE sobre asunto.
+// (columna search_vector ausente), reintenta con ILIKE sobre asunto y avisa
+// vía alCaer para observabilidad (la app lo redirige a Sentry).
 async function conFallbackFulltext<F>(
   intento: () => Promise<RespuestaLista<F>>,
   alternativa: () => Promise<RespuestaLista<F>>,
+  alCaer?: (info: { motivo: string }) => void,
 ): Promise<RespuestaLista<F>> {
   const r = await intento();
-  if (r.error && /search_vector|does not exist/i.test(r.error.message)) return alternativa();
+  if (r.error && /search_vector|does not exist/i.test(r.error.message)) {
+    alCaer?.({ motivo: r.error.message });
+    return alternativa();
+  }
   return r;
 }
 
@@ -315,6 +320,8 @@ export type ListMyTicketsParams = {
   q?: string;
   page?: number;
   pageSize?: number;
+  /** H9 — se invoca si full-text cae a ILIKE (la app lo reporta a Sentry) */
+  onFallbackFulltext?: (info: { consulta: string; motivo: string }) => void;
 };
 
 export type ListMyTicketsResult = {
@@ -377,6 +384,7 @@ export async function listMyTickets(
     ? await conFallbackFulltext(
       async () => query.textSearch('search_vector', q as string, { type: 'websearch', config: 'spanish' }),
       async () => query.ilike('asunto', `%${escaped}%`),
+      (info) => params.onFallbackFulltext?.({ consulta: q as string, motivo: info.motivo }),
     )
     : await query;
   const { data, error, count } = res;
@@ -505,7 +513,7 @@ export async function transitionTicket(
   client: SupabaseClient,
   ticketId: string,
   nuevoEstado: EstadoTicket,
-  opts?: { solucionAplicada?: string; comentario?: string },
+  opts?: { solucionAplicada?: string; comentario?: string; onError?: (e: unknown) => void },
 ): Promise<Ticket> {
   if (!ticketId) throw new Error('ticketId requerido');
   if (!isEstadoTicket(nuevoEstado)) throw new Error('Estado inválido');
@@ -535,7 +543,7 @@ export async function transitionTicket(
   if (error) throw new Error(error.message);
   if (!data) throw new Error('El ticket cambió de estado mientras lo editabas. Recarga e inténtalo de nuevo.');
   if (opts?.comentario?.trim()) {
-    try { await addComentario(client, ticketId, opts.comentario.trim()); } catch (e) { console.warn('[transitionTicket] comentario no guardado', e); }
+    try { await addComentario(client, ticketId, opts.comentario.trim()); } catch (e) { opts.onError?.(e); }
   }
   return mapTicket(data as unknown as Record<string, unknown>);
 }
@@ -601,6 +609,8 @@ export type ListAssignedParams = {
   mesaId?: number;
   page?: number;
   pageSize?: number;
+  /** H9 — se invoca si full-text cae a ILIKE (la app lo reporta a Sentry) */
+  onFallbackFulltext?: (info: { consulta: string; motivo: string }) => void;
 };
 
 export async function listAssignedTickets(client: SupabaseClient, params: ListAssignedParams = {}): Promise<ListMyTicketsResult> {
@@ -626,6 +636,7 @@ export async function listAssignedTickets(client: SupabaseClient, params: ListAs
     ? await conFallbackFulltext(
       async () => query.textSearch('search_vector', q as string, { type: 'websearch', config: 'spanish' }),
       async () => query.ilike('asunto', `%${esc}%`),
+      (info) => params.onFallbackFulltext?.({ consulta: q as string, motivo: info.motivo }),
     )
     : await query;
   const { data, error, count } = res;

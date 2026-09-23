@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleS
 import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, IaValidationCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 type Props = { route: { params: { id: string } }; navigation?: any };
@@ -105,7 +106,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
       return;
     }
     setTransLoading(estado); setTransError(null);
-    try { await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined }); setShowTrans(false); setSolucion(''); await load(); }
+    try { await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined, onError: (e) => reportError(e, { flujo: 'transicion-comentario' }) }); setShowTrans(false); setSolucion(''); await load(); }
     catch (e) { setTransError(e instanceof Error ? e.message : String(e)); } finally { setTransLoading(null); }
   };
   const onReassign = async () => {

@@ -73,6 +73,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         q: qDebounced || undefined,
         page: targetPage,
         pageSize: PAGE_SIZE,
+        onFallbackFulltext: (info) => reportError(new Error(info.motivo), { flujo: 'bandeja-fallback-ft', consulta: info.consulta }),
       });
       setTotal(res.total);
       setHasMore(res.hasMore);
