@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Te
 import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 type Props = {
@@ -94,11 +95,11 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
-      } catch {}
+      } catch (e) { reportError(e, { flujo: 'detalle-mesas' }); }
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
-      } catch {}
+      } catch (e) { reportError(e, { flujo: 'detalle-categorias' }); }
       // resolver nombres de técnicos y actores vía RPC segura (respeta RLS de profiles)
       try {
         const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
@@ -106,8 +107,9 @@ export function TicketDetailScreen({ route, navigation }: Props) {
           const map = await fetchTecnicoNombres(supabase, ids);
           if (Object.keys(map).length > 0) setTecnicoNombres(map);
         }
-      } catch {}
+      } catch (e) { reportError(e, { flujo: 'detalle-tecnicos' }); }
     } catch (e) {
+      reportError(e, { flujo: 'detalle-load' });
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);

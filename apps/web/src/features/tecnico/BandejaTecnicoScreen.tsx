@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Tex
 import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { TecnicoStackParamList } from '../../navigation/types';
 
@@ -78,7 +79,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
       setPage(targetPage);
       setTickets((prev) => (opts.reset || isFirst ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      console.warn('[BandejaTecnico] listAssignedTickets', e);
+      reportError(e, { flujo: 'bandeja-list' });
     } finally {
       setLoading(false);
       setLoadingMore(false);

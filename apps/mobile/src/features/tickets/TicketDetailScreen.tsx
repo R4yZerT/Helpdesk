@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWi
 import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Card, theme, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 import { TicketHeader } from './components/TicketHeader';
 import { FsmActions } from './components/FsmActions';
@@ -68,19 +69,20 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
-      } catch (e) { console.warn('[TicketDetail] fetch mesas', e); }
+      } catch (e) { reportError(e, { flujo: 'detalle-mesas' }); }
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
-      } catch (e) { console.warn('[TicketDetail] fetch categorias', e); }
+      } catch (e) { reportError(e, { flujo: 'detalle-categorias' }); }
       try {
         const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length > 0) {
           const map = await fetchTecnicoNombres(supabase, ids);
           if (Object.keys(map).length > 0) setTecnicoNombres(map);
         }
-      } catch (e) { console.warn('[TicketDetail] fetch tecnico nombres', e); }
+      } catch (e) { reportError(e, { flujo: 'detalle-tecnicos' }); }
     } catch (e) {
+      reportError(e, { flujo: 'detalle-load' });
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);

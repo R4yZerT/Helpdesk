@@ -24,6 +24,7 @@ import {
 import { theme } from '@helpdesk/shared';
 import { Card, Divider, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { TicketForm } from './components/TicketForm';
 import { AdjuntoPicker } from './components/AdjuntoPicker';
 import { IaSugerenciaPanel } from './components/IaSugerenciaPanel';
@@ -208,7 +209,10 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     }
     setSubmitting(true);
     try {
-      console.log('[CreateTicket] submit', form);
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        // eslint-disable-next-line no-console
+        console.log('[CreateTicket] submit', form);
+      }
       const { data: { user } } = await supabase.auth.getUser();
       const res = await createTicket(supabase, form);
       // Guarda la sugerencia IA vista al crear — el trigger crea la fila pendiente,
@@ -223,7 +227,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           });
         }
       } catch (fbErr) {
-        console.warn('[CreateTicket] feedback IA no guardado', fbErr);
+        reportError(fbErr, { flujo: 'crear-feedback-ia' });
       }
       const adjuntosFailed: string[] = [];
       if (adjuntos.length) {
@@ -235,7 +239,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             const { error: insErr } = await supabase.from('ticket_adjuntos').insert({ ticket_id: res.id, storage_path: path, nombre_original: a.name, mime: a.type, tamano_bytes: a.size, subido_por: user?.id ?? null });
             if (insErr) throw insErr;
           } catch (upE) {
-            console.warn('[CreateTicket] adjunto fail', a.name, upE);
+            reportError(upE, { flujo: 'crear-adjunto', archivo: a.name });
             adjuntosFailed.push(a.name);
           }
         }
@@ -249,7 +253,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       fb.show('Solicitud creada', `Ticket #${res.numero} creado correctamente`, 'success', { onConfirm: resetTrasCrear });
     } catch (e) {
       const msg = humanizeError(e instanceof Error ? e.message : String(e));
-      console.error('[CreateTicket] error', e);
+      reportError(e, { flujo: 'crear-ticket' });
       setSubmitError(msg);
       fb.show('Error al crear', msg, 'error');
     } finally {
