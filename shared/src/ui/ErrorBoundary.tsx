@@ -13,7 +13,6 @@ type Props = {
 };
 
 type State = { error: Error | null };
-
 export class ErrorBoundary extends React.Component<Props, State> {
   state: State = { error: null };
 
@@ -64,3 +63,21 @@ const s = StyleSheet.create({
   btn: { marginTop: 6, backgroundColor: theme.colors.primary, paddingHorizontal: 16, paddingVertical: 11, borderRadius: theme.radius.full, alignItems: 'center' },
   btnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
 });
+
+// H6 — Aísla una pantalla: si rompe, el fallback con reintentar la contiene
+// sin tumbar el navigator ni la app. El reportero lo inyecta la app (Sentry).
+export function withScreenBoundary<P extends object>(
+  Component: React.ComponentType<P>,
+  opts: { titulo: string; onError?: (error: Error, info: string) => void },
+): React.FunctionComponent<P> {
+  const nombre = Component.displayName ?? Component.name ?? 'Pantalla';
+  function PantallaAislada(props: P) {
+    return (
+      <ErrorBoundary titulo={opts.titulo} onError={opts.onError}>
+        <Component {...props} />
+      </ErrorBoundary>
+    );
+  }
+  PantallaAislada.displayName = `ConBorde(${nombre})`;
+  return PantallaAislada;
+}

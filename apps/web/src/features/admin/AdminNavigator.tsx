@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell } from '@helpdesk/shared';
+import { theme, AppShell, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
@@ -12,10 +12,20 @@ import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { AdminStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 import { RequirePermission } from '../../components/RequirePermission';
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
+
+// H6 — cada pantalla aislada: si una rompe, el resto del navigator sigue vivo
+const MesaTicketsAislada = withScreenBoundary(AdminMesaTicketsScreen, { titulo: 'Los tickets no pudieron cargarse', onError: (e) => reportError(e, { flujo: 'admin-mesa-tickets' }) });
+const MesasAislada = withScreenBoundary(AdminMesasScreen, { titulo: 'Las dependencias no pudieron cargarse', onError: (e) => reportError(e, { flujo: 'admin-mesas' }) });
+const UsuariosAislada = withScreenBoundary(AdminUsuariosScreen, { titulo: 'Los usuarios no pudieron cargarse', onError: (e) => reportError(e, { flujo: 'admin-usuarios' }) });
+const CategoriasAislada = withScreenBoundary(AdminCategoriasScreen, { titulo: 'Las categorías no pudieron cargarse', onError: (e) => reportError(e, { flujo: 'admin-categorias' }) });
+const ImportAislado = withScreenBoundary(AdminImportScreen, { titulo: 'La importación no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-import' }) });
+const PerfilAislado = withScreenBoundary(PerfilScreen, { titulo: 'El perfil no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-perfil' }) });
+const DetalleAislado = withScreenBoundary(TicketDetailScreen, { titulo: 'El detalle no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-detalle' }) });
 
 const screenOpts = {
   headerStyle: { backgroundColor: theme.colors.surface } as const,
@@ -90,13 +100,13 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
       headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
     >
       <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
-        <Stack.Screen name="MesaTickets" component={AdminMesaTicketsScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
-        {isGeneralAdmin ? <Stack.Screen name="Mesas" component={AdminMesasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
-        <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
-        <Stack.Screen name="Categorias" component={AdminCategoriasScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
-        <Stack.Screen name="Import" component={AdminImportScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })} />
-        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-        <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
+        <Stack.Screen name="MesaTickets" component={MesaTicketsAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
+        {isGeneralAdmin ? <Stack.Screen name="Mesas" component={MesasAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
+        <Stack.Screen name="Usuarios" component={UsuariosAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
+        <Stack.Screen name="Categorias" component={CategoriasAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Categorias'); } })} />
+        <Stack.Screen name="Import" component={ImportAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Import'); } })} />
+        <Stack.Screen name="Perfil" component={PerfilAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
+        <Stack.Screen name="DetalleTicket" component={DetalleAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
       </Stack.Navigator>
     </AppShell>
   );
@@ -115,7 +125,7 @@ export function AdminNavigator() {
   return (
     <RequirePermission permission="profile:manage">
       <Stack.Navigator screenOptions={screenOpts}>
-        <Stack.Screen name="Usuarios" component={AdminUsuariosScreen} options={{ title: 'Usuarios' }} />
+        <Stack.Screen name="Usuarios" component={UsuariosAislada} options={{ title: 'Usuarios' }} />
       </Stack.Navigator>
     </RequirePermission>
   );
