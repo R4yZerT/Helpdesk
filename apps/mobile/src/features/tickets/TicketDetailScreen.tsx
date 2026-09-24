@@ -157,7 +157,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     setTransLoading(estado);
     setTransError(null);
     try {
-      await transitionTicket(supabase, id, estado as any, { solucionAplicada: sol || undefined });
+      await transitionTicket(supabase, id, estado as any, { solucionAplicada: sol || undefined, onError: (e) => reportError(e, { flujo: 'transicion-comentario' }) });
       setShowTrans(false);
       setSolucion('');
       await load();

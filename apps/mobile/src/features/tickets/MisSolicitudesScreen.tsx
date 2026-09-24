@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Tex
 import { fetchMesas, fetchTecnicoNombres, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EmpleadoStackParamList } from '../../navigation/types';
 import { TicketRow } from './components/TicketRow';
@@ -54,6 +55,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         q: qDebounced || undefined,
         page: targetPage,
         pageSize: PAGE_SIZE,
+        onFallbackFulltext: (info) => reportError(new Error(info.motivo), { flujo: 'mis-fallback-ft', consulta: info.consulta }),
       });
       setTotal(res.total);
       setHasMore(res.hasMore);

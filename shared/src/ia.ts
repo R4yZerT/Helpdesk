@@ -153,7 +153,7 @@ async function predecirConBeto(
           && normalizarNombre(c.subcategoria) === normalizarNombre(data.subcategoria as string),
       );
       if (!cat) {
-        console.warn('[IA] etiqueta BETO sin match en catálogo:', data.etiqueta ?? `${data.dominio}:${data.subcategoria}`);
+        // Etiqueta BETO sin match: se descarta y decide el fallback de reglas
         return null;
       }
       return {
