@@ -1,7 +1,7 @@
 // RF-12 — Módulo Técnico: bandeja asignada prioridad→antigüedad (Stitch #0E87E2 / #FD7C06)
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ESTADOS, PRIORIDADES, listAssignedTickets, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
+import { ESTADOS, PRIORIDADES, listAssignedTickets, fetchMesas, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -55,6 +55,12 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
   const [q, setQ] = useState('');
   const [qDebounced, setQDebounced] = useState('');
   const ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // H10 — selección en lote
+  const [modoBulk, setModoBulk] = useState(false);
+  const [seleccion, setSeleccion] = useState<string[]>([]);
+  const [mesas, setMesas] = useState<Mesa[]>([]);
+  const [ejecutandoBulk, setEjecutandoBulk] = useState(false);
+  const [resultadoBulk, setResultadoBulk] = useState<BulkResultado | null>(null);
 
   useEffect(() => {
     if (ref.current) clearTimeout(ref.current);
@@ -95,6 +101,35 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
     return () => { supabase.removeChannel(ch); };
   }, [fetchPage]);
 
+  useEffect(() => {
+    fetchMesas(supabase).then(setMesas).catch((e) => reportError(e, { flujo: 'bandeja-mesas' }));
+  }, []);
+
+  const toggleSeleccion = useCallback((id: string) => {
+    setSeleccion((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }, []);
+
+  const salirModoBulk = useCallback(() => { setModoBulk(false); setSeleccion([]); setResultadoBulk(null); }, []);
+
+  const onEjecutarBulk = useCallback(async (accion: BulkAccion, args: { solucion?: string; mesaId?: number }) => {
+    setEjecutandoBulk(true);
+    try {
+      const r = await ejecutarBulk(supabase, {
+        ids: seleccion,
+        operacion: accion === 'cerrar' ? 'cerrar' : 'reasignar',
+        solucion: args.solucion,
+        mesaId: args.mesaId,
+      });
+      setResultadoBulk(r);
+      setSeleccion([]);
+      fetchPage(0, { reset: true });
+    } catch (e) {
+      reportError(e, { flujo: 'bandeja-bulk' });
+    } finally {
+      setEjecutandoBulk(false);
+    }
+  }, [seleccion, fetchPage]);
+
   const onRefresh = useCallback(() => { setRefreshing(true); fetchPage(0, { reset: true }); }, [fetchPage]);
   const onEndReached = useCallback(() => {
     if (loadingMore || loading || !hasMore) return;
@@ -107,9 +142,10 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
 
   const renderItem = ({ item }: { item: Ticket }) => {
     const slaCritico = item.prioridad === 'critica' && item.estado !== 'cerrado' && item.estado !== 'solucionado';
+    const marcado = seleccion.includes(item.id);
     return (
       <Pressable
-        onPress={() => navigation.navigate('DetalleTicket', { id: item.id })}
+        onPress={() => (modoBulk ? toggleSeleccion(item.id) : navigation.navigate('DetalleTicket', { id: item.id }))}
         style={({ pressed }) => [s.cardPress, pressed && { opacity: 0.96 }]}
         accessibilityRole="button"
         accessibilityLabel={`Ticket #${item.numero} ${item.asunto}`}
@@ -122,6 +158,11 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
               <Badge label={prettyEstado(item.estado)} tone={tonoEstado(item.estado)} />
             </View>
           </View>
+          {modoBulk ? (
+            <Pressable onPress={() => toggleSeleccion(item.id)} style={[s.check, marcado && s.checkActive]} accessibilityRole="checkbox" accessibilityState={{ checked: marcado }} accessibilityLabel={`Seleccionar ticket #${item.numero}`}>
+              <Text style={[s.checkText, marcado && s.checkTextActive]}>{marcado ? '✓' : ''}</Text>
+            </Pressable>
+          ) : null}
           <Text style={s.asunto} numberOfLines={2}>{item.asunto}</Text>
           <Text style={s.desc} numberOfLines={2}>{item.descripcion}</Text>
           <Divider />
@@ -180,6 +221,9 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters} style={s.linkBtn}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
+          <Pressable onPress={() => (modoBulk ? salirModoBulk() : setModoBulk(true))} style={s.linkBtn} accessibilityRole="button" accessibilityLabel="Selección en lote">
+            <Text style={s.linkText}>{modoBulk ? 'Cancelar selección' : 'Selección en lote'}</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -203,6 +247,18 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         ListFooterComponent={loadingMore ? <View style={s.footer}><ActivityIndicator color={theme.colors.primary} /></View> : null}
         contentContainerStyle={s.listContent}
       />
+      {modoBulk || resultadoBulk ? (
+        <BulkPanel
+          seleccionados={seleccion.length}
+          acciones={['cerrar', 'mesa']}
+          mesas={mesas}
+          ejecutando={ejecutandoBulk}
+          resultado={resultadoBulk}
+          onLimpiar={() => { setSeleccion([]); }}
+          onEjecutar={onEjecutarBulk}
+          onCerrarResultado={() => setResultadoBulk(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -282,6 +338,10 @@ const s = StyleSheet.create({
   slaText: { fontSize: 10, fontWeight: '800', color: '#991B1B', textTransform: 'uppercase', letterSpacing: 0.5 },
   empty: { alignItems: 'center', padding: theme.space[8], gap: theme.space[3] - 2, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.space[2] },
   emptyTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
+  check: { position: 'absolute', top: 10, right: 10, width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  checkActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+  checkText: { fontSize: 14, fontWeight: '800', color: 'transparent' },
+  checkTextActive: { color: '#fff' },
   emptyBtn: { marginTop: theme.space[2], backgroundColor: theme.colors.primary, paddingHorizontal: theme.space[4], paddingVertical: theme.space[3] - 2, borderRadius: theme.radius.sm },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   footer: { padding: 16, alignItems: 'center' },

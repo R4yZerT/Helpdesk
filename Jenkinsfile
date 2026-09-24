@@ -65,7 +65,7 @@ pipeline {
     }
 
     stage('Test') {
-      steps { sh 'pnpm --filter @helpdesk/shared test' }
+      steps { sh 'pnpm --filter @helpdesk/shared exec vitest run --reporter=junit --outputFile=junit-unit.xml' }
       post {
         always {
           junit allowEmptyResults: true, testResults: '**/junit*.xml'

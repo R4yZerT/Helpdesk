@@ -2,8 +2,9 @@
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +45,15 @@ export function AdminMesaTicketsScreen() {
   const [tecnicos, setTecnicos] = useState<TecnicoOpt[]>([]);
   const [assignId, setAssignId] = useState<string>('');
   const [assignLoading, setAssignLoading] = useState(false);
+  // H10 — prioridad en lote (solo admin: RLS rechaza a otros roles por ítem)
+  const [modoBulk, setModoBulk] = useState(false);
+  const [seleccion, setSeleccion] = useState<string[]>([]);
+  const [ejecutandoBulk, setEjecutandoBulk] = useState(false);
+  const [resultadoBulk, setResultadoBulk] = useState<BulkResultado | null>(null);
+
+  const toggleSeleccion = useCallback((id: string) => {
+    setSeleccion((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }, []);
 
   useEffect(() => {
     if (debRef.current) clearTimeout(debRef.current);
@@ -66,6 +76,22 @@ export function AdminMesaTicketsScreen() {
   }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter]);
 
   useEffect(()=>{ fetchTickets(); }, [fetchTickets]);
+
+  const onEjecutarBulk = useCallback(async (_accion: BulkAccion, args: { prioridad?: PrioridadTicket }) => {
+    setEjecutandoBulk(true);
+    try {
+      const r = await ejecutarBulk(supabase as never, { ids: seleccion, operacion: 'prioridad', prioridad: args.prioridad });
+      setResultadoBulk(r);
+      setSeleccion([]);
+      setFeedback({ visible: true, variant: r.fallos ? 'info' : 'success', title: `Lote: ${r.ok} ok, ${r.fallos} fallos`, message: r.items.filter((i) => !i.ok).slice(0, 3).map((i) => `${i.id.slice(0, 8)}: ${i.error}`).join(' · ') || undefined });
+      fetchTickets();
+    } catch (e) {
+      reportError(e, { flujo: 'admin-bulk' });
+      setFeedback({ visible: true, variant: 'error', title: 'Error en lote', message: getErrorMessage(e) });
+    } finally {
+      setEjecutandoBulk(false);
+    }
+  }, [seleccion, fetchTickets]);
 
   // cargar técnicos para filtro
   useEffect(() => {
@@ -155,6 +181,7 @@ export function AdminMesaTicketsScreen() {
         <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
         <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
         <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
+        <Pressable onPress={() => { setModoBulk((v) => !v); setSeleccion([]); setResultadoBulk(null); }} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button" accessibilityLabel="Selección en lote"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>{modoBulk ? 'Cancelar selección' : 'Lote'}</Text></Pressable>
       </View>
       <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}
@@ -162,6 +189,11 @@ export function AdminMesaTicketsScreen() {
         renderItem={({item})=> (
           <Card style={s.card}>
             <View style={s.cardTop}><Text style={s.cardId}>#{item.numero} · {formatEstado(item.estado as never)}</Text><Text style={[s.priority, { color: priorityColor(item.prioridad) }]}>{formatPrioridad(item.prioridad as never)}</Text></View>
+            {modoBulk ? (
+              <Pressable onPress={() => toggleSeleccion(item.id)} style={[s.check, seleccion.includes(item.id) && s.checkActive]} accessibilityRole="checkbox" accessibilityState={{ checked: seleccion.includes(item.id) }} accessibilityLabel={`Seleccionar ticket #${item.numero}`}>
+                <Text style={[s.checkText, seleccion.includes(item.id) && s.checkTextActive]}>{seleccion.includes(item.id) ? '✓' : ''}</Text>
+              </Pressable>
+            ) : null}
             <Text style={s.name} numberOfLines={2}>{item.asunto}</Text>
             <Text style={s.muted} numberOfLines={2}>{item.descripcion}</Text>
             <View style={s.actions}>
@@ -189,6 +221,18 @@ export function AdminMesaTicketsScreen() {
         </View></View>
       </Modal>
       {feedback? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>:null}
+      {modoBulk || resultadoBulk ? (
+        <BulkPanel
+          seleccionados={seleccion.length}
+          acciones={['prioridad']}
+          mesas={[]}
+          ejecutando={ejecutandoBulk}
+          resultado={resultadoBulk}
+          onLimpiar={() => setSeleccion([])}
+          onEjecutar={onEjecutarBulk}
+          onCerrarResultado={() => setResultadoBulk(null)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -220,6 +264,10 @@ const s = StyleSheet.create({
   btnPrimaryText:{color:'#fff', fontWeight:'800', fontSize:12},
   listContent:{padding:12, gap:10, paddingBottom:24},
   card:{gap:8, flex:1},
+  check:{width:26, height:26, borderRadius:13, borderWidth:2, borderColor:theme.colors.border, backgroundColor:theme.colors.surface, alignItems:'center', justifyContent:'center'},
+  checkActive:{backgroundColor:theme.colors.primary, borderColor:theme.colors.primary},
+  checkText:{fontSize:14, fontWeight:'800', color:'transparent'},
+  checkTextActive:{color:'#fff'},
   cardTop:{flexDirection:'row', justifyContent:'space-between'},
   cardId:{fontSize:10, fontWeight:'700', color:theme.colors.mutedSoft},
   priority:{fontSize:10, fontWeight:'800', color:theme.colors.primaryDark},

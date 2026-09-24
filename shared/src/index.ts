@@ -55,6 +55,8 @@ export * from './sla.js';
 export * from './ia.js';
 export * from './ia-feedback.js';
 export * from './admin.js';
+export * from './bulk.js';
+export * from './ui/bulk/BulkPanel.js';
 export * from './mesas.js';
 export * from './autoasignar.js';
 export * from './categorias.js';
