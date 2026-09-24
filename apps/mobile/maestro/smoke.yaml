@@ -1,0 +1,10 @@
+# H16 — smoke mobile mínimo (Maestro). Corre en dispositivo/emulador con la app
+# instalada; valida arranque frío hasta login. El resto del smoke móvil corre
+# en el proyecto Playwright "mobile" (viewport Pixel 7, flujos sin backend).
+appId: com.helpdesk.mobile
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Inicia sesión"
+- tapOn: "Cédula o correo"
+- assertVisible: "¿Olvidaste tu contraseña?"

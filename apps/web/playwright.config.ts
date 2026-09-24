@@ -10,7 +10,15 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:3100',
     trace: 'retain-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // H16 — smoke mobile mínimo: mismos flujos sin backend en viewport móvil
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 7'] },
+      testMatch: ['e2e/auth-validacion.spec.ts', 'e2e/guardias.spec.ts'],
+    },
+  ],
   webServer: {
     command: 'pnpm --filter web build && npx -y serve dist -l 3100',
     url: 'http://127.0.0.1:3100',
