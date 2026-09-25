@@ -16,7 +16,7 @@ type Props = { navigation: NativeStackNavigationProp<EmpleadoStackParamList, 'Mi
 
 export function MisSolicitudesScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
-  const isWide = width >= 768;
+  const isWide = width >= 1024;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [page, setPage] = useState(0);

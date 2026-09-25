@@ -1,13 +1,15 @@
 // RF replanteo — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useAuth } from '../../context/AuthContext';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { AdminStackParamList } from '../../navigation/types';
 
 function getErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -23,11 +25,26 @@ function getErrorMessage(e: unknown): string {
 
 type TecnicoOpt = { id: string; full_name: string | null; email: string | null };
 
-const PRIORITY_COLOR: Record<string,string> = { critica: '#DC2626', alta: '#FB923C', media: '#0E87E2', baja: '#64748B' };
-function priorityColor(p: string){ return PRIORITY_COLOR[p] ?? theme.colors.primaryDark; }
+function prioridadTone(p: string): 'success' | 'warning' | 'danger' | 'accent' | 'info' {
+  if (p === 'critica') return 'accent';
+  if (p === 'alta') return 'danger';
+  if (p === 'media') return 'warning';
+  return 'success';
+}
+function estadoTone(e: string): 'muted' | 'info' | 'success' | 'ink' | 'danger' {
+  if (e === 'abierto') return 'muted';
+  if (e === 'en_proceso') return 'info';
+  if (e === 'solucionado') return 'success';
+  if (e === 'cerrado') return 'ink';
+  if (e === 'devuelto') return 'danger';
+  return 'muted';
+}
 
+type Props = { navigation?: NativeStackNavigationProp<AdminStackParamList, 'MesaTickets'> };
 
-export function AdminMesaTicketsScreen() {
+export function AdminMesaTicketsScreen({ navigation }: Props) {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 1024;
   const { profile } = useAuth();
   const mesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
   const [q, setQ] = useState('');
@@ -43,6 +60,7 @@ export function AdminMesaTicketsScreen() {
   const [feedback, setFeedback] = useState<{visible:boolean; variant:'success'|'error'|'info'; title:string; message?:string}|null>(null);
   const [assignOpen, setAssignOpen] = useState<Ticket|null>(null);
   const [tecnicos, setTecnicos] = useState<TecnicoOpt[]>([]);
+  const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
   const [assignId, setAssignId] = useState<string>('');
   const [assignLoading, setAssignLoading] = useState(false);
   // H10 — prioridad en lote (solo admin: RLS rechaza a otros roles por ítem)
@@ -70,7 +88,7 @@ export function AdminMesaTicketsScreen() {
         tecnicoIdParam = tecnicoFilter === '__unassigned' ? null : tecnicoFilter;
       } else if (asignacionFilter === 'asignadas') tecnicoIdParam = '__assigned';
       else if (asignacionFilter === 'no_asignadas') tecnicoIdParam = null;
-      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as any) || undefined, page: 0, pageSize: 50 });
+      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as PrioridadTicket) || undefined, page: 0, pageSize: 50 });
       setTickets(res.data); setTotal(res.total);
     } catch (e) { const m=getErrorMessage(e); setErrorMsg(m); } finally { setLoading(false); }
   }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter]);
@@ -93,38 +111,57 @@ export function AdminMesaTicketsScreen() {
     }
   }, [seleccion, fetchTickets]);
 
-  // cargar técnicos para filtro
+  // cargar técnicos para filtro (solo misma dependencia del admin)
   useEffect(() => {
     if (mesaId == null) { setTecnicos([]); return; }
     (async () => {
       try {
         const { data } = await supabase.from('profiles').select('id,full_name,email').eq('mesa_id', mesaId).eq('rol', 'tecnico').eq('activo', true).order('full_name');
-        setTecnicos((data ?? []) as TecnicoOpt[]);
+        const list = (data ?? []) as TecnicoOpt[];
+        setTecnicos(list);
+        // precarga mapa de nombres para no mostrar UID en filtros/tarjetas
+        setTecnicoNombres((prev) => {
+          const next = { ...prev };
+          for (const t of list) next[t.id] = t.full_name ?? t.email ?? t.id;
+          return next;
+        });
       } catch {}
     })();
   }, [mesaId]);
+
+  // Resolver nombres de técnicos asignados vía RPC segura (respeta RLS de profiles)
+  useEffect(() => {
+    const ids = tickets.map((t) => t.tecnicoAsignadoId).filter((x): x is string => !!x && !tecnicoNombres[x]);
+    if (ids.length === 0) return;
+    let alive = true;
+    fetchTecnicoNombres(supabase as never, ids).then((map) => {
+      if (alive && Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
+    }).catch(() => {});
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tickets]);
 
   const onExportCsv = useCallback(() => {
     try {
       const header = ['numero', 'asunto', 'estado', 'prioridad', 'tecnico'];
       const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const csvRows = tickets.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ?? 'Sin asignar']);
+      const csvRows = tickets.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ? (tecnicoNombres[t.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar']);
       const csv = [header.map(esc).join(','), ...csvRows.map((r) => r.map(esc).join(','))].join('\r\n');
       const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${tickets.length}`, `# Mesa: ${mesaId ?? '—'}`].join('\r\n') + '\r\n' + csv;
       const ok = downloadCsv(buildExportFilename('admin-mesa-tickets', 'csv'), meta);
       if (!ok) setFeedback({ visible:true, variant:'info', title:'CSV generado', message:`Se generaron ${tickets.length} filas.` });
-    } catch (e: any) { console.warn('[AdminMesaTickets] export csv', e); setFeedback({ visible:true, variant:'error', title:'Error al exportar CSV', message:e?.message ?? 'Error al exportar CSV' }); }
-  }, [tickets, mesaId]);
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-csv' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar CSV', message:getErrorMessage(e) }); }
+  }, [tickets, mesaId, tecnicoNombres]);
   const onExportPng = useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible:true, variant:'info', title:'Exportación no disponible', message:'Exportar PNG solo disponible en web' }); return; }
       const el = document.getElementById('admin-export-root') as HTMLElement | null;
       if (!el) { setFeedback({ visible:true, variant:'error', title:'Error al exportar PNG', message:'No se encontró el contenedor de tickets' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
+      const canvas = await html2canvas(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-mesa-tickets', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminMesaTickets] export png', e); setFeedback({ visible:true, variant:'error', title:'Error al exportar PNG', message:e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG' }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-png' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar PNG', message:getErrorMessage(e) }); }
   }, []);
   const onExportPdf = useCallback(async () => {
     try {
@@ -133,20 +170,26 @@ export function AdminMesaTicketsScreen() {
       if (!el) { setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:'No se encontró el contenedor de tickets' }); return; }
       // html2canvas importado estático arriba — evita Cannot find module en Metro web
       // jsPDF importado estático arriba
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
+      const canvas = await html2canvas(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('admin-mesa-tickets', 'pdf'));
-    } catch (e: any) { console.warn('[AdminMesaTickets] export pdf', e); setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF' }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-pdf' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:getErrorMessage(e) }); }
   }, []);
   const openAssign = async (t: Ticket) => {
     setAssignOpen(t); setAssignId(t.tecnicoAsignadoId ?? '');
-    // fetch tecnicos de esa mesa
+    // fetch técnicos de esa mesa (misma dependencia del ticket)
     try {
       const { data, error } = await supabase.from('profiles').select('id,full_name,email,rol').eq('mesa_id', t.mesaId).in('rol', ['tecnico']).eq('activo', true).order('full_name');
       if (error) throw error;
-      setTecnicos((data ?? []) as TecnicoOpt[]);
+      const list = (data ?? []) as TecnicoOpt[];
+      setTecnicos(list);
+      setTecnicoNombres((prev) => {
+        const next = { ...prev };
+        for (const x of list) next[x.id] = x.full_name ?? x.email ?? x.id;
+        return next;
+      });
     } catch {}
   };
 
@@ -185,23 +228,45 @@ export function AdminMesaTicketsScreen() {
       </View>
       <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}
+        numColumns={isWide ? 2 : 1}
+        key={isWide ? 'grid-2' : 'list-1'}
+        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
         ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin tickets</Text><Text style={s.mutedCenter}>No hay tickets para esta dependencia.</Text></View>}
-        renderItem={({item})=> (
+        renderItem={({item})=> {
+          const marcado = seleccion.includes(item.id);
+          return (
+          <Pressable
+            onPress={() => (modoBulk ? toggleSeleccion(item.id) : (navigation as unknown as { navigate?: (name: string, params?: object) => void })?.navigate?.('DetalleTicket', { id: item.id }))}
+            style={({ pressed }) => [s.cardPress, pressed && { opacity: 0.96 }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Ticket #${item.numero} ${item.asunto}`}
+          >
           <Card style={s.card}>
-            <View style={s.cardTop}><Text style={s.cardId}>#{item.numero} · {formatEstado(item.estado as never)}</Text><Text style={[s.priority, { color: priorityColor(item.prioridad) }]}>{formatPrioridad(item.prioridad as never)}</Text></View>
+            <View style={s.cardTop}>
+              <Text style={s.cardId}>#{String(item.numero).padStart(4, '0')}</Text>
+              <View style={s.badges}>
+                <Badge label={formatPrioridad(item.prioridad as never)} tone={prioridadTone(item.prioridad)} />
+                <Badge label={formatEstado(item.estado as never)} tone={estadoTone(item.estado)} />
+              </View>
+            </View>
             {modoBulk ? (
-              <Pressable onPress={() => toggleSeleccion(item.id)} style={[s.check, seleccion.includes(item.id) && s.checkActive]} accessibilityRole="checkbox" accessibilityState={{ checked: seleccion.includes(item.id) }} accessibilityLabel={`Seleccionar ticket #${item.numero}`}>
-                <Text style={[s.checkText, seleccion.includes(item.id) && s.checkTextActive]}>{seleccion.includes(item.id) ? '✓' : ''}</Text>
+              <Pressable onPress={() => toggleSeleccion(item.id)} style={[s.check, marcado && s.checkActive]} accessibilityRole="checkbox" accessibilityState={{ checked: marcado }} accessibilityLabel={`Seleccionar ticket #${item.numero}`}>
+                <Text style={[s.checkText, marcado && s.checkTextActive]}>{marcado ? '✓' : ''}</Text>
               </Pressable>
             ) : null}
             <Text style={s.name} numberOfLines={2}>{item.asunto}</Text>
             <Text style={s.muted} numberOfLines={2}>{item.descripcion}</Text>
+            <Divider />
+            <View style={s.metaRow}>
+              <TecnicoChip nombre={item.tecnicoAsignadoId ? (tecnicoNombres[item.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
+            </View>
             <View style={s.actions}>
-              <Text style={s.muted}>Técnico: {item.tecnicoAsignadoId ?? 'Sin asignar'}</Text>
-              <Pressable onPress={()=>openAssign(item)} style={s.btnGhost}><Text style={s.btnGhostText}>Asignar técnico</Text></Pressable>
+              <Pressable onPress={()=>openAssign(item)} style={s.btnGhost} accessibilityRole="button" accessibilityLabel={`Asignar técnico ticket #${item.numero}`}><Text style={s.btnGhostText}>Asignar técnico</Text></Pressable>
             </View>
           </Card>
-        )}
+          </Pressable>
+          );
+        }}
       />
       </View>
       <Modal visible={!!assignOpen} transparent animationType="fade" onRequestClose={()=>setAssignOpen(null)}>
@@ -209,11 +274,14 @@ export function AdminMesaTicketsScreen() {
           <Text style={s.modalTitle}>Asignar técnico · #{assignOpen?.numero}</Text>
           <Text style={s.modalHint}>Solo técnicos de la dependencia {assignOpen?.mesaId}</Text>
           {tecnicos.length===0? <Text style={s.muted}>Sin técnicos en esta dependencia</Text>:
-            tecnicos.map(t=> (
-              <Pressable key={t.id} onPress={()=>setAssignId(t.id)} style={[s.techRow, assignId===t.id && s.techRowActive]}><Text style={s.techText}>{t.full_name ?? t.email ?? t.id}</Text></Pressable>
-            ))
+            <FilterDropdown
+              label="Técnico de la dependencia"
+              value={assignId as never}
+              options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicos.map((t) => ({ value: t.id as never, label: (t.full_name ?? t.email ?? 'Técnico') }))]}
+              onSelect={(v) => setAssignId(v as string)}
+              placeholder="Seleccionar técnico"
+            />
           }
-          <Pressable onPress={()=>setAssignId('')} style={[s.techRow, !assignId && s.techRowActive]}><Text style={s.techText}>Sin asignar</Text></Pressable>
           <View style={s.modalActions}>
             <Pressable onPress={()=>setAssignOpen(null)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
             <Pressable onPress={doAssign} disabled={assignLoading} style={[s.btnPrimary, assignLoading && {opacity:0.6}]}><Text style={s.btnPrimaryText}>{assignLoading?'Guardando…':'Guardar'}</Text></Pressable>
@@ -263,7 +331,10 @@ const s = StyleSheet.create({
   btnPrimary:{backgroundColor:theme.colors.primary, paddingHorizontal:16, height:40, borderRadius:theme.radius.sm, alignItems:'center', justifyContent:'center'},
   btnPrimaryText:{color:'#fff', fontWeight:'800', fontSize:12},
   listContent:{padding:12, gap:10, paddingBottom:24},
+  cardPress:{flex:1},
   card:{gap:8, flex:1},
+  badges:{flexDirection:'row', gap:6, alignItems:'center'},
+  metaRow:{flexDirection:'row', alignItems:'center', marginTop:2},
   check:{width:26, height:26, borderRadius:13, borderWidth:2, borderColor:theme.colors.border, backgroundColor:theme.colors.surface, alignItems:'center', justifyContent:'center'},
   checkActive:{backgroundColor:theme.colors.primary, borderColor:theme.colors.primary},
   checkText:{fontSize:14, fontWeight:'800', color:'transparent'},
@@ -272,7 +343,7 @@ const s = StyleSheet.create({
   cardId:{fontSize:10, fontWeight:'700', color:theme.colors.mutedSoft},
   priority:{fontSize:10, fontWeight:'800', color:theme.colors.primaryDark},
   name:{fontSize:14, fontWeight:'800', color:theme.colors.text},
-  actions:{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginTop:4},
+  actions:{flexDirection:'row', justifyContent:'flex-end', alignItems:'center', marginTop:4},
   btnGhost:{height:36, borderRadius:theme.radius.sm, borderWidth:1, borderColor:theme.colors.border, backgroundColor:theme.colors.surfaceAlt, alignItems:'center', justifyContent:'center', paddingHorizontal:12},
   btnGhostText:{fontSize:11, fontWeight:'700', color:theme.colors.text},
   empty:{alignItems:'center', padding:32, gap:10, backgroundColor:theme.colors.surface, borderRadius:theme.radius.lg, borderWidth:1, borderColor:theme.colors.border},
