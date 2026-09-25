@@ -49,6 +49,14 @@ export function toCsv(rows: ExportRow[]): string {
   return lines.join('\r\n');
 }
 
+/** CSV simple sin metadatos `#` — la primera fila es siempre el header.
+ * Los exports con líneas `#` se rompen al abrirlos en Excel (filas fantasma
+ * y columnas desalineadas); usar este builder para CSV aptos para Excel. */
+export function toCsvSimple(header: string[], rows: unknown[][]): string {
+  const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  return [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
+}
+
 /** Nombre de archivo con fecha local YYYY-MM-DD */
 export function buildExportFilename(prefix: string, ext: 'csv' | 'pdf' | 'png' = 'csv'): string {
   return `${prefix}-${new Date().toISOString().slice(0, 10)}.${ext}`;

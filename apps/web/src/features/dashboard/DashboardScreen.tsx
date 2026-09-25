@@ -4,6 +4,7 @@ import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Te
 import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, isEstadoTicket, isPrioridadTicket, type Mesa, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
+import { exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { KpiRow } from '@helpdesk/shared';
 import { EstadoPrioridadRow } from '@helpdesk/shared';
 import { ChartsSection } from '@helpdesk/shared';
@@ -129,33 +130,53 @@ export function DashboardScreen() {
       fb.show('Error al exportar', msg, 'error');
     }
   }, [filters, mesas, categorias, tecnicos]);
+  // Tabla de datos filtrados para PNG/PDF basados en datos (fallback del screenshot)
+  const fetchExportTable = React.useCallback(async (): Promise<ExportTable> => {
+    const data = await fetchTicketsFiltrados(supabase, filters, 2000);
+    const mesaName = (id: number | null) => mesas.find((m) => m.id === id)?.nombre ?? String(id ?? '—');
+    const categoriaName = (id: number) => categorias.find((c) => c.id === id)?.nombre ?? String(id);
+    const tecnicoName = (id: string) => tecnicos.find((t) => t.id === id)?.nombre ?? id;
+    const rows = ticketsToRows(data ?? [], mesaName);
+    return {
+      title: 'Tablero de tickets',
+      subtitle: (await import('@helpdesk/shared')).formatFiltrosResumen(filters, { mesaName, categoriaName, tecnicoName }),
+      header: ['numero', 'asunto', 'estado', 'prioridad', 'mesa', 'categoria', 'creado', 'actualizado'],
+      rows: rows.map((r) => [r.numero, r.asunto, r.estado, r.prioridad, r.mesa, r.categoria, r.creado, r.actualizado]),
+    };
+  }, [filters, mesas, categorias, tecnicos]);
+
   const onExportPng = React.useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('No disponible', 'Exportar PNG solo disponible en web', 'warning'); return; }
       const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
-      const html2canvas = await import('html2canvas');
-      const render = html2canvas.default as unknown as (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
-      const canvas = await render(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = (await import('@helpdesk/shared')).buildExportFilename('dashboard', 'png'); a.click();
+      if (el) {
+        try {
+          const html2canvas = await import('html2canvas');
+          const render = html2canvas.default as unknown as (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
+          const canvas = await render(el, { backgroundColor: '#F8FAFC', scale: 1, useCORS: true, logging: false });
+          const url = canvas.toDataURL('image/png');
+          // Las gráficas SVG no siempre las rasteriza html2canvas → si sale vacío, fallback a tabla de datos
+          if (canvas.width > 0 && canvas.height > 0 && url.length > 4000) {
+            const a = document.createElement('a'); a.href = url; a.download = (await import('@helpdesk/shared')).buildExportFilename('dashboard', 'png'); a.click();
+            return;
+          }
+        } catch (e) { reportError(e, { flujo: 'dashboard-export-png-shot' }); }
+      }
+      // Fallback basado en datos (nunca sale vacío)
+      const table = await fetchExportTable();
+      const { count } = await exportTablePng('dashboard', table);
+      fb.show('PNG listo', `El tablero como imagen no se pudo capturar; se exportó la tabla con ${count} filas.`, 'success');
     } catch (e: unknown) { reportError(e, { flujo: 'dashboard-export-png' }); fb.show('Error al exportar', 'Error al exportar PNG', 'error'); }
-  }, []);
+  }, [fb, filters, mesas, categorias, tecnicos]);
   const onExportPdf = React.useCallback(async () => {
     try {
       if (Platform.OS !== 'web' || typeof document === 'undefined') { fb.show('No disponible', 'Exportar PDF solo disponible en web', 'warning'); return; }
-      const el = document.getElementById('dashboard-export-root') as HTMLElement | null;
-      if (!el) { fb.show('Sin contenido', 'No se encontró el contenedor de gráficas', 'warning'); return; }
-      const html2canvas = await import('html2canvas');
-      const { jsPDF } = await import('jspdf');
-      const render = html2canvas.default as unknown as (el: HTMLElement, opts?: object) => Promise<HTMLCanvasElement>;
-      const canvas = await render(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save((await import('@helpdesk/shared')).buildExportFilename('dashboard', 'pdf'));
+      // PDF siempre desde datos (texto real, paginado): el screenshot de gráficas suele salir vacío
+      const table = await fetchExportTable();
+      const { count } = exportTablePdf('dashboard', table);
+      fb.show('PDF listo', `Se generaron ${count} filas (dataset completo).`, 'success');
     } catch (e: unknown) { reportError(e, { flujo: 'dashboard-export-pdf' }); fb.show('Error al exportar', 'Error al exportar PDF', 'error'); }
-  }, []);
+  }, [fb, filters, mesas, categorias, tecnicos]);
   const onGenerarAlertas = React.useCallback(async () => {
     setGenerandoAlertas(true);
     try { await generarAlertasIA(supabase); const a = await listAlertasIA(supabase, { estado: 'nueva' }); setAlertas(a); } catch(e: unknown){ reportError(e, { flujo: 'dashboard-generar-alertas' }); } finally { setGenerandoAlertas(false); }

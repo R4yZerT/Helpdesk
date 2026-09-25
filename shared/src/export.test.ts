@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildExportFilename, formatFiltrosResumen, ticketsToRows, toCsv, toCsvWithMeta } from './export.js';
+import { buildExportFilename, formatFiltrosResumen, ticketsToRows, toCsv, toCsvSimple, toCsvWithMeta } from './export.js';
 
 describe('RF-18 export helpers', () => {
   it('ticketsToRows soporta Ticket camelCase y raw snake_case', () => {
@@ -52,5 +52,18 @@ describe('RF-18 export helpers', () => {
 
   it('toCsv vacio solo header', () => {
     expect(toCsv([]).split('\r\n')).toHaveLength(1);
+  });
+
+  it('toCsvSimple primera fila es header, sin lineas #', () => {
+    const csv = toCsvSimple(['id', 'nombre'], [[1, 'a"b'], [2, null]]);
+    const lines = csv.split('\r\n');
+    expect(lines[0]).toBe('"id","nombre"');
+    expect(lines[1]).toBe('"1","a""b"');
+    expect(lines[2]).toBe('"2",""');
+    expect(csv).not.toContain('#');
+  });
+
+  it('toCsvSimple vacio solo header', () => {
+    expect(toCsvSimple(['a'], []).split('\r\n')).toHaveLength(1);
   });
 });
