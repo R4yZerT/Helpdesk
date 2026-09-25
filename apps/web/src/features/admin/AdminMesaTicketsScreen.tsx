@@ -1,12 +1,11 @@
 // RF replanteo — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { useAuth } from '../../context/AuthContext';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { AdminStackParamList } from '../../navigation/types';
@@ -141,42 +140,63 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets]);
 
-  const onExportCsv = useCallback(() => {
+  // Exportación desde datos completos (no solo la página visible ni screenshots).
+  // listMyTickets limita pageSize a 50 → se itera por páginas con los mismos filtros.
+  const fetchAllForExport = useCallback(async (): Promise<Ticket[]> => {
+    if (mesaId == null) return [];
+    let tecnicoIdParam: string | null | undefined = undefined;
+    if (tecnicoFilter) {
+      tecnicoIdParam = tecnicoFilter === '__unassigned' ? null : tecnicoFilter;
+    } else if (asignacionFilter === 'asignadas') tecnicoIdParam = '__assigned';
+    else if (asignacionFilter === 'no_asignadas') tecnicoIdParam = null;
+    const all: Ticket[] = [];
+    let page = 0;
+    for (;;) {
+      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as PrioridadTicket) || undefined, page, pageSize: 50 });
+      all.push(...res.data);
+      if (!res.hasMore || res.data.length === 0) break;
+      page += 1;
+    }
+    // Resolver nombres de técnicos que aún no están en el mapa (para no exportar UID)
+    const missing = [...new Set(all.map((t) => t.tecnicoAsignadoId).filter((x): x is string => !!x && !tecnicoNombres[x]))];
+    if (missing.length > 0) {
+      try {
+        const map = await fetchTecnicoNombres(supabase as never, missing);
+        if (Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
+        for (const [k, v] of Object.entries(map)) tecnicoNombres[k] = v;
+      } catch {}
+    }
+    return all;
+  }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter, tecnicoNombres]);
+
+  const buildTable = useCallback((all: Ticket[], nombres: Record<string, string>): ExportTable => ({
+    title: 'Tickets de la dependencia',
+    subtitle: `Mesa ${mesaId ?? '—'}`,
+    header: ['numero', 'asunto', 'estado', 'prioridad', 'tecnico'],
+    rows: all.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ? (nombres[t.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar']),
+  }), [mesaId]);
+
+  const onExportCsv = useCallback(async () => {
     try {
-      const header = ['numero', 'asunto', 'estado', 'prioridad', 'tecnico'];
-      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const csvRows = tickets.map((t) => [String(t.numero), t.asunto.replace(/\r?\n/g, ' '), formatEstado(t.estado as never), formatPrioridad(t.prioridad as never), t.tecnicoAsignadoId ? (tecnicoNombres[t.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar']);
-      const csv = [header.map(esc).join(','), ...csvRows.map((r) => r.map(esc).join(','))].join('\r\n');
-      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${tickets.length}`, `# Mesa: ${mesaId ?? '—'}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-mesa-tickets', 'csv'), meta);
-      if (!ok) setFeedback({ visible:true, variant:'info', title:'CSV generado', message:`Se generaron ${tickets.length} filas.` });
+      const table = buildTable(await fetchAllForExport(), tecnicoNombres);
+      const { count, ok } = exportTableCsv('admin-mesa-tickets', table);
+      setFeedback({ visible: true, variant: ok ? 'success' : 'info', title: ok ? 'CSV listo' : 'CSV generado', message: `Se generaron ${count} filas (dataset completo).` });
     } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-csv' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar CSV', message:getErrorMessage(e) }); }
-  }, [tickets, mesaId, tecnicoNombres]);
+  }, [fetchAllForExport, buildTable, tecnicoNombres]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible:true, variant:'info', title:'Exportación no disponible', message:'Exportar PNG solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible:true, variant:'error', title:'Error al exportar PNG', message:'No se encontró el contenedor de tickets' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await html2canvas(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-mesa-tickets', 'png'); a.click();
+      const table = buildTable(await fetchAllForExport(), tecnicoNombres);
+      const { count } = await exportTablePng('admin-mesa-tickets', table);
+      setFeedback({ visible:true, variant:'success', title:'PNG listo', message:`Se generaron ${count} filas (dataset completo).` });
     } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-png' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar PNG', message:getErrorMessage(e) }); }
-  }, []);
+  }, [fetchAllForExport, buildTable, tecnicoNombres]);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible:true, variant:'info', title:'Exportación no disponible', message:'Exportar PDF solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:'No se encontró el contenedor de tickets' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      // jsPDF importado estático arriba
-      const canvas = await html2canvas(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('admin-mesa-tickets', 'pdf'));
+      const table = buildTable(await fetchAllForExport(), tecnicoNombres);
+      const { count } = exportTablePdf('admin-mesa-tickets', table);
+      setFeedback({ visible:true, variant:'success', title:'PDF listo', message:`Se generaron ${count} filas (dataset completo).` });
     } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-pdf' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:getErrorMessage(e) }); }
-  }, []);
+  }, [fetchAllForExport, buildTable, tecnicoNombres]);
   const openAssign = async (t: Ticket) => {
     setAssignOpen(t); setAssignId(t.tecnicoAsignadoId ?? '');
     // fetch técnicos de esa mesa (misma dependencia del ticket)

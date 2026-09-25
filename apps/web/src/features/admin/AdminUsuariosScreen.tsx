@@ -1,10 +1,10 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
@@ -106,43 +106,48 @@ export function AdminUsuariosScreen() {
   const hasActiveFilters = !!qDebounced || rol !== 'todos' || (isGeneralAdmin && mesaId !== 'todos') || activo !== 'todos';
   const clearFilters = () => { setQ(''); setRol('todos'); if (isGeneralAdmin) setMesaId('todos'); setActivo('todos'); };
 
-  // Export: CSV/PNG/PDF — mismo patrón que DashboardScreen (RF-18) via html2canvas + jsPDF, id admin-export-root
-  const onExportCsv = useCallback(() => {
+  // Export: CSV/PNG/PDF desde datos completos (no solo la página visible ni screenshots)
+  const fetchAllForExport = useCallback(async () => {
+    const effectiveMesaId = isGeneralAdmin ? ((mesaId === 'todos' ? 'todos' : Number(mesaId)) as never) : (adminMesaId as never);
+    const res = await listUsers(supabase, {
+      search: qDebounced || undefined,
+      rol: rol as never,
+      mesaId: effectiveMesaId as never,
+      activo: activo as never,
+      page: 1,
+      pageSize: 1000,
+    });
+    return res.data;
+  }, [qDebounced, rol, mesaId, activo, adminMesaId, isGeneralAdmin]);
+
+  const buildTable = useCallback((all: AdminUser[]): ExportTable => ({
+    title: 'Usuarios',
+    subtitle: hasActiveFilters ? 'Filtrado' : 'Sin filtros',
+    header: ['nombre', 'cedula', 'correo', 'rol', 'dependencia', 'estado'],
+    rows: all.map((u) => [u.fullName, u.cedula ?? '', u.email ?? '', formatRol(u.rol as never), u.mesaNombre ?? (u.mesaId ? String(u.mesaId) : ''), u.activo ? 'activo' : 'inactivo']),
+  }), [hasActiveFilters]);
+
+  const onExportCsv = useCallback(async () => {
     try {
-      const header = ['nombre', 'cedula', 'correo', 'rol', 'dependencia', 'estado'];
-      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const rows = users.map((u) => [u.fullName, u.cedula ?? '', u.email ?? '', u.rol, u.mesaNombre ?? (u.mesaId ? String(u.mesaId) : ''), u.activo ? 'activo' : 'inactivo']);
-      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
-      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${users.length}`, `# Filtros: ${hasActiveFilters ? 'filtrado' : 'sin filtros'}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-usuarios', 'csv'), meta);
-      if (!ok) setFeedback({ visible: true, variant: 'info', title: 'CSV generado', message: `Se generaron ${users.length} filas.` });
-    } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
-  }, [users, hasActiveFilters]);
+      const table = buildTable(await fetchAllForExport());
+      const { count, ok } = exportTableCsv('admin-usuarios', table);
+      setFeedback({ visible: true, variant: ok ? 'success' : 'info', title: ok ? 'CSV listo' : 'CSV generado', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-usuarios-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PNG solo está disponible en web (motivo: plataforma no web).' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: 'No se encontró el contenedor de usuarios (motivo: tabla aún no renderizada).' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-usuarios', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminUsuarios] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: explainUserError(e) }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = await exportTablePng('admin-usuarios', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PNG listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-usuarios-export-png' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: explainUserError(e) }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PDF solo está disponible en web (motivo: plataforma no web).' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: 'No se encontró el contenedor de usuarios (motivo: tabla aún no renderizada).' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      // jsPDF importado estático arriba
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('admin-usuarios', 'pdf'));
-    } catch (e: any) { console.warn('[AdminUsuarios] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: explainUserError(e) }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = exportTablePdf('admin-usuarios', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PDF listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-usuarios-export-pdf' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: explainUserError(e) }); }
+  }, [fetchAllForExport, buildTable]);
 
   const toggleActivo = (u: AdminUser) => setConfirmToggle(u);
   const doToggleActivo = async () => {
@@ -328,7 +333,7 @@ export function AdminUsuariosScreen() {
         </View>
       </View>
 
-      {/* Acciones export — web: PNG/PDF via html2canvas, CSV via downloadCsv. Misma UX que Dashboard RF-18 */}
+      {/* Acciones export — CSV/PDF/PNG desde dataset completo via lib/exportTable */}
       <View style={s.exportRow}>
         <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button" accessibilityLabel="Exportar CSV usuarios"><Text style={s.exportBtnText}>CSV</Text></Pressable>
         <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button" accessibilityLabel="Exportar PNG usuarios"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>

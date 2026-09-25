@@ -1,10 +1,10 @@
 // RF-32 — Admin: categorías maestras ticket_categories
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -86,42 +86,46 @@ export function AdminCategoriasScreen() {
   const onEndReached = useCallback(() => { if (loadingMore || loading || !hasMore) return; fetchPage(page + 1); }, [loadingMore, loading, hasMore, page, fetchPage]);
   const hasFilters = !!qDeb || effectiveDominio !== 'todos' || activa !== 'todos';
   const clearFilters = () => { setQ(''); if (isGeneralAdmin) setDominio('todos'); setActiva('todos'); };
-  const onExportCsv = useCallback(() => {
+  // Exportación desde datos completos (no solo la página visible ni screenshots)
+  const fetchAllForExport = useCallback(async () => {
+    const res = await listCategoriasPaginated(supabase, {
+      search: qDeb || undefined,
+      dominio: effectiveDominio as never,
+      activa: activa as never,
+      page: 1,
+      pageSize: 1000,
+    });
+    return res.data;
+  }, [qDeb, effectiveDominio, activa]);
+
+  const buildTable = useCallback((all: TicketCategoria[]): ExportTable => ({
+    title: 'Categorías',
+    subtitle: hasFilters ? 'Filtrado' : 'Sin filtros',
+    header: ['id', 'dominio', 'subcategoria', 'orden', 'estado'],
+    rows: all.map((r) => [String(r.id), formatDominio(r.dominio as never), r.subcategoria, String(r.orden), r.activa ? 'activa' : 'inactiva']),
+  }), [hasFilters]);
+
+  const onExportCsv = useCallback(async () => {
     try {
-      const header = ['id', 'dominio', 'subcategoria', 'orden', 'estado'];
-      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const exportRows = rows.map((r) => [String(r.id), r.dominio, r.subcategoria, String(r.orden), r.activa ? 'activa' : 'inactiva']);
-      const csv = [header.map(esc).join(','), ...exportRows.map((r) => r.map(esc).join(','))].join('\r\n');
-      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${exportRows.length}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-categorias', 'csv'), meta);
-      if (!ok) setFeedback({ visible: true, variant: 'info', title: 'CSV generado', message: `Se generaron ${exportRows.length} filas.` });
-    } catch (e: any) { console.warn('[AdminCategorias] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message ?? 'Error al exportar CSV' }); }
-  }, [rows]);
+      const table = buildTable(await fetchAllForExport());
+      const { count, ok } = exportTableCsv('admin-categorias', table);
+      setFeedback({ visible: true, variant: ok ? 'success' : 'info', title: ok ? 'CSV listo' : 'CSV generado', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-categorias-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e instanceof Error ? e.message : 'Error al exportar CSV' }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PNG solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: 'No se encontró el contenedor de categorías' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-categorias', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminCategorias] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG' }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = await exportTablePng('admin-categorias', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PNG listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-categorias-export-png' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: e instanceof Error ? e.message : 'Error al exportar PNG' }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PDF solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: 'No se encontró el contenedor de categorías' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      // jsPDF importado estático arriba
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('admin-categorias', 'pdf'));
-    } catch (e: any) { console.warn('[AdminCategorias] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF' }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = exportTablePdf('admin-categorias', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PDF listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-categorias-export-pdf' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: e instanceof Error ? e.message : 'Error al exportar PDF' }); }
+  }, [fetchAllForExport, buildTable]);
 
   const toggleActiva = (r: TicketCategoria) => setConfirmToggle(r);
   const doToggleActiva = async () => {

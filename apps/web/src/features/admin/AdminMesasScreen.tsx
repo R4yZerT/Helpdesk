@@ -2,12 +2,12 @@
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { MesaEquipoModal } from './MesaEquipoModal';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 20;
@@ -97,42 +97,46 @@ export function AdminMesasScreen() {
 
   const hasActiveFilters = !!qDeb || activa !== 'todos';
   const clearFilters = () => { setQ(''); setActiva('todos'); };
-  const onExportCsv = useCallback(() => {
+  // Exportación desde datos completos (no solo la página visible ni screenshots)
+  const fetchAllForExport = useCallback(async (): Promise<Mesa[]> => {
+    const res = await listMesasPaginated(supabase, {
+      search: qDeb || undefined,
+      activa: activa as never,
+      page: 1,
+      pageSize: 1000,
+      secretariaId: secretariaId ?? undefined,
+    });
+    return res.data;
+  }, [qDeb, activa, secretariaId]);
+
+  const buildTable = useCallback((all: Mesa[]): ExportTable => ({
+    title: 'Dependencias',
+    subtitle: hasActiveFilters ? 'Filtrado' : 'Sin filtros',
+    header: ['id', 'nombre', 'estado'],
+    rows: all.map((m) => [String(m.id), m.nombre, m.activa ? 'activa' : 'inactiva']),
+  }), [hasActiveFilters]);
+
+  const onExportCsv = useCallback(async () => {
     try {
-      const header = ['id', 'nombre', 'estado'];
-      const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-      const rows = mesas.map((m) => [String(m.id), m.nombre, m.activa ? 'activa' : 'inactiva']);
-      const csv = [header.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\r\n');
-      const meta = [`# Generado: ${new Date().toISOString()}`, `# Registros: ${mesas.length}`].join('\r\n') + '\r\n' + csv;
-      const ok = downloadCsv(buildExportFilename('admin-dependencias', 'csv'), meta);
-      if (!ok) setFeedback({ visible: true, variant: 'info', title: 'CSV generado', message: `Se generaron ${mesas.length} filas.` });
-    } catch (e: any) { console.warn('[AdminMesas] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message ?? 'Error al exportar CSV' }); }
-  }, [mesas]);
+      const table = buildTable(await fetchAllForExport());
+      const { count, ok } = exportTableCsv('admin-dependencias', table);
+      setFeedback({ visible: true, variant: ok ? 'success' : 'info', title: ok ? 'CSV listo' : 'CSV generado', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: getErrorMessage(e) }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPng = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PNG solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: 'No se encontró el contenedor de dependencias' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
-      const url = canvas.toDataURL('image/png');
-      const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-dependencias', 'png'); a.click();
-    } catch (e: any) { console.warn('[AdminMesas] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: e?.message ? `Error al exportar PNG: ${e.message}` : 'Error al exportar PNG' }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = await exportTablePng('admin-dependencias', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PNG listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-png' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG', message: getErrorMessage(e) }); }
+  }, [fetchAllForExport, buildTable]);
   const onExportPdf = useCallback(async () => {
     try {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') { setFeedback({ visible: true, variant: 'info', title: 'Exportación no disponible', message: 'Exportar PDF solo disponible en web' }); return; }
-      const el = document.getElementById('admin-export-root') as HTMLElement | null;
-      if (!el) { setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: 'No se encontró el contenedor de dependencias' }); return; }
-      // html2canvas importado estático arriba — evita Cannot find module en Metro web
-      // jsPDF importado estático arriba
-      const canvas = await (html2canvas as any)(el, { backgroundColor: '#FFFFFF', scale: 2, useCORS: true, logging: false });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(buildExportFilename('admin-dependencias', 'pdf'));
-    } catch (e: any) { console.warn('[AdminMesas] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: e?.message ? `Error al exportar PDF: ${e.message}` : 'Error al exportar PDF' }); }
-  }, []);
+      const table = buildTable(await fetchAllForExport());
+      const { count } = exportTablePdf('admin-dependencias', table);
+      setFeedback({ visible: true, variant: 'success', title: 'PDF listo', message: `Se generaron ${count} filas (dataset completo).` });
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-pdf' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF', message: getErrorMessage(e) }); }
+  }, [fetchAllForExport, buildTable]);
 
   const toggleActiva = (m: Mesa) => setConfirmToggle(m);
   const doToggleActiva = async () => {
