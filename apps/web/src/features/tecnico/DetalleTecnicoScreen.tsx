@@ -1,7 +1,7 @@
 // RF-09/10/13/14/15 — Detalle Técnico (Stitch split 8+4, FSM naranja, SLA 35m)
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail } from '@helpdesk/shared';
+import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, FilterDropdown, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, IaValidationCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -44,9 +44,30 @@ export function DetalleTecnicoScreen({ route }: Props) {
   const [transError, setTransError] = useState<string | null>(null);
   const [showReassign, setShowReassign] = useState(false);
   const [reassignTecnico, setReassignTecnico] = useState('');
-  const [reassignMesa, setReassignMesa] = useState('');
+  const [reassignMesaId, setReassignMesaId] = useState('');
+  const [tecnicosMesa, setTecnicosMesa] = useState<{ id: string; full_name: string | null; email: string | null }[]>([]);
   const [reassignLoading, setReassignLoading] = useState(false);
   const [reassignError, setReassignError] = useState<string | null>(null);
+
+  // Técnicos activos de la dependencia elegida (dropdown, sin UUID manual)
+  useEffect(() => {
+    if (!showReassign || !reassignMesaId) { setTecnicosMesa([]); return; }
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from('profiles').select('id,full_name,email').eq('mesa_id', Number(reassignMesaId)).eq('rol', 'tecnico').eq('activo', true).order('full_name');
+        if (!alive) return;
+        const list = (data ?? []) as { id: string; full_name: string | null; email: string | null }[];
+        setTecnicosMesa(list);
+        setTecnicoNombres((prev) => {
+          const next = { ...prev };
+          for (const t of list) if (!next[t.id]) next[t.id] = t.full_name ?? t.email ?? 'Técnico asignado';
+          return next;
+        });
+      } catch { if (alive) setTecnicosMesa([]); }
+    })();
+    return () => { alive = false; };
+  }, [showReassign, reassignMesaId]);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState('');
   const [mesas, setMesas] = useState<Record<number, string>>({});
@@ -110,14 +131,28 @@ export function DetalleTecnicoScreen({ route }: Props) {
     try { await transitionTicket(supabase, id, estado as any, { solucionAplicada: solucion || undefined, onError: (e) => reportError(e, { flujo: 'transicion-comentario' }) }); setShowTrans(false); setSolucion(''); await load(); }
     catch (e) { setTransError(e instanceof Error ? e.message : String(e)); } finally { setTransLoading(null); }
   };
+  // Abrir reasignación preseleccionando el asignado actual (evita reasignar a quien ya lo tiene)
+  const openReassign = useCallback(() => {
+    if (detail) {
+      setReassignTecnico(detail.ticket.tecnicoAsignadoId ?? '');
+      setReassignMesaId(detail.ticket.mesaId != null ? String(detail.ticket.mesaId) : '');
+    }
+    setReassignError(null);
+    setShowReassign((v) => !v);
+  }, [detail]);
+
   const onReassign = async () => {
+    if (!detail) return;
     setReassignLoading(true); setReassignError(null);
     try {
-      const patch: any = {};
-      if (reassignTecnico.trim()) patch.tecnicoId = reassignTecnico.trim() === 'null' ? null : reassignTecnico.trim();
-      if (reassignMesa.trim()) patch.mesaId = reassignMesa.trim() === 'null' ? null : Number(reassignMesa.trim());
-      if (!Object.keys(patch).length) { setReassignError('Ingresa técnico UUID o mesa ID'); return; }
-      await reassignTicket(supabase, id, patch); setShowReassign(false); setReassignTecnico(''); setReassignMesa(''); await load();
+      const patch: { tecnicoId?: string | null; mesaId?: number } = {};
+      const tecChanged = (reassignTecnico || '') !== (detail.ticket.tecnicoAsignadoId ?? '');
+      const mesaChanged = reassignMesaId !== '' && Number(reassignMesaId) !== detail.ticket.mesaId;
+      if (reassignTecnico && !tecChanged) { setReassignError('Ese técnico ya está asignado a este ticket'); return; }
+      if (tecChanged) patch.tecnicoId = reassignTecnico || null;
+      if (mesaChanged) patch.mesaId = Number(reassignMesaId);
+      if (!Object.keys(patch).length) { setReassignError('Sin cambios por aplicar'); return; }
+      await reassignTicket(supabase, id, patch); setShowReassign(false); await load();
     } catch (e) { setReassignError(e instanceof Error ? e.message : String(e)); } finally { setReassignLoading(false); }
   };
 
@@ -240,12 +275,13 @@ export function DetalleTecnicoScreen({ route }: Props) {
         ) : null}
         <View style={s.ghostStack}>
           <Pressable onPress={()=> setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir información</Text></Pressable>
-          {canReassign ? <Pressable onPress={()=>setShowReassign(v=>!v)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign?'Ocultar reasignar':'Reasignar'}</Text></Pressable> : null}
+          {canReassign ? <Pressable onPress={openReassign} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign?'Ocultar reasignar':'Reasignar'}</Text></Pressable> : null}
         </View>
         {showReassign ? (
           <View style={{ gap: 8 }}>
-            <TextInput value={reassignTecnico} onChangeText={setReassignTecnico} placeholder="UUID técnico (o 'null' para desasignar)" style={s.input} autoCapitalize="none" />
-            <TextInput value={reassignMesa} onChangeText={setReassignMesa} placeholder="ID mesa (número)" style={s.input} keyboardType="numeric" />
+            <Text style={s.mutedSmall}>Asignado actual: {ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
+            <FilterDropdown label="Dependencia" value={reassignMesaId as never} options={mesasRaw.map((m) => ({ value: String(m.id) as never, label: m.nombre }))} onSelect={(v) => { setReassignMesaId(v as string); setReassignTecnico(''); }} placeholder="Seleccionar dependencia" />
+            <FilterDropdown label="Técnico de la dependencia" value={reassignTecnico as never} options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicosMesa.map((t) => ({ value: t.id as never, label: (t.full_name ?? t.email ?? 'Técnico') }))]} onSelect={(v) => setReassignTecnico(v as string)} placeholder={reassignMesaId ? 'Seleccionar técnico' : 'Elige primero la dependencia'} />
             {reassignError ? <Text style={s.error}>{reassignError}</Text> : null}
             <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && {opacity:0.6} as any]}><Text style={s.btnPrimaryText}>{reassignLoading?'Reasignando…':'Confirmar reasignación'}</Text></Pressable>
           </View>

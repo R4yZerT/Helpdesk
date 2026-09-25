@@ -2,7 +2,7 @@
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { MesaEquipoModal } from './MesaEquipoModal';
@@ -10,7 +10,7 @@ import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from
 import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function getErrorMessage(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -25,8 +25,6 @@ function getErrorMessage(e: unknown): string {
 }
 
 export function AdminMesasScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 1024;
   const { profile } = useAuth();
   // RF-30: el administrador ve todas las mesas (sin filtro por dependencia propia)
   const rol = (profile as unknown as { rol?: string } | null)?.rol ?? null;
@@ -246,9 +244,7 @@ export function AdminMesasScreen() {
         data={mesas}
         keyExtractor={(m) => String(m.id)}
         renderItem={renderItem}
-        numColumns={isWide ? 2 : 1}
-        key={isWide ? 'grid-2' : 'list-1'}
-        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+        numColumns={1}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}

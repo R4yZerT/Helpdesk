@@ -7,7 +7,7 @@ import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from
 import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function pillDominio(d: string) {
   if (d === 'tic') return { bg: '#EFF6FF', border: '#BFDBFE', fg: '#1E40AF', label: 'TIC' };

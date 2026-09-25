@@ -8,7 +8,7 @@ import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function pillRol(rol: string) {
   if (rol === 'administrador') return { bg: '#EFF6FF', border: '#BFDBFE', fg: '#1D4ED8', label: 'Admin' };
