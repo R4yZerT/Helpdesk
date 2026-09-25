@@ -1,6 +1,6 @@
 // RF-08 — Mis solicitudes: server paginado + Realtime + pull-to-refresh (Stitch: grid 2cols, FAB naranja)
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fetchMesas, fetchTecnicoNombres, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { Badge, Card, Divider, TecnicoChip } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
@@ -10,13 +10,11 @@ import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { EmpleadoStackParamList } from '../../navigation/types';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 type Props = { navigation: NativeStackNavigationProp<EmpleadoStackParamList, 'MisSolicitudes'> };
 
 export function MisSolicitudesScreen({ navigation }: Props) {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 1024;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [page, setPage] = useState(0);
@@ -180,8 +178,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
     <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <FlatList
         data={tickets}
-        key={isWide ? 'grid-2' : 'grid-1'}
-        numColumns={isWide ? 2 : 1}
+        numColumns={1}
         keyExtractor={(t) => t.id}
         renderItem={renderItem}
         ListHeaderComponent={filterCard}
@@ -213,7 +210,6 @@ export function MisSolicitudesScreen({ navigation }: Props) {
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 88 }}
-        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
       />
       {/* FAB Stitch #FD7C06 */}
       <Pressable onPress={() => navigation.navigate('CrearTicket')} style={s.fab} accessibilityRole="button" accessibilityLabel="Crear nueva solicitud">

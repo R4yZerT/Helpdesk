@@ -1,8 +1,8 @@
 // RF replanteo — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, reassignTicket, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
@@ -42,8 +42,6 @@ function estadoTone(e: string): 'muted' | 'info' | 'success' | 'ink' | 'danger' 
 type Props = { navigation?: NativeStackNavigationProp<AdminStackParamList, 'MesaTickets'> };
 
 export function AdminMesaTicketsScreen({ navigation }: Props) {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 1024;
   const { profile } = useAuth();
   const mesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
   const [q, setQ] = useState('');
@@ -57,11 +55,8 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string|null>(null);
   const [feedback, setFeedback] = useState<{visible:boolean; variant:'success'|'error'|'info'; title:string; message?:string}|null>(null);
-  const [assignOpen, setAssignOpen] = useState<Ticket|null>(null);
   const [tecnicos, setTecnicos] = useState<TecnicoOpt[]>([]);
   const [tecnicoNombres, setTecnicoNombres] = useState<Record<string, string>>({});
-  const [assignId, setAssignId] = useState<string>('');
-  const [assignLoading, setAssignLoading] = useState(false);
   // H10 — prioridad en lote (solo admin: RLS rechaza a otros roles por ítem)
   const [modoBulk, setModoBulk] = useState(false);
   const [seleccion, setSeleccion] = useState<string[]>([]);
@@ -87,7 +82,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
         tecnicoIdParam = tecnicoFilter === '__unassigned' ? null : tecnicoFilter;
       } else if (asignacionFilter === 'asignadas') tecnicoIdParam = '__assigned';
       else if (asignacionFilter === 'no_asignadas') tecnicoIdParam = null;
-      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as PrioridadTicket) || undefined, page: 0, pageSize: 50 });
+      const res = await listMyTickets(supabase as never, { mesaId: mesaId as number, q: qDeb || undefined, tecnicoId: tecnicoIdParam, prioridad: (prioridadFilter as PrioridadTicket) || undefined, page: 0, pageSize: 10 });
       setTickets(res.data); setTotal(res.total);
     } catch (e) { const m=getErrorMessage(e); setErrorMsg(m); } finally { setLoading(false); }
   }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter]);
@@ -197,33 +192,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
       setFeedback({ visible:true, variant:'success', title:'PDF listo', message:`Se generaron ${count} filas (dataset completo).` });
     } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-pdf' }); setFeedback({ visible:true, variant:'error', title:'Error al exportar PDF', message:getErrorMessage(e) }); }
   }, [fetchAllForExport, buildTable, tecnicoNombres]);
-  const openAssign = async (t: Ticket) => {
-    setAssignOpen(t); setAssignId(t.tecnicoAsignadoId ?? '');
-    // fetch técnicos de esa mesa (misma dependencia del ticket)
-    try {
-      const { data, error } = await supabase.from('profiles').select('id,full_name,email,rol').eq('mesa_id', t.mesaId).in('rol', ['tecnico']).eq('activo', true).order('full_name');
-      if (error) throw error;
-      const list = (data ?? []) as TecnicoOpt[];
-      setTecnicos(list);
-      setTecnicoNombres((prev) => {
-        const next = { ...prev };
-        for (const x of list) next[x.id] = x.full_name ?? x.email ?? x.id;
-        return next;
-      });
-    } catch {}
-  };
-
-  const doAssign = async () => {
-    if (!assignOpen) return;
-    setAssignLoading(true);
-    try {
-      await reassignTicket(supabase as never, assignOpen.id, { tecnicoId: assignId || null });
-      setTickets(prev=> prev.map(x=> x.id===assignOpen.id? {...x, tecnicoAsignadoId: assignId || null}:x));
-      setFeedback({ visible:true, variant:'success', title:'Ticket asignado', message:`Ticket #${assignOpen.numero} asignado correctamente`});
-      setAssignOpen(null);
-    } catch (e) { setFeedback({ visible:true, variant:'error', title:'Error al asignar', message:getErrorMessage(e)}); } finally { setAssignLoading(false); }
-  };
-
+  // La asignación se hace desde el detalle del ticket, no desde esta lista
   if (mesaId == null) {
     return <View style={s.center}><Text style={s.emptyTitle}>Sin dependencia asignada</Text><Text style={s.mutedCenter}>Tu perfil no tiene mesa asignada. Contacta a un administrador.</Text></View>;
   }
@@ -248,9 +217,6 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
       </View>
       <View nativeID="admin-export-root" style={{ flex: 1 }}>
       <FlatList data={tickets} keyExtractor={t=>t.id} contentContainerStyle={s.listContent}
-        numColumns={isWide ? 2 : 1}
-        key={isWide ? 'grid-2' : 'list-1'}
-        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
         ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin tickets</Text><Text style={s.mutedCenter}>No hay tickets para esta dependencia.</Text></View>}
         renderItem={({item})=> {
           const marcado = seleccion.includes(item.id);
@@ -280,34 +246,12 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
             <View style={s.metaRow}>
               <TecnicoChip nombre={item.tecnicoAsignadoId ? (tecnicoNombres[item.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
             </View>
-            <View style={s.actions}>
-              <Pressable onPress={()=>openAssign(item)} style={s.btnGhost} accessibilityRole="button" accessibilityLabel={`Asignar técnico ticket #${item.numero}`}><Text style={s.btnGhostText}>Asignar técnico</Text></Pressable>
-            </View>
           </Card>
           </Pressable>
           );
         }}
       />
       </View>
-      <Modal visible={!!assignOpen} transparent animationType="fade" onRequestClose={()=>setAssignOpen(null)}>
-        <View style={s.modalBackdrop}><View style={s.modalCard}>
-          <Text style={s.modalTitle}>Asignar técnico · #{assignOpen?.numero}</Text>
-          <Text style={s.modalHint}>Solo técnicos de la dependencia {assignOpen?.mesaId}</Text>
-          {tecnicos.length===0? <Text style={s.muted}>Sin técnicos en esta dependencia</Text>:
-            <FilterDropdown
-              label="Técnico de la dependencia"
-              value={assignId as never}
-              options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicos.map((t) => ({ value: t.id as never, label: (t.full_name ?? t.email ?? 'Técnico') }))]}
-              onSelect={(v) => setAssignId(v as string)}
-              placeholder="Seleccionar técnico"
-            />
-          }
-          <View style={s.modalActions}>
-            <Pressable onPress={()=>setAssignOpen(null)} style={s.btnGhost}><Text style={s.btnGhostText}>Cancelar</Text></Pressable>
-            <Pressable onPress={doAssign} disabled={assignLoading} style={[s.btnPrimary, assignLoading && {opacity:0.6}]}><Text style={s.btnPrimaryText}>{assignLoading?'Guardando…':'Guardar'}</Text></Pressable>
-          </View>
-        </View></View>
-      </Modal>
       {feedback? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={()=>setFeedback(null)} onConfirm={()=>setFeedback(null)}/>:null}
       {modoBulk || resultadoBulk ? (
         <BulkPanel
@@ -363,17 +307,6 @@ const s = StyleSheet.create({
   cardId:{fontSize:10, fontWeight:'700', color:theme.colors.mutedSoft},
   priority:{fontSize:10, fontWeight:'800', color:theme.colors.primaryDark},
   name:{fontSize:14, fontWeight:'800', color:theme.colors.text},
-  actions:{flexDirection:'row', justifyContent:'flex-end', alignItems:'center', marginTop:4},
-  btnGhost:{height:36, borderRadius:theme.radius.sm, borderWidth:1, borderColor:theme.colors.border, backgroundColor:theme.colors.surfaceAlt, alignItems:'center', justifyContent:'center', paddingHorizontal:12},
-  btnGhostText:{fontSize:11, fontWeight:'700', color:theme.colors.text},
   empty:{alignItems:'center', padding:32, gap:10, backgroundColor:theme.colors.surface, borderRadius:theme.radius.lg, borderWidth:1, borderColor:theme.colors.border},
   emptyTitle:{fontSize:14, fontWeight:'700', color:theme.colors.text},
-  modalBackdrop:{flex:1, backgroundColor:'rgba(15,23,42,0.45)', alignItems:'center', justifyContent:'center', padding:16},
-  modalCard:{width:'100%', maxWidth:520, backgroundColor:theme.colors.surface, borderRadius:theme.radius.lg, padding:16, gap:12, borderWidth:1, borderColor:theme.colors.border},
-  modalTitle:{fontSize:16, fontWeight:'800', color:theme.colors.text},
-  modalHint:{fontSize:11, color:theme.colors.muted},
-  techRow:{padding:10, borderWidth:1, borderColor:theme.colors.border, borderRadius:8, backgroundColor:theme.colors.surfaceAlt},
-  techRowActive:{borderColor:theme.colors.primary, backgroundColor:theme.colors.primarySoft},
-  techText:{fontSize:12, fontWeight:'700', color:theme.colors.text},
-  modalActions:{flexDirection:'row', justifyContent:'flex-end', gap:10, marginTop:4},
 });

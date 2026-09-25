@@ -1,10 +1,42 @@
 // FilterBar — RF-17 filtros combinables: rango/dependencia/tecnico/categoria/prioridad/estado
 import * as React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { theme } from '../theme.js';
 import { getMesaIdPorDominio } from '../../ia.js';
 import { FilterDropdown } from '../FilterDropdown.js';
 import { ESTADO_OPTIONS, PRIORIDAD_OPTIONS } from '../../filters.js';
+
+// Selector de fecha por dropdowns día/mes/año (todos los filtros van por dropdown).
+// Compone 'YYYY-MM-DD'; si falta alguna parte emite '' (sin filtro).
+const MESES = [
+  { value: '01', label: 'Ene' }, { value: '02', label: 'Feb' }, { value: '03', label: 'Mar' },
+  { value: '04', label: 'Abr' }, { value: '05', label: 'May' }, { value: '06', label: 'Jun' },
+  { value: '07', label: 'Jul' }, { value: '08', label: 'Ago' }, { value: '09', label: 'Sep' },
+  { value: '10', label: 'Oct' }, { value: '11', label: 'Nov' }, { value: '12', label: 'Dic' },
+];
+const DIAS = Array.from({ length: 31 }, (_, i) => ({ value: String(i + 1).padStart(2, '0'), label: String(i + 1).padStart(2, '0') }));
+const ANIOS = Array.from({ length: 7 }, (_, i) => ({ value: String(new Date().getFullYear() - i), label: String(new Date().getFullYear() - i) }));
+
+function splitFecha(v?: string): { d: string; m: string; y: string } {
+  const mt = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v ?? '');
+  return mt ? { y: mt[1], m: mt[2], d: mt[3] } : { d: '', m: '', y: '' };
+}
+
+function DatePickers({ label, value, onChange }: { label: string; value?: string; onChange: (v: string) => void }) {
+  const p = splitFecha(value);
+  const set = (k: 'd' | 'm' | 'y', v: string) => {
+    const next = { ...p, [k]: String(v) };
+    onChange(next.d && next.m && next.y ? `${next.y}-${next.m}-${next.d}` : '');
+  };
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <Text style={s.dateLabel}>{label}</Text>
+      <FilterDropdown label="Día" value={p.d as never} placeholder="DD" options={[{ value: '' as never, label: '—' }, ...DIAS as never[]]} onSelect={(v) => set('d', String(v))} />
+      <FilterDropdown label="Mes" value={p.m as never} placeholder="MM" options={[{ value: '' as never, label: '—' }, ...MESES as never[]]} onSelect={(v) => set('m', String(v))} />
+      <FilterDropdown label="Año" value={p.y as never} placeholder="AAAA" options={[{ value: '' as never, label: '—' }, ...ANIOS as never[]]} onSelect={(v) => set('y', String(v))} />
+    </View>
+  );
+}
 
 export type FilterRange = 'hoy' | '7d' | '30d' | 'custom';
 
@@ -145,10 +177,8 @@ export function FilterBar({
       ) : null}
       {range === 'custom' && onCustomDesdeChange && onCustomHastaChange ? (
         <View style={s.dateRow}>
-          <Text style={s.dateLabel}>Desde</Text>
-          <TextInput value={customDesde ?? ''} onChangeText={onCustomDesdeChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.colors.muted} style={s.dateInput} />
-          <Text style={s.dateLabel}>Hasta</Text>
-          <TextInput value={customHasta ?? ''} onChangeText={onCustomHastaChange} placeholder="YYYY-MM-DD" placeholderTextColor={theme.colors.muted} style={s.dateInput} />
+          <DatePickers label="Desde" value={customDesde} onChange={onCustomDesdeChange} />
+          <DatePickers label="Hasta" value={customHasta} onChange={onCustomHastaChange} />
         </View>
       ) : null}
     </View>
@@ -171,7 +201,6 @@ const s = StyleSheet.create({
   exportBtn: { marginLeft: 8, backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   exportText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   secondRow: { flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' },
-  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8, flexWrap: 'wrap' },
   dateLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.muted },
-  dateInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6, fontSize: 12, minWidth: 110, backgroundColor: theme.colors.surface },
 });

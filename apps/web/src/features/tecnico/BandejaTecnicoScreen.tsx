@@ -1,14 +1,14 @@
 // RF-12 — Módulo Técnico: bandeja asignada prioridad→antigüedad (Stitch #0E87E2 / #FD7C06)
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ESTADOS, PRIORIDADES, listAssignedTickets, fetchMesas, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ESTADO_OPTIONS, PRIORIDAD_OPTIONS, FilterDropdown, listAssignedTickets, fetchMesas, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { TecnicoStackParamList } from '../../navigation/types';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 type Props = { navigation: NativeStackNavigationProp<TecnicoStackParamList, 'Bandeja'> };
 
@@ -41,8 +41,6 @@ function relativeTime(iso: string): string {
 }
 
 export function BandejaTecnicoScreen({ navigation }: Props) {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 1024;
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -198,25 +196,9 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
           />
           {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn} accessibilityRole="button" accessibilityLabel="Limpiar búsqueda"><Text style={s.clearText}>×</Text></Pressable>}
         </View>
-        <View style={s.chipsBlock}>
-          <Text style={s.chipsLabel}>Estado</Text>
-          <View style={s.chipsRow}>
-            {(['' as const, ...ESTADOS] as const).map((e) => (
-              <Pressable key={String(e)} onPress={() => setEstado(e as EstadoTicket | '')} style={[s.chip, estado === e && s.chipActive]} accessibilityRole="button" accessibilityState={{ selected: estado === e }}>
-                <Text style={[s.chipText, estado === e && s.chipTextActive]}>{e ? prettyEstado(e) : 'Todos'}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-        <View style={s.chipsBlock}>
-          <Text style={s.chipsLabel}>Prioridad</Text>
-          <View style={s.chipsRow}>
-            {(['' as const, ...PRIORIDADES] as const).map((p) => (
-              <Pressable key={String(p)} onPress={() => setPrioridad(p as PrioridadTicket | '')} style={[s.chip, prioridad === p && s.chipActive]} accessibilityRole="button" accessibilityState={{ selected: prioridad === p }}>
-                <Text style={[s.chipText, prioridad === p && s.chipTextActive]}>{p || 'Todas'}</Text>
-              </Pressable>
-            ))}
-          </View>
+        <View style={s.dropdownRow}>
+          <FilterDropdown label="Estado" value={estado} options={ESTADO_OPTIONS as never} onSelect={(v) => setEstado(v as EstadoTicket | '')} placeholder="Todos" />
+          <FilterDropdown label="Prioridad" value={prioridad} options={PRIORIDAD_OPTIONS as never} onSelect={(v) => setPrioridad(v as PrioridadTicket | '')} placeholder="Todas" />
         </View>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
@@ -231,9 +213,7 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
         data={tickets}
         keyExtractor={(t) => t.id}
         renderItem={renderItem}
-        numColumns={isWide ? 2 : 1}
-        key={isWide ? 'grid-2' : 'list-1'}
-        columnWrapperStyle={isWide ? { gap: 12 } : undefined}
+        numColumns={1}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
@@ -300,22 +280,7 @@ const s = StyleSheet.create({
   search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   clearBtn: { padding: 6, marginLeft: 6 },
   clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
-  chipsBlock: { gap: 6 },
-  chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] - 2 }, // 6
-  chip: {
-    paddingHorizontal: theme.space[4] - 2, // 14
-    paddingVertical: theme.space[2] - 2, // 6
-    height: 32,
-    justifyContent: 'center',
-    borderRadius: theme.radius.full,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  chipActive: { backgroundColor: theme.colors.primarySoft, borderColor: theme.colors.primary, borderWidth: 1 },
-  chipText: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
-  chipTextActive: { color: theme.colors.primaryDark, fontWeight: '700' },
+  dropdownRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
   filterFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: theme.space[2], borderTopWidth: 1, borderTopColor: theme.colors.border },
   filterCount: { fontSize: 11, fontWeight: '600', color: theme.colors.muted },
   linkBtn: { paddingVertical: 4, paddingHorizontal: 8 },
