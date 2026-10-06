@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 
@@ -101,7 +102,7 @@ export function AdminCategoriasScreen() {
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: any) { console.warn('[AdminCategorias] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-categorias-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e instanceof Error ? e.message : String(e) }); }
   }, [rows]);
   const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PNG solo disponible en web — en móvil usa CSV' }); }, []);
   const onExportPdf = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PDF solo disponible en web — en móvil usa CSV' }); }, []);

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
@@ -86,7 +87,7 @@ export function AdminUsuariosScreen() {
     } catch (e) {
       const msg = explainUserError(e);
       setErrorMsg(msg);
-      console.warn('[AdminUsuarios] listUsers', e);
+      reportError(e, { flujo: 'admin-usuarios-list' });
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -123,7 +124,7 @@ export function AdminUsuariosScreen() {
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: any) { console.warn('[AdminUsuarios] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-usuarios-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: explainUserError(e) }); }
   }, [users, hasActiveFilters]);
   const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PNG solo está disponible en web (motivo: plataforma móvil). Usa CSV.' }); }, []);
   const onExportPdf = useCallback(async () => { setFeedback({ visible: true, variant: 'error', title: 'Exportación no disponible', message: 'Exportar PDF solo está disponible en web (motivo: plataforma móvil). Usa CSV.' }); }, []);

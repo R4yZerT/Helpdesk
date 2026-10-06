@@ -62,7 +62,7 @@ export function MisSolicitudesScreen({ navigation }: Props) {
       setPage(targetPage);
       setTickets((prev) => (opts.reset || isFirst ? res.data : [...prev, ...res.data]));
     } catch (e) {
-      console.warn('[MisSolicitudes] listMyTickets', e);
+      reportError(e, { flujo: 'mis-solicitudes-list' });
     } finally {
       setLoading(false);
       setLoadingMore(false);

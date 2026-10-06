@@ -1,6 +1,7 @@
 // RF-09 — Tabs + archivos + composer — sub-componente de TicketDetailScreen
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { supabase } from '../../../lib/supabase';
+import { reportError } from '../../../lib/sentry';
 import { TicketCommentList, TicketCommentComposer, TicketHistoryList, theme } from '@helpdesk/shared';
 import type { TicketDetail } from '@helpdesk/shared';
 
@@ -52,7 +53,7 @@ export function TicketTabs({ detail, activeTab, tecnicoNombres, mesas, categoria
         ) : (
           <View style={{ gap: 8 }}>
             {adjuntos.map((a) => (
-              <Pressable key={a.id} onPress={async () => { try { const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60); const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl; if (url) await Linking.openURL(url); } catch (e) { console.warn('[TicketTabs] open adjunto', e); } }} style={styles.adjRow}>
+              <Pressable key={a.id} onPress={async () => { try { const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60); const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl; if (url) await Linking.openURL(url); } catch (e) { reportError(e, { flujo: 'ticket-adjunto-open' }); } }} style={styles.adjRow}>
                 {String(a.mime ?? '').startsWith('image/') ? (
                   <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={styles.adjThumb} />
                 ) : (

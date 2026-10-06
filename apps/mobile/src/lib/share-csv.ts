@@ -2,6 +2,7 @@
 // En web se usa downloadCsv del shared (descarga directa); este helper solo cubre iOS/Android.
 // Require diferido: evita romper el bundle en plataformas sin soporte nativo (web, Expo Go parcial).
 import { Platform } from 'react-native';
+import { reportError } from './sentry';
 
 export async function shareCsvNativo(filename: string, csv: string): Promise<boolean> {
   if (Platform.OS === 'web') return false;
@@ -18,7 +19,7 @@ export async function shareCsvNativo(filename: string, csv: string): Promise<boo
     await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: filename });
     return true;
   } catch (e) {
-    console.warn('[shareCsv] compartir nativo no disponible', e);
+    reportError(e, { flujo: 'share-csv-nativo' });
     return false;
   }
 }
