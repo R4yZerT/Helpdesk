@@ -16,6 +16,7 @@ function toError(error: unknown): Error {
 
 export function reportError(error: unknown, context?: Record<string, string>): void {
   if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    // Guarda intencional (H7): traza local solo en dev; en prod el error va a Sentry.
     // eslint-disable-next-line no-console
     console.error('[reportError]', error, context ?? '');
   }

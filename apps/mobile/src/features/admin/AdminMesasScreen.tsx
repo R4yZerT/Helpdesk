@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 import { MesaEquipoModal } from './MesaEquipoModal';
@@ -112,7 +113,7 @@ export function AdminMesasScreen() {
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: any) { console.warn('[AdminMesas] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e?.message }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e instanceof Error ? e.message : String(e) }); }
   }, [mesas]);
   const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PNG solo disponible en web — en móvil usa CSV' }); }, []);
   const onExportPdf = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PDF solo disponible en web — en móvil usa CSV' }); }, []);

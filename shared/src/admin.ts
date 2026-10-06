@@ -447,8 +447,7 @@ export async function updateUser(
       if (/Cédula ya registrada|Correo ya registrado|Contraseña|Email inválido|Cédula 5-15|Mínimo|Máximo/i.test(msg)) throw e;
       // Si falla Edge/auth pero solo era email/password/cedula, propagar; si hay además cambios de profile, continuar con profile update
       if (patch.fullName === undefined && patch.rol === undefined && patch.mesaId === undefined && patch.activo === undefined) throw e;
-      // caso mixto: log pero continuar para actualizar otros campos de profile
-      console.warn('[updateUser] edge/auth fallback falló, continuando con profile update:', msg);
+      // caso mixto: continuar con profile update (el error de edge/auth ya se propaga al llamador si no hay cambios de profile)
     }
   }
   const payload: Record<string, unknown> = {};

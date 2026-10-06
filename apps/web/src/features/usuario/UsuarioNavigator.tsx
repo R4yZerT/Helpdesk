@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { theme, AppShell, IconInbox, IconPlus, IconUser, NotificationBell, PaletteHost, listMyTickets, type ComandoNav, type TicketResultado } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
@@ -82,7 +83,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
         if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
         return;
       }
-    } catch (e) { console.warn('[UsuarioNavigator] navigate', e); }
+    } catch (e) { reportError(e, { flujo: 'usuario-navigate', destino: name }); }
     nav?.navigate(name as never);
   };
   const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
