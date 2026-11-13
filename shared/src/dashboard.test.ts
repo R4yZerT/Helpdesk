@@ -49,6 +49,15 @@ describe('dashboard getKPIs', () => {
     expect(k.ingresadosHoy).toBe(2);
     expect(k.slaVencidos).toBe(1);
     expect(k.slaRiesgo).toBe(k.slaVencidos! + k.slaPorVencer!);
+    expect(k.ttrHoras).toBeNull();
+  });
+  it('calcula TTR solo con resoluciones disponibles; sin fecha no inventa un valor', async () => {
+    const rows = [
+      { estado: 'cerrado', creado_en: '2026-01-01T00:00:00Z', fecha_resolucion: '2026-01-01T04:00:00Z' },
+      { estado: 'solucionado', creado_en: '2026-01-01T00:00:00Z', fecha_resolucion: '2026-01-01T06:00:00Z' },
+    ];
+    const kpis = await getKPIs(mockClientFallback(rows), {});
+    expect(kpis.ttrHoras).toBe(5);
   });
   it('fallback propaga error de tickets', async () => {
     const client = { rpc: async () => { throw new Error('x'); }, from: () => mockQuery({ error: { message: 'db caida' } }) } as never;

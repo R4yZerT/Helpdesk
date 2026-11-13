@@ -1,5 +1,5 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere dependencia + categoría → prioridad bloqueada
-// La IA no sugiere técnico: el ticket entra a la cola de la dependencia.
+// La asignación del técnico se realiza de forma automática en la base de datos.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
@@ -13,13 +13,11 @@ import {
   getPrioridadPorCategoria,
   resolverMesaId,
   predecirCategoria,
-  listTecnicosPorMesa,
   registrarSugerenciaIa,
   type CreateTicketInput,
   type PrediccionCategoria,
   type Mesa,
   type TicketCategoria,
-  type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { Card, Divider, useFeedback } from '@helpdesk/shared';
@@ -43,7 +41,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     descripcion: '',
     prioridad: 'media',
     mesaId: null,
-    tecnicoAsignadoId: null,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateTicketInput, string>>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -51,7 +48,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const [iaLoading, setIaLoading] = useState(false);
   // Si el usuario elige dependencia/categoría manualmente, la IA no debe sobrescribir.
   const eleccionManualRef = useRef(false);
-  const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: Blob }[]>([]);
@@ -73,16 +69,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Técnicos disponibles de la dependencia seleccionada (para confirmar/cambiar)
-  useEffect(() => {
-    if (form.mesaId == null) { setTecnicosMesa([]); return; }
-    let alive = true;
-    listTecnicosPorMesa(supabase, form.mesaId)
-      .then((t) => { if (alive) setTecnicosMesa(t.filter((x) => x.activo)); })
-      .catch(() => { if (alive) setTecnicosMesa([]); });
-    return () => { alive = false; };
-  }, [form.mesaId]);
 
   // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars.
   // BETO primero (micro-API), reglas locales como fallback. Solo auto-aplica si el
@@ -124,7 +110,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   };
 
   const resetTrasCrear = () => {
-    setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
+    setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
     setAdjuntos([]); setErrors({}); setTouched({}); setSugerencia(null); eleccionManualRef.current = false; navigation?.goBack?.();
   };
 
@@ -183,7 +169,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       categoriaId: c.id,
       prioridad: getPrioridadPorCategoria(c.id, categorias),
       mesaId: resolverMesaId(c.dominio, mesas),
-      tecnicoAsignadoId: null,
     }));
   };
 
@@ -300,7 +285,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             touched={touched}
             categorias={categorias}
             mesas={mesas}
-            tecnicosMesa={tecnicosMesa}
             sugerencia={sugerencia}
             iaLoading={iaLoading}
             onChange={setForm}

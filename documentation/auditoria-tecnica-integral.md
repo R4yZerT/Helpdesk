@@ -275,3 +275,32 @@ La auditoría se declara **cerrada** cuando:
 ---
 
 > **Próximo paso (actualizado 2026-09-23):** ejecutar Sprint 1 (Sentry real + cierre H5 `any`). Ver §3. Branch de trabajo sugerida: `docs/cierre-auditoria-h5-h7` o continuar en feature actual.
+
+## 8. Actualización de flujo de tickets (2026-11-13)
+
+Esta sección complementa los hallazgos históricos anteriores; no implica que la
+configuración remota de Supabase o los workflows de producción hayan sido verificados.
+
+- La creación desde web y móvil ya no permite escoger técnico. La base de datos
+  asigna al técnico activo con menor carga ponderada dentro de la misma mesa;
+  prioridad y tickets activos próximos a vencer SLA elevan la carga. Si no hay
+  candidatos, el ticket permanece en cola. Las afinidades fueron retiradas.
+- El dueño puede reabrir un ticket cerrado (estado `devuelto`) y enviar una
+  encuesta de cuatro calificaciones de 1 a 5 con comentario opcional.
+- La creación y reapertura tienen validaciones en migraciones/RLS además de la
+  UI. Las migraciones nuevas requieren ejecución/verificación contra Supabase
+  local o de CI; no se consideran desplegadas en producción por existir en el repo.
+- Los KPIs son consultas/RPC sobre tickets. El fallback de TTR calcula el promedio
+  usando cierres disponibles y presenta `—` si no hay muestra, en vez de inventar
+  un valor. La vista de pronóstico ML lee `pronosticos_picos`, cuyos datos se
+  generan por el proceso ML; su frecuencia efectiva depende del workflow
+  desplegado. La suscripción Realtime del dashboard reacciona a cambios de
+  `tickets` y agrupa ráfagas con 600 ms de debounce; eso no vuelve en tiempo real
+  las métricas alimentadas por procesos programados.
+- El dashboard todavía ejecuta varias consultas agregadas por recarga. El debounce
+  reduce ráfagas, pero no sustituye consolidar agregados, corregir filtros de RPC,
+  paginar los fallbacks ni medir p50/p95. La frecuencia/configuración efectiva de
+  Cron, Realtime y publicación de tablas en producción queda pendiente de verificar.
+- Límite arquitectónico pendiente: `shared` aún mezcla UI, dominio y acceso a
+  Supabase; conviene separar contratos/datos, casos de uso y componentes visuales
+  en cambios graduales con pruebas de integración RLS.

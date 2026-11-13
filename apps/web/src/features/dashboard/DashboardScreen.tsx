@@ -85,8 +85,15 @@ export function DashboardScreen() {
 
   React.useEffect(() => { setLoading(true); load(); }, [load]);
   React.useEffect(() => {
-    const ch = supabase.channel('dashboard-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => load()).subscribe();
-    return () => { supabase.removeChannel(ch); };
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const ch = supabase.channel('dashboard-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => { void load(); }, 600);
+    }).subscribe();
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(ch);
+    };
   }, [load]);
   React.useEffect(() => {
     fetchMesas(supabase).then(setMesas).catch((err) => reportError(err, { flujo: 'dashboard-mesas' }));

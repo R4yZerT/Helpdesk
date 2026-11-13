@@ -12,7 +12,7 @@ export type DashboardFilters = {
   tecnicoId?: string;
 };
 
-export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number };
+export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number | null; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number };
 export type StatsEstado = { estado: EstadoTicket; count: number }[];
 export type StatsPrioridad = { prioridad: PrioridadTicket; count: number }[];
 export type EvolucionPunto = { dia: string; mesaId: number; count: number };
@@ -63,7 +63,7 @@ export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}):
     }
   } catch (_) { /* fallback */ }
   // Fallback cliente usando SLA real (critica 60m, alta 4h, media 24h, baja 72h)
-  let q = client.from('tickets').select('id,estado,prioridad,creado_en,sla_vence_en', { count: 'exact' });
+  let q = client.from('tickets').select('id,estado,prioridad,creado_en,sla_vence_en,fecha_resolucion', { count: 'exact' });
   q = applyFilters(q, f);
   const { data, count, error } = await q;
   if (error) throw new Error(error.message);
@@ -85,7 +85,14 @@ export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}):
     }
   }
   const slaRiesgo = slaVencidos + slaPorVencer;
-  return { abiertos, slaRiesgo, ttrHoras: 4.2, ingresadosHoy, total, slaVencidos, slaPorVencer };
+  const tiemposResolucion = rows
+    .filter((r) => r.fecha_resolucion && (r.estado === 'cerrado' || r.estado === 'solucionado'))
+    .map((r) => (new Date(r.fecha_resolucion).getTime() - new Date(r.creado_en).getTime()) / 3600000)
+    .filter((horas) => Number.isFinite(horas) && horas >= 0);
+  const ttrHoras = tiemposResolucion.length
+    ? tiemposResolucion.reduce((totalHoras, horas) => totalHoras + horas, 0) / tiemposResolucion.length
+    : null;
+  return { abiertos, slaRiesgo, ttrHoras, ingresadosHoy, total, slaVencidos, slaPorVencer };
 }
 
 export async function getStatsPorEstado(client: SupabaseClient, f: DashboardFilters = {}): Promise<StatsEstado> {

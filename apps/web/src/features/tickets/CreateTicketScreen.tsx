@@ -1,5 +1,5 @@
 // RF-06 — Crear solicitud: descripción primero → IA sugiere dependencia + categoría → prioridad bloqueada
-// La IA no sugiere técnico: el ticket entra a la cola de la dependencia.
+// La asignación del técnico se realiza de forma automática en la base de datos.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
@@ -12,13 +12,11 @@ import {
   getPrioridadPorCategoria,
   resolverMesaId,
   predecirCategoria,
-  listTecnicosPorMesa,
   registrarSugerenciaIa,
   type CreateTicketInput,
   type PrediccionCategoria,
   type Mesa,
   type TicketCategoria,
-  type TecnicoDeMesa,
 } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { Card, Badge, Divider, FeedbackModal, FilterDropdown } from '@helpdesk/shared';
@@ -39,7 +37,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     descripcion: '',
     prioridad: 'media',
     mesaId: null,
-    tecnicoAsignadoId: null,
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CreateTicketInput, string>>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -48,7 +45,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Si el usuario elige dependencia/categoría manualmente, la IA no debe sobrescribir.
   const eleccionManualRef = useRef(false);
-  const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
   const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
@@ -71,16 +67,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  // Técnicos disponibles de la dependencia seleccionada (para confirmar/cambiar)
-  useEffect(() => {
-    if (form.mesaId == null) { setTecnicosMesa([]); return; }
-    let alive = true;
-    listTecnicosPorMesa(supabase, form.mesaId)
-      .then((t) => { if (alive) setTecnicosMesa(t.filter((x) => x.activo)); })
-      .catch(() => { if (alive) setTecnicosMesa([]); });
-    return () => { alive = false; };
-  }, [form.mesaId]);
 
   // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars.
   // BETO primero (micro-API), reglas locales como fallback. Solo auto-aplica si el
@@ -145,7 +131,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       categoriaId: c.id,
       prioridad: getPrioridadPorCategoria(c.id, categorias),
       mesaId: resolverMesaId(c.dominio, mesas),
-      tecnicoAsignadoId: null,
     }));
   };
 
@@ -217,7 +202,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           message: msg,
         });
         // limpiar formulario pero dejar visible el error de adjuntos
-        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
+        setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
         setAdjuntos([]);
         setErrors({});
         setTouched({});
@@ -231,7 +216,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
         title: 'Solicitud creada',
         message: `Ticket #${res.numero} creado correctamente · Prioridad ${form.prioridad} · Mesa ${mesas.find(m => m.id === form.mesaId)?.nombre ?? form.mesaId}`,
         onOk: () => {
-          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null, tecnicoAsignadoId: null });
+          setForm({ categoriaId: 0, asunto: '', descripcion: '', prioridad: 'media', mesaId: null });
           setAdjuntos([]);
           setErrors({});
           setTouched({});
@@ -288,10 +273,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     : []
   ).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` }));
   const iaFuente = sugerencia?.fuente === 'beto' ? 'modelo BETO' : 'reglas locales';
-  const tecnicoOptions = [
-    { value: '', label: 'Sin asignar (cola de mesa)' },
-    ...tecnicosMesa.map(t => ({ value: t.id, label: t.fullName })),
-  ];
 
   return (
     <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled" style={s.bg}>
@@ -380,7 +361,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
                   // si cambia dependencia, limpia categoría que no pertenece a esa mesa
                   const keepCat = f.categoriaId ? categorias.find(c => c.id === f.categoriaId) : null;
                   const keep = keepCat && resolverMesaId(keepCat.dominio, mesas) === id ? f.categoriaId : 0;
-                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep, categorias) : f.prioridad, tecnicoAsignadoId: null };
+                  return { ...f, mesaId: id, categoriaId: keep, prioridad: keep ? getPrioridadPorCategoria(keep, categorias) : f.prioridad };
                 });
                 setTouched(t => ({ ...t, mesaId: true }));
               }}
@@ -401,16 +382,7 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
             />
           </View>
           <Text style={s.sectionHint}>La IA sugiere dependencia y categoría al escribir (auto-aplica solo si aún no elegiste). Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
-          <FilterDropdown<string>
-            label="Técnico (opcional)"
-            value={form.tecnicoAsignadoId ?? ''}
-            options={tecnicoOptions}
-            placeholder={form.mesaId ? 'Seleccionar técnico' : 'Elige dependencia primero'}
-            onSelect={(v) => {
-              setForm(f => ({ ...f, tecnicoAsignadoId: v === '' ? null : String(v) }));
-            }}
-          />
-          <Text style={s.sectionHint}>Vacío = cola de la dependencia. La IA no sugiere técnico: lo asigna el jefe de mesa.</Text>
+          <Text style={s.sectionHint}>El técnico se asigna automáticamente según su carga activa y la urgencia del SLA.</Text>
           {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 

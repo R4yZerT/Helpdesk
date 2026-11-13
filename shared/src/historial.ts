@@ -1,5 +1,5 @@
 // Historial y ciclo de vida por rol — helpers compartidos web/mobile
-// - nextEstadosParaRol: el solicitante solo confirma cierre/devuelve cuando está solucionado
+// - nextEstadosParaRol: el solicitante confirma/devuelve desde solucionado y puede reabrir un ticket cerrado
 // - formatDuracion: "2 h 15 min" entre etapas del historial
 // - formatFechaHora: fecha corta es-ES con hora
 
@@ -10,7 +10,7 @@ export const ESTADOS_SOLICITANTE_CIERRE: readonly EstadoTicket[] = ['cerrado', '
 
 /**
  * Siguientes estados visibles según rol.
- * Solicitante (usuario): solo confirmar cierre o devolver cuando está solucionado.
+ * Solicitante (usuario): confirmar/devolver una solución o reabrir su ticket cerrado.
  * Técnico/jefe/administrador: toda la FSM.
  */
 export function nextEstadosParaRol(
@@ -19,6 +19,7 @@ export function nextEstadosParaRol(
   todos: readonly EstadoTicket[],
 ): EstadoTicket[] {
   if (rol === 'usuario') {
+    if (estadoActual === 'cerrado') return ['devuelto'];
     if (estadoActual !== 'solucionado') return [];
     return (todos as EstadoTicket[]).filter(
       (e) => e === 'cerrado' || e === 'devuelto',

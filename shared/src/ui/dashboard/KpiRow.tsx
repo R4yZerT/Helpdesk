@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { KpiCard } from '../charts/KpiCard.js';
 
 type Props = {
-  kpis: { abiertos: number; slaRiesgo: number; ttrHoras: number; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number } | null;
+  kpis: { abiertos: number; slaRiesgo: number; ttrHoras: number | null; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number } | null;
   isWide: boolean;
 };
 
@@ -18,7 +18,7 @@ export function KpiRow({ kpis, isWide }: Props) {
     <View style={[s.grid, !isWide && s.gridCollapsed]}>
       <KpiCard label="Tickets abiertos" value={String(kpis?.abiertos ?? 0)} delta="+12% vs ayer" />
       <KpiCard label="SLA en riesgo" value={String(kpis?.slaRiesgo ?? 0)} delta={slaDelta} deltaTone={deltaTone} accent="orange" />
-      <KpiCard label="Tiempo medio" value={`${kpis?.ttrHoras ?? 4.2}h`} delta="-0.3h" />
+      <KpiCard label="Tiempo medio" value={kpis?.ttrHoras == null ? '—' : `${kpis.ttrHoras.toFixed(1)}h`} />
       <KpiCard label="Ingresados hoy" value={String(kpis?.ingresadosHoy ?? 0)} delta={`${kpis?.total ?? 0} total`} />
     </View>
   );

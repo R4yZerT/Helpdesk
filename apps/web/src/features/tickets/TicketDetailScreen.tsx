@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
-import { Badge, Card, Divider, theme, FeedbackModal, FilterDropdown, TicketCommentList, TicketCommentComposer, TicketHistoryList } from '@helpdesk/shared';
+import { Badge, Card, Divider, theme, FeedbackModal, FilterDropdown, TicketCommentList, TicketCommentComposer, TicketHistoryList, TicketSatisfactionCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
@@ -305,7 +305,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
-  // Ciclo de vida visible según rol: el solicitante solo confirma/deuelve desde solucionado
+  // El solicitante confirma/deuelve una solución o reabre un ticket cerrado.
   const nextEstados = nextEstadosParaRol(profile?.rol, ticket.estado as any, ESTADOS);
   const slaVence = (ticket as any).slaVenceEn ? new Date((ticket as any).slaVenceEn) : getSlaVencimiento(ticket.creadoEn, ticket.prioridad as any);
   const slaEstado = getSlaEstado({ creadoEn: ticket.creadoEn, prioridad: ticket.prioridad as any, estado: ticket.estado, venceEn: slaVence.toISOString(), fechaResolucion: ticket.fechaResolucion });
@@ -419,7 +419,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {nextEstados.map((e) => (
                   <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
-                    {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : 'Devolver al técnico'}</Text>}
+                    {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : ticket.estado === 'cerrado' ? 'Reabrir ticket' : 'Devolver al técnico'}</Text>}
                   </Pressable>
                 ))}
               </View>
@@ -460,6 +460,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         ) : null}
         {nextEstados.length === 0 && !canReassign && !showTrans ? <Text style={s.mutedSmall}>Sin acciones disponibles</Text> : null}
       </Card>
+      {isOwner && ticket.estado === 'cerrado' ? <TicketSatisfactionCard client={supabase} ticketId={ticket.id} /> : null}
 
       <Card style={{ gap: 10 }}>
         <Text style={s.section}>Progreso del Ticket</Text>
