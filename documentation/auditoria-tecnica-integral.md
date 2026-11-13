@@ -304,10 +304,15 @@ configuración remota de Supabase o los workflows de producción hayan sido veri
   segmentar. Esto evita resultados silenciosamente parciales, aunque los fallbacks
   siguen transfiriendo filas y no reemplazan agregaciones SQL dedicadas.
 - El dashboard consolida KPI, estado, prioridad, evolución y carga horaria en una
-  RPC filtrada; con alertas, catálogos, forecast y telemetría quedan aprox. 8
-  operaciones concurrentes por recarga. El debounce agrupa ráfagas. Sigue pendiente
-  medir p50/p95 y consolidar los agregados restantes. La frecuencia/configuración
-  efectiva de Cron, Realtime y publicación de tablas en producción queda pendiente.
+  RPC filtrada. Las recargas por cambios de tickets actualizan solo el snapshot y
+  alertas (2 operaciones); forecast y métricas IA, que cambian con mucha menor
+  frecuencia, se consultan por separado al montar. El debounce agrupa ráfagas.
+  Sigue pendiente medir p50/p95 y consolidar los agregados restantes. La
+  configuración efectiva de Cron, Realtime y publicación en producción queda pendiente.
+- Se instrumentaron spans Sentry para carga filtrada, actualización Realtime y datos
+  estáticos en web/móvil. Solo incluyen cantidad/tipo de filtros, nunca valores,
+  identificadores ni contenido de tickets. El SDK está muestreado al 10%; se requiere
+  tráfico real con DSN para observar distribuciones y calcular p50/p95.
 - Límite arquitectónico pendiente: `shared` aún mezcla UI, dominio y acceso a
   Supabase; conviene separar contratos/datos, casos de uso y componentes visuales
   en cambios graduales con pruebas de integración RLS.

@@ -3,7 +3,7 @@ import * as React from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { FilterBar, theme, getDashboardSnapshot, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, isEstadoTicket, isPrioridadTicket, type Mesa, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
-import { reportError } from '../../lib/sentry';
+import { reportError, withPerformanceSpan } from '../../lib/sentry';
 import { exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { KpiRow } from '@helpdesk/shared';
 import { EstadoPrioridadRow } from '@helpdesk/shared';
@@ -62,35 +62,54 @@ export function DashboardScreen() {
 
   const load = React.useCallback(async () => {
     try {
-      const [snapshot, pp, pr, pat, a, ms, ml, mia] = await Promise.all([
-        getDashboardSnapshot(supabase, filters),
-        getPicosPrediccion(supabase, { ...filters, dias: 30 }),
-        getPicosResumen(supabase, { ...filters, dias: 30 }),
-        getPatronesCategoria(supabase, { ...filters, dias: 30 }),
-        listAlertasIA(supabase, { estado: 'nueva' }),
-        mesas.length ? Promise.resolve(mesas) : fetchMesas(supabase),
-        getPronosticoSemanal(supabase),
-        getMetricasIaFeedback(supabase),
-      ]);
-      setKpis(snapshot.kpis); setPorEstado(snapshot.porEstado); setPorPrioridad(snapshot.porPrioridad); setEvolucion(snapshot.evolucion); setCarga(snapshot.carga); setPicos(pp); setPicosResumen(pr); setPatrones(pat); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
-      if (!mesas.length) setMesas(ms);
+      await withPerformanceSpan('Dashboard filtered load', 'dashboard.load', async () => {
+        const [snapshot, pp, pr, pat, a] = await Promise.all([
+          getDashboardSnapshot(supabase, filters),
+          getPicosPrediccion(supabase, { ...filters, dias: 30 }),
+          getPicosResumen(supabase, { ...filters, dias: 30 }),
+          getPatronesCategoria(supabase, { ...filters, dias: 30 }),
+          listAlertasIA(supabase, { estado: 'nueva' }),
+        ]);
+        setKpis(snapshot.kpis); setPorEstado(snapshot.porEstado); setPorPrioridad(snapshot.porPrioridad); setEvolucion(snapshot.evolucion); setCarga(snapshot.carga); setPicos(pp); setPicosResumen(pr); setPatrones(pat); setAlertas(a);
+      }, {
+        filter_count: Object.keys(filters).length,
+        has_date_range: Boolean(filters.desde || filters.hasta),
+        has_operational_filter: Boolean(filters.estado || filters.prioridad || filters.tecnicoId),
+      });
     } catch (err) {
       reportError(err, { flujo: 'dashboard-load' });
     } finally { setLoading(false); setRefreshing(false); }
-  }, [filters, mesas.length]);
+  }, [filters]);
 
   React.useEffect(() => { setLoading(true); load(); }, [load]);
+  const refreshTicketDerived = React.useCallback(async () => {
+    try {
+      await withPerformanceSpan('Dashboard realtime refresh', 'dashboard.refresh', async () => {
+        const [snapshot, nextAlerts] = await Promise.all([
+          getDashboardSnapshot(supabase, filters),
+          listAlertasIA(supabase, { estado: 'nueva' }),
+        ]);
+        setKpis(snapshot.kpis); setPorEstado(snapshot.porEstado); setPorPrioridad(snapshot.porPrioridad);
+        setEvolucion(snapshot.evolucion); setCarga(snapshot.carga); setAlertas(nextAlerts);
+      }, {
+        filter_count: Object.keys(filters).length,
+        has_operational_filter: Boolean(filters.estado || filters.prioridad || filters.tecnicoId),
+      });
+    } catch (err) {
+      reportError(err, { flujo: 'dashboard-realtime-refresh' });
+    }
+  }, [filters]);
   React.useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null;
     const ch = supabase.channel('dashboard-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
       if (refreshTimer) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => { void load(); }, 600);
+      refreshTimer = setTimeout(() => { void refreshTicketDerived(); }, 600);
     }).subscribe();
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       supabase.removeChannel(ch);
     };
-  }, [load]);
+  }, [refreshTicketDerived]);
   React.useEffect(() => {
     fetchMesas(supabase).then(setMesas).catch((err) => reportError(err, { flujo: 'dashboard-mesas' }));
     type CategoriaRow = { id: number; subcategoria: string | null; dominio: string };
@@ -105,6 +124,12 @@ export function DashboardScreen() {
       const rows = (data ?? []) as unknown as PerfilRow[];
       setTecnicos(rows.map((u) => ({ id: u.id, nombre: u.full_name ?? u.email ?? u.id })));
     });
+  }, []);
+  React.useEffect(() => {
+    void withPerformanceSpan('Dashboard static data', 'dashboard.static', async () => {
+      const [forecast, metrics] = await Promise.all([getPronosticoSemanal(supabase), getMetricasIaFeedback(supabase)]);
+      setPronosticoML(forecast); setMetricasIa(metrics);
+    }).catch((err) => reportError(err, { flujo: 'dashboard-static-data' }));
   }, []);
 
   const onToggleMesa = (id: number) => setMesaIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
