@@ -1,15 +1,14 @@
 // Dashboard queries — agregados para KPI/Donut/Prioridad/Evolución/Heatmap/Alertas
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EstadoTicket, PrioridadTicket } from './types.js';
+import { fetchDashboardTicketRows, fetchTicketsFiltrados, type DashboardQueryFilters } from './dashboard-repository.js';
+import { calcularKpisDesdeTickets } from './dashboard-analytics.js';
 
-export type DashboardFilters = {
-  desde?: string; // ISO date
-  hasta?: string;
-  mesaIds?: number[];
-  categoriaId?: number;
+export { fetchTicketsFiltrados } from './dashboard-repository.js';
+
+export type DashboardFilters = Omit<DashboardQueryFilters, 'estado' | 'prioridad'> & {
   estado?: EstadoTicket;
   prioridad?: PrioridadTicket;
-  tecnicoId?: string;
 };
 
 export type Kpis = { abiertos: number; slaRiesgo: number; ttrHoras: number | null; ingresadosHoy: number; total: number; slaVencidos?: number; slaPorVencer?: number };
@@ -23,122 +22,130 @@ export type PicoPrediccion = { dow: number; hour: number; mesaId: number | null;
 export type PicosResumen = { mesaId: number | null; mesaNombre: string | null; avgDia: number; forecast7d: number; forecast30d: number; peakHour: number | null; peakDow: number | null };
 export type PatronCategoria = { categoriaId: number; subcategoria: string; dominio: string; cntActual: number; cntPrevio: number; variacionPct: number; sharePct: number; tendencia: string };
 
-function applyFilters(q: any, f: DashboardFilters) {
-  if (f.desde) q = q.gte('creado_en', f.desde);
-  if (f.hasta) q = q.lte('creado_en', f.hasta);
-  if (f.mesaIds?.length) q = q.in('mesa_id', f.mesaIds);
-  if (f.categoriaId) q = q.eq('categoria_id', f.categoriaId);
-  if (f.estado) q = q.eq('estado', f.estado);
-  if (f.prioridad) q = q.eq('prioridad', f.prioridad);
-  if (f.tecnicoId) q = q.eq('tecnico_asignado_id', f.tecnicoId);
-  return q;
+function tieneFiltrosNoSoportadosPorRpc(f: DashboardFilters): boolean {
+  return Boolean(f.estado || f.prioridad || f.tecnicoId);
 }
 
-/** RF-18: tickets filtrados para export — respeta los 6 filtros combinables (RF-17) */
-export async function fetchTicketsFiltrados(
-  client: SupabaseClient,
-  f: DashboardFilters,
-  limit = 2000,
-): Promise<any[]> {
-  let q: any = client
-    .from('tickets')
-    .select('numero,asunto,estado,prioridad,mesa_id,categoria_id,creado_en,actualizado_en')
-    .order('creado_en', { ascending: false })
-    .limit(limit);
-  q = applyFilters(q, f);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
-  return (data ?? []) as any[];
-}
+export type DashboardSnapshot = {
+  kpis: Kpis;
+  porEstado: StatsEstado;
+  porPrioridad: StatsPrioridad;
+  evolucion: EvolucionPunto[];
+  carga: CargaCelda[];
+};
 
-export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}): Promise<Kpis> {
-  // Intenta RPC dashboard_kpis si existe (Sprint 6 migración); fallback a agregación cliente
+/** Recupera cinco agregados con una sola ida a Postgres; conserva fallback legado. */
+export async function getDashboardSnapshot(client: SupabaseClient, f: DashboardFilters = {}): Promise<DashboardSnapshot> {
   try {
-    const { data, error } = await (client as any).rpc('dashboard_kpis', {
-      p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null,
+    const { data, error } = await (client as any).rpc('dashboard_snapshot_filtrado', {
+      p_desde: f.desde ?? null,
+      p_hasta: f.hasta ?? null,
+      p_mesa_ids: f.mesaIds ?? null,
+      p_categoria_id: f.categoriaId ?? null,
+      p_estado: f.estado ?? null,
+      p_prioridad: f.prioridad ?? null,
+      p_tecnico_id: f.tecnicoId ?? null,
+    });
+    if (!error && data?.kpis) {
+      const number = (value: unknown) => value == null ? 0 : Number(value);
+      const rows = (value: unknown): Record<string, unknown>[] => Array.isArray(value) ? value : [];
+      const k = data.kpis as Record<string, unknown>;
+      return {
+        kpis: {
+          abiertos: number(k.abiertos),
+          total: number(k.total),
+          slaRiesgo: number(k.sla_riesgo),
+          ttrHoras: k.ttr_horas == null ? null : number(k.ttr_horas),
+          ingresadosHoy: number(k.ingresados_hoy),
+          slaVencidos: number(k.sla_vencidos),
+          slaPorVencer: number(k.sla_por_vencer),
+        },
+        porEstado: rows(data.estados).map((r) => ({ estado: String(r.estado) as EstadoTicket, count: number(r.count) })),
+        porPrioridad: rows(data.prioridades).map((r) => ({ prioridad: String(r.prioridad) as PrioridadTicket, count: number(r.count) })),
+        evolucion: rows(data.evolucion).map((r) => ({ dia: String(r.dia).slice(0, 10), mesaId: number(r.mesa_id), count: number(r.count) })),
+        carga: rows(data.carga_horaria).map((r) => {
+          const count = number(r.count);
+          return { dow: number(r.dow), hour: number(r.hour), count, nivel: nivel(count) };
+        }),
+      };
+    }
+  } catch (_) { /* fallback a consultas individuales */ }
+
+  const [kpis, porEstado, porPrioridad, evolucion, carga] = await Promise.all([
+    getKPIs(client, f),
+    getStatsPorEstado(client, f),
+    getStatsPorPrioridad(client, f),
+    getEvolucionPorMesa(client, { ...f, dias: 30 }),
+    getCargaHoraria(client, f),
+  ]);
+  return { kpis, porEstado, porPrioridad, evolucion, carga };
+}
+
+/** RF-18: exporta tickets filtrados con paginación y un límite explícito. */
+export async function getKPIs(client: SupabaseClient, f: DashboardFilters = {}): Promise<Kpis> {
+  // El RPC agrega dentro de Postgres y aplica todos los filtros activos.
+  try {
+    const { data, error } = await (client as any).rpc('dashboard_kpis_filtrado', {
+      p_desde: f.desde ?? null,
+      p_hasta: f.hasta ?? null,
+      p_mesa_ids: f.mesaIds ?? null,
+      p_categoria_id: f.categoriaId ?? null,
+      p_estado: f.estado ?? null,
+      p_prioridad: f.prioridad ?? null,
+      p_tecnico_id: f.tecnicoId ?? null,
     });
     if (!error && data?.length) {
       const r = data[0];
-      return { abiertos: Number(r.abiertos), total: Number(r.total), slaRiesgo: Number(r.sla_riesgo), ttrHoras: Number(r.ttr_horas), ingresadosHoy: Number(r.ingresados_hoy), slaVencidos: r.sla_vencidos != null ? Number(r.sla_vencidos) : undefined, slaPorVencer: r.sla_por_vencer != null ? Number(r.sla_por_vencer) : undefined };
+      return { abiertos: Number(r.abiertos), total: Number(r.total), slaRiesgo: Number(r.sla_riesgo), ttrHoras: r.ttr_horas == null ? null : Number(r.ttr_horas), ingresadosHoy: Number(r.ingresados_hoy), slaVencidos: r.sla_vencidos != null ? Number(r.sla_vencidos) : undefined, slaPorVencer: r.sla_por_vencer != null ? Number(r.sla_por_vencer) : undefined };
     }
   } catch (_) { /* fallback */ }
-  // Fallback cliente usando SLA real (critica 60m, alta 4h, media 24h, baja 72h)
-  let q = client.from('tickets').select('id,estado,prioridad,creado_en,sla_vence_en,fecha_resolucion', { count: 'exact' });
-  q = applyFilters(q, f);
-  const { data, count, error } = await q;
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as any[];
-  const total = count ?? rows.length;
-  const abiertos = rows.filter((r) => ['abierto', 'en_proceso', 'programado'].includes(r.estado)).length;
-  const hoy = new Date().toISOString().slice(0, 10);
-  const ingresadosHoy = rows.filter((r) => String(r.creado_en).slice(0, 10) === hoy).length;
-  const SLA_MIN = { critica: 60, alta: 240, media: 1440, baja: 4320 } as Record<string, number>;
-  const ahora = Date.now();
-  let slaVencidos = 0, slaPorVencer = 0;
-  for (const r of rows) {
-    if (r.estado === 'cerrado' || r.estado === 'solucionado') continue;
-    const vence = r.sla_vence_en ? new Date(r.sla_vence_en).getTime() : (new Date(r.creado_en).getTime() + (SLA_MIN[r.prioridad] ?? 1440) * 60000);
-    if (ahora > vence) slaVencidos++;
-    else {
-      const porVencerMs = Math.max(60, Math.floor((SLA_MIN[r.prioridad] ?? 1440) * 0.25)) * 60000;
-      if (ahora >= vence - porVencerMs) slaPorVencer++;
-    }
-  }
-  const slaRiesgo = slaVencidos + slaPorVencer;
-  const tiemposResolucion = rows
-    .filter((r) => r.fecha_resolucion && (r.estado === 'cerrado' || r.estado === 'solucionado'))
-    .map((r) => (new Date(r.fecha_resolucion).getTime() - new Date(r.creado_en).getTime()) / 3600000)
-    .filter((horas) => Number.isFinite(horas) && horas >= 0);
-  const ttrHoras = tiemposResolucion.length
-    ? tiemposResolucion.reduce((totalHoras, horas) => totalHoras + horas, 0) / tiemposResolucion.length
-    : null;
-  return { abiertos, slaRiesgo, ttrHoras, ingresadosHoy, total, slaVencidos, slaPorVencer };
+  const rows = await fetchDashboardTicketRows(
+    client,
+    'estado,prioridad,creado_en,sla_vence_en,fecha_resolucion',
+    f,
+  );
+  return calcularKpisDesdeTickets(rows);
 }
 
 export async function getStatsPorEstado(client: SupabaseClient, f: DashboardFilters = {}): Promise<StatsEstado> {
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f)) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_por_estado', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ estado: r.estado as EstadoTicket, count: Number(r.cnt) }));
   } catch (_) {}
-  let q = client.from('tickets').select('estado');
-  q = applyFilters(q, f);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const data = await fetchDashboardTicketRows(client, 'estado', f);
   const map = new Map<string, number>();
-  for (const r of (data ?? []) as any[]) map.set(r.estado, (map.get(r.estado) ?? 0) + 1);
+  for (const r of data) map.set(r.estado, (map.get(r.estado) ?? 0) + 1);
   return Array.from(map.entries()).map(([estado, count]) => ({ estado: estado as EstadoTicket, count }));
 }
 
 export async function getStatsPorPrioridad(client: SupabaseClient, f: DashboardFilters = {}): Promise<StatsPrioridad> {
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f)) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_por_prioridad', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ prioridad: r.prioridad as PrioridadTicket, count: Number(r.cnt) }));
   } catch (_) {}
-  let q = client.from('tickets').select('prioridad');
-  q = applyFilters(q, f);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const data = await fetchDashboardTicketRows(client, 'prioridad', f);
   const map = new Map<string, number>();
-  for (const r of (data ?? []) as any[]) map.set(r.prioridad, (map.get(r.prioridad) ?? 0) + 1);
+  for (const r of data) map.set(r.prioridad, (map.get(r.prioridad) ?? 0) + 1);
   return Array.from(map.entries()).map(([prioridad, count]) => ({ prioridad: prioridad as PrioridadTicket, count }));
 }
 
 export async function getEvolucionPorMesa(client: SupabaseClient, f: DashboardFilters & { dias?: number } = {}): Promise<EvolucionPunto[]> {
   const dias = f.dias ?? 30;
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f) || f.desde || f.hasta) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_evolucion', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dia: String(r.dia).slice(0,10), mesaId: Number(r.mesa_id), count: Number(r.cnt) }));
   } catch (_) {}
   const desde = new Date();
   desde.setDate(desde.getDate() - dias);
-  const desdeIso = desde.toISOString();
-  let q = client.from('tickets').select('creado_en,mesa_id').gte('creado_en', desdeIso);
-  if (f.mesaIds?.length) q = q.in('mesa_id', f.mesaIds);
-  if (f.categoriaId) q = q.eq('categoria_id', f.categoriaId);
-  const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  const filas = await fetchDashboardTicketRows(client, 'creado_en,mesa_id', {
+    ...f,
+    desde: f.desde ?? desde.toISOString(),
+  });
   const byKey = new Map<string, number>();
-  for (const r of (data ?? []) as any[]) {
+  for (const r of filas) {
     const dia = String(r.creado_en).slice(0, 10);
     const key = `${dia}|${r.mesa_id}`;
     byKey.set(key, (byKey.get(key) ?? 0) + 1);
@@ -158,15 +165,13 @@ function nivel(count: number): CargaCelda['nivel'] {
 
 export async function getCargaHoraria(client: SupabaseClient, f: DashboardFilters = {}): Promise<CargaCelda[]> {
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f) || f.categoriaId) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_carga_horaria', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), count: Number(r.cnt), nivel: nivel(Number(r.cnt)) }));
   } catch (_) {}
-  let q = client.from('tickets').select('creado_en');
-  q = applyFilters(q, f);
-  const { data, error } = await q.limit(2000);
-  if (error) throw new Error(error.message);
+  const data = await fetchDashboardTicketRows(client, 'creado_en', f);
   const bucket = new Map<string, number>();
-  for (const r of (data ?? []) as any[]) {
+  for (const r of data) {
     const d = new Date(r.creado_en);
     const dow = (d.getDay() + 6) % 7;
     if (dow > 4) continue;
@@ -185,19 +190,19 @@ export async function getCargaHoraria(client: SupabaseClient, f: DashboardFilter
 export async function getPicosPrediccion(client: SupabaseClient, f: DashboardFilters & { dias?: number } = {}): Promise<PicoPrediccion[]> {
   const dias = f.dias ?? 30;
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f) || f.desde || f.hasta) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_picos_prediccion', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), mesaId: r.mesa_id != null ? Number(r.mesa_id) : null, mesaNombre: r.mesa_nombre ?? null, avgCnt: Number(r.avg_cnt), forecastCnt: Number(r.forecast_cnt), nivel: r.nivel as any, esPico: Boolean(r.es_pico) }));
   } catch (_) {}
   // fallback: promedio histórico por dow/hour desde tickets (sin estacionalidad)
   const desde = new Date(); desde.setDate(desde.getDate() - dias);
-  let q = client.from('tickets').select('creado_en,mesa_id').gte('creado_en', desde.toISOString());
-  if (f.mesaIds?.length) q = q.in('mesa_id', f.mesaIds);
-  if (f.categoriaId) q = q.eq('categoria_id', f.categoriaId);
-  const { data, error } = await q.limit(3000);
-  if (error) throw new Error(error.message);
+  const data = await fetchDashboardTicketRows(client, 'creado_en,mesa_id', {
+    ...f,
+    desde: f.desde ?? desde.toISOString(),
+  });
   const weeks = Math.max(dias / 7, 1);
   const bucket = new Map<string,{cnt:number, mesaId:number|null}>();
-  for (const r of (data ?? []) as any[]) {
+  for (const r of data) {
     const d = new Date(r.creado_en); const dow=(d.getDay()+6)%7; if (dow>4) continue; const h=d.getHours(); if (h<7||h>21) continue;
     const key=`${dow}-${h}-${r.mesa_id ?? 'null'}`; const b=bucket.get(key) ?? {cnt:0, mesaId:r.mesa_id ?? null}; b.cnt++; bucket.set(key,b);
   }
@@ -207,7 +212,15 @@ export async function getPicosPrediccion(client: SupabaseClient, f: DashboardFil
   return out.sort((a,b)=>b.forecastCnt-a.forecastCnt).slice(0,60);
 }
 export async function getPicosResumen(client: SupabaseClient, f: DashboardFilters & { dias?: number } = {}): Promise<PicosResumen[]> {
+  // Este resumen persistido solo se puede segmentar por mesa; no mezclarlo con
+  // filtros de categoría/estado/prioridad/técnico que el modelo no recibió.
+  if (f.categoriaId || tieneFiltrosNoSoportadosPorRpc(f)) return [];
   const dias = f.dias ?? 30;
+  if (f.hasta) return [];
+  if (f.desde) {
+    const inicioEsperado = Date.now() - dias * 86400000;
+    if (!Number.isFinite(new Date(f.desde).getTime()) || Math.abs(new Date(f.desde).getTime() - inicioEsperado) > 86400000) return [];
+  }
   try {
     const { data, error } = await (client as any).rpc('dashboard_picos_resumen', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r)=>({ mesaId:r.mesa_id!=null?Number(r.mesa_id):null, mesaNombre:r.mesa_nombre??null, avgDia:Number(r.avg_dia), forecast7d:Number(r.forecast_7d), forecast30d:Number(r.forecast_30d), peakHour:r.peak_hour!=null?Number(r.peak_hour):null, peakDow:r.peak_dow!=null?Number(r.peak_dow):null }));
@@ -217,16 +230,27 @@ export async function getPicosResumen(client: SupabaseClient, f: DashboardFilter
 export async function getPatronesCategoria(client: SupabaseClient, f: DashboardFilters & { dias?: number } = {}): Promise<PatronCategoria[]> {
   const dias = f.dias ?? 30;
   try {
+    if (tieneFiltrosNoSoportadosPorRpc(f) || f.categoriaId || f.hasta || f.desde) {
+      throw new Error('El RPC aún no acepta todos los filtros');
+    }
     const { data, error } = await (client as any).rpc('dashboard_patrones_categoria', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r)=>({ categoriaId:Number(r.categoria_id), subcategoria:r.subcategoria, dominio:r.dominio, cntActual:Number(r.cnt_actual), cntPrevio:Number(r.cnt_previo), variacionPct:Number(r.variacion_pct), sharePct:Number(r.share_pct), tendencia:String(r.tendencia) }));
   } catch (_) {}
-  // fallback: compara periodos actual vs previo vía count cliente
-  const now=new Date(), desdeAct=new Date(now); desdeAct.setDate(now.getDate()-dias); const desdePrev=new Date(desdeAct); desdePrev.setDate(desdeAct.getDate()-dias);
-  let qAct=client.from('tickets').select('categoria_id').gte('creado_en',desdeAct.toISOString());
-  let qPrev=client.from('tickets').select('categoria_id').gte('creado_en',desdePrev.toISOString()).lt('creado_en',desdeAct.toISOString());
-  if (f.mesaIds?.length){ qAct=qAct.in('mesa_id',f.mesaIds); qPrev=qPrev.in('mesa_id',f.mesaIds); }
-  const [{data:a},{data:p}] = await Promise.all([qAct.limit(5000) as any, qPrev.limit(5000) as any]);
-  const ca=new Map<number,number>(), cp=new Map<number,number>(); for(const r of (a??[]) as any[]) ca.set(r.categoria_id,(ca.get(r.categoria_id)??0)+1); for(const r of (p??[]) as any[]) cp.set(r.categoria_id,(cp.get(r.categoria_id)??0)+1);
+  // fallback paginado: compara periodos sin truncar resultados ni omitir filtros.
+  const ahora = new Date();
+  const desdeActual = f.desde ? new Date(f.desde) : new Date(ahora.getTime() - dias * 86400000);
+  const hastaActual = f.hasta ? new Date(f.hasta) : ahora;
+  const duracion = Math.max(1, hastaActual.getTime() - desdeActual.getTime());
+  const desdePrevio = new Date(desdeActual.getTime() - duracion);
+  const filtrosActuales = { ...f, desde: desdeActual.toISOString(), hasta: hastaActual.toISOString() };
+  const filtrosPrevios = { ...f, desde: desdePrevio.toISOString(), hasta: new Date(desdeActual.getTime() - 1).toISOString() };
+  const [filasActuales, filasPrevias] = await Promise.all([
+    fetchDashboardTicketRows(client, 'categoria_id', filtrosActuales),
+    fetchDashboardTicketRows(client, 'categoria_id', filtrosPrevios),
+  ]);
+  const ca=new Map<number,number>(), cp=new Map<number,number>();
+  for(const r of filasActuales) ca.set(r.categoria_id,(ca.get(r.categoria_id)??0)+1);
+  for(const r of filasPrevias) cp.set(r.categoria_id,(cp.get(r.categoria_id)??0)+1);
   const totalAct=[...ca.values()].reduce((s,n)=>s+n,0)||1; const ids=new Set([...ca.keys(),...cp.keys()]);
   // nombres: intentar fetch
   let names=new Map<number,{subcategoria:string,dominio:string}>(); try{ const {data: cats}=await (client.from('ticket_categories').select('id,subcategoria,dominio') as any); for(const c of (cats??[]) as any[]) names.set(c.id,{subcategoria:c.subcategoria??String(c.id),dominio:c.dominio}); }catch(_){}

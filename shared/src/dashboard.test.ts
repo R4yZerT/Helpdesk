@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   getKPIs,
+  getDashboardSnapshot,
+  fetchTicketsFiltrados,
   getStatsPorEstado,
   getStatsPorPrioridad,
   getCargaHoraria,
@@ -15,11 +17,27 @@ import {
 // Builder encadenable thenable con todos los filtros usados por dashboard.ts
 function mockQuery(result: { data?: unknown; count?: number | null; error?: { message: string } | null }) {
   const q: Record<string, (...args: unknown[]) => unknown> = {};
-  for (const m of ['select', 'order', 'limit', 'eq', 'gte', 'lte', 'in', 'update']) {
+  let start = 0;
+  let end = Number.POSITIVE_INFINITY;
+  const filters: Array<(row: Record<string, unknown>) => boolean> = [];
+  for (const m of ['select', 'order', 'limit', 'update']) {
     q[m] = () => q;
   }
-  (q as { then: unknown }).then = (resolve: (v: unknown) => unknown) =>
-    Promise.resolve({ data: result.data ?? null, count: result.count ?? null, error: result.error ?? null }).then(resolve);
+  q.eq = (...args: unknown[]) => { filters.push((row) => row[String(args[0])] === args[1]); return q; };
+  q.gte = (...args: unknown[]) => { filters.push((row) => String(row[String(args[0])] ?? '') >= String(args[1])); return q; };
+  q.lte = (...args: unknown[]) => { filters.push((row) => String(row[String(args[0])] ?? '') <= String(args[1])); return q; };
+  q.in = (...args: unknown[]) => { filters.push((row) => (args[1] as unknown[]).includes(row[String(args[0])])); return q; };
+  q.range = (...args: unknown[]) => { start = Number(args[0]); end = Number(args[1]); return q; };
+  (q as { then: unknown }).then = (resolve: (v: unknown) => unknown) => {
+    const data = Array.isArray(result.data)
+      ? result.data.filter((row) => filters.every((filter) => filter(row as Record<string, unknown>))).slice(start, end + 1)
+      : result.data ?? null;
+    return Promise.resolve({
+      data,
+      count: result.count ?? null,
+      error: result.error ?? null,
+    }).then(resolve);
+  };
   return q;
 }
 // Cliente cuyo rpc siempre falla (fuerza fallback cliente) salvo override
@@ -31,11 +49,82 @@ function mockClientFallback(tickets: unknown[], opts: { count?: number } = {}) {
 const hoyISO = new Date().toISOString();
 const ayerISO = new Date(Date.now() - 86400000).toISOString();
 
+describe('dashboard snapshot agregado', () => {
+  it('trae los cinco agregados desde un RPC y aplica todos los filtros', async () => {
+    let rpcName = '';
+    let rpcArgs: unknown;
+    const client = {
+      rpc: async (name: string, args: unknown) => {
+        rpcName = name;
+        rpcArgs = args;
+        return {
+          data: {
+            kpis: { abiertos: 2, total: 4, sla_riesgo: 1, ttr_horas: null, ingresados_hoy: 1 },
+            estados: [{ estado: 'abierto', count: 2 }],
+            prioridades: [{ prioridad: 'alta', count: 2 }],
+            evolucion: [{ dia: '2026-11-13', mesa_id: 3, count: 2 }],
+            carga_horaria: [{ dow: 0, hour: 9, count: 4 }],
+          },
+          error: null,
+        };
+      },
+    } as never;
+    const snapshot = await getDashboardSnapshot(client, {
+      desde: '2026-11-01T00:00:00Z',
+      mesaIds: [3],
+      categoriaId: 4,
+      estado: 'abierto',
+      prioridad: 'alta',
+      tecnicoId: 'tech-1',
+    });
+
+    expect(rpcName).toBe('dashboard_snapshot_filtrado');
+    expect(rpcArgs).toMatchObject({
+      p_mesa_ids: [3],
+      p_categoria_id: 4,
+      p_estado: 'abierto',
+      p_prioridad: 'alta',
+      p_tecnico_id: 'tech-1',
+    });
+    expect(snapshot.kpis.ttrHoras).toBeNull();
+    expect(snapshot.porEstado).toEqual([{ estado: 'abierto', count: 2 }]);
+    expect(snapshot.porPrioridad).toEqual([{ prioridad: 'alta', count: 2 }]);
+    expect(snapshot.evolucion).toEqual([{ dia: '2026-11-13', mesaId: 3, count: 2 }]);
+    expect(snapshot.carga).toEqual([{ dow: 0, hour: 9, count: 4, nivel: 'media' }]);
+  });
+});
+
 describe('dashboard getKPIs', () => {
-  it('usa RPC dashboard_kpis cuando existe', async () => {
-    const rpc = async () => ({ data: [{ abiertos: 5, total: 9, sla_riesgo: 2, ttr_horas: 3.1, ingresados_hoy: 1, sla_vencidos: 1, sla_por_vencer: 1 }], error: null });
-    const k = await getKPIs({ rpc } as never, {});
+  it('usa RPC agregado filtrado y conserva TTR nulo cuando no hay muestra', async () => {
+    let calledWith: unknown[] = [];
+    const rpc = async (...args: unknown[]) => {
+      calledWith = args;
+      return { data: [{ abiertos: 5, total: 9, sla_riesgo: 2, ttr_horas: 3.1, ingresados_hoy: 1, sla_vencidos: 1, sla_por_vencer: 1 }], error: null };
+    };
+    const k = await getKPIs({ rpc } as never, {
+      desde: '2026-11-01T00:00:00Z',
+      hasta: '2026-11-10T23:59:59Z',
+      mesaIds: [3],
+      categoriaId: 4,
+      estado: 'cerrado',
+      prioridad: 'alta',
+      tecnicoId: 'tech-1',
+    });
+    expect(calledWith).toEqual(['dashboard_kpis_filtrado', {
+      p_desde: '2026-11-01T00:00:00Z',
+      p_hasta: '2026-11-10T23:59:59Z',
+      p_mesa_ids: [3],
+      p_categoria_id: 4,
+      p_estado: 'cerrado',
+      p_prioridad: 'alta',
+      p_tecnico_id: 'tech-1',
+    }]);
     expect(k).toEqual({ abiertos: 5, total: 9, slaRiesgo: 2, ttrHoras: 3.1, ingresadosHoy: 1, slaVencidos: 1, slaPorVencer: 1 });
+  });
+  it('no convierte TTR SQL nulo en cero', async () => {
+    const rpc = async () => ({ data: [{ abiertos: 0, total: 0, sla_riesgo: 0, ttr_horas: null, ingresados_hoy: 0, sla_vencidos: 0, sla_por_vencer: 0 }], error: null });
+    const k = await getKPIs({ rpc } as never, {});
+    expect(k.ttrHoras).toBeNull();
   });
   it('fallback cliente agrega abiertos/SLA/hoy', async () => {
     const rows = [
@@ -81,6 +170,39 @@ describe('dashboard stats', () => {
   it('getStatsPorPrioridad agrupa por prioridad (fallback)', async () => {
     const s = await getStatsPorPrioridad(mockClientFallback([{ prioridad: 'media' }, { prioridad: 'critica' }]), {});
     expect(s).toContainEqual({ prioridad: 'media', count: 1 });
+  });
+  it('pagina más allá del límite REST y evita RPC que ignora filtros operativos', async () => {
+    const rows = Array.from({ length: 1001 }, () => ({ estado: 'cerrado' }));
+    let llamadasRpc = 0;
+    const client = {
+      rpc: async () => { llamadasRpc++; return { data: [], error: null }; },
+      from: () => mockQuery({ data: rows }),
+    } as never;
+    const stats = await getStatsPorEstado(client, { estado: 'cerrado' });
+    expect(llamadasRpc).toBe(0);
+    expect(stats).toEqual([{ estado: 'cerrado', count: 1001 }]);
+  });
+});
+
+describe('exportación del dashboard', () => {
+  it('pagina el resultado para respetar el límite solicitado por encima del máximo REST', async () => {
+    const tickets = Array.from({ length: 1001 }, (_, index) => ({ numero: index + 1 }));
+    const result = await fetchTicketsFiltrados(mockClientFallback(tickets), {}, 1500);
+    expect(result).toHaveLength(1001);
+    expect(result[1000]).toEqual({ numero: 1001 });
+  });
+
+  it('respeta los filtros operativos al exportar', async () => {
+    const tickets = [
+      { numero: 1, estado: 'abierto', prioridad: 'alta', tecnico_asignado_id: 't1' },
+      { numero: 2, estado: 'cerrado', prioridad: 'alta', tecnico_asignado_id: 't1' },
+      { numero: 3, estado: 'abierto', prioridad: 'baja', tecnico_asignado_id: 't1' },
+    ];
+    const result = await fetchTicketsFiltrados(
+      mockClientFallback(tickets),
+      { estado: 'abierto', prioridad: 'alta', tecnicoId: 't1' },
+    );
+    expect(result.map((ticket) => ticket.numero)).toEqual([1]);
   });
 });
 
@@ -129,10 +251,11 @@ describe('dashboard alertas IA', () => {
 
 describe('dashboard pronóstico semanal', () => {
   it('mapea filas con lo/hi/generado_en y retorna [] sin datos o con error', async () => {
-    const ok = { from: () => mockQuery({ data: [{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1', lo: 9.1, hi: 16.2, generado_en: '2026-09-14T06:00:00Z' }] }) } as never;
-    expect(await getPronosticoSemanal(ok)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: 9.1, hi: 16.2, generadoEn: '2026-09-14T06:00:00Z' }]);
-    const legacy = { from: () => mockQuery({ data: [{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1' }] }) } as never;
-    expect(await getPronosticoSemanal(legacy)).toEqual([{ fecha: '2026-09-20', serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: null, hi: null, generadoEn: null }]);
+    const fecha = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    const ok = { from: () => mockQuery({ data: [{ fecha, serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1', lo: 9.1, hi: 16.2, generado_en: '2026-09-14T06:00:00Z' }] }) } as never;
+    expect(await getPronosticoSemanal(ok)).toEqual([{ fecha, serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: 9.1, hi: 16.2, generadoEn: '2026-09-14T06:00:00Z' }]);
+    const legacy = { from: () => mockQuery({ data: [{ fecha, serie: 'global', forecast: 12.5, nivel: 'alta', es_pico: true, modelo_version: 'v1' }] }) } as never;
+    expect(await getPronosticoSemanal(legacy)).toEqual([{ fecha, serie: 'global', forecast: 12.5, nivel: 'alta', esPico: true, modeloVersion: 'v1', lo: null, hi: null, generadoEn: null }]);
     const vacio = { from: () => mockQuery({ data: null }) } as never;
     expect(await getPronosticoSemanal(vacio)).toEqual([]);
   });

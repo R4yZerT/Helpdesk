@@ -297,10 +297,17 @@ configuración remota de Supabase o los workflows de producción hayan sido veri
   desplegado. La suscripción Realtime del dashboard reacciona a cambios de
   `tickets` y agrupa ráfagas con 600 ms de debounce; eso no vuelve en tiempo real
   las métricas alimentadas por procesos programados.
-- El dashboard todavía ejecuta varias consultas agregadas por recarga. El debounce
-  reduce ráfagas, pero no sustituye consolidar agregados, corregir filtros de RPC,
-  paginar los fallbacks ni medir p50/p95. La frecuencia/configuración efectiva de
-  Cron, Realtime y publicación de tablas en producción queda pendiente de verificar.
+- Los KPI ahora usan `dashboard_kpis_filtrado`, que aplica fecha, mesa, categoría,
+  estado, prioridad y técnico en Postgres. Los fallbacks de agregaciones recorren
+  páginas de hasta 1000 filas y conservan esos filtros; la exportación también pagina
+  hasta su límite explícito. El resumen ML no se muestra bajo filtros que no puede
+  segmentar. Esto evita resultados silenciosamente parciales, aunque los fallbacks
+  siguen transfiriendo filas y no reemplazan agregaciones SQL dedicadas.
+- El dashboard consolida KPI, estado, prioridad, evolución y carga horaria en una
+  RPC filtrada; con alertas, catálogos, forecast y telemetría quedan aprox. 8
+  operaciones concurrentes por recarga. El debounce agrupa ráfagas. Sigue pendiente
+  medir p50/p95 y consolidar los agregados restantes. La frecuencia/configuración
+  efectiva de Cron, Realtime y publicación de tablas en producción queda pendiente.
 - Límite arquitectónico pendiente: `shared` aún mezcla UI, dominio y acceso a
   Supabase; conviene separar contratos/datos, casos de uso y componentes visuales
   en cambios graduales con pruebas de integración RLS.

@@ -1,7 +1,7 @@
 // Dashboard — Stitch 2560×2048 acoplado a Supabase (RF-16/17/21/24)
 import * as React from 'react';
 import { ActivityIndicator, Platform, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { FilterBar, theme, getKPIs, getStatsPorEstado, getStatsPorPrioridad, getEvolucionPorMesa, getCargaHoraria, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, isEstadoTicket, isPrioridadTicket, type Mesa, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
+import { FilterBar, theme, getDashboardSnapshot, listAlertasIA, generarAlertasIA, marcarAlertaIA, fetchMesas, getPicosPrediccion, getPicosResumen, getPronosticoSemanal, getPatronesCategoria, getMesaIdPorDominio, fetchTicketsFiltrados, ticketsToRows, toCsvWithMeta, buildExportFilename, downloadCsv, getMetricasIaFeedback, isEstadoTicket, isPrioridadTicket, type Mesa, type DashboardFilters, type FilterRange, type PronosticoDia, type MetricaIaFuente, type Kpis, type StatsEstado, type StatsPrioridad, type EvolucionPunto, type CargaCelda, type PicoPrediccion, type PicosResumen, type PatronCategoria, type AlertaIA, useFeedback } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
@@ -62,12 +62,8 @@ export function DashboardScreen() {
 
   const load = React.useCallback(async () => {
     try {
-      const [k, e, p, ev, c, pp, pr, pat, a, ms, ml, mia] = await Promise.all([
-        getKPIs(supabase, filters),
-        getStatsPorEstado(supabase, filters),
-        getStatsPorPrioridad(supabase, filters),
-        getEvolucionPorMesa(supabase, { ...filters, dias: 30 }),
-        getCargaHoraria(supabase, filters),
+      const [snapshot, pp, pr, pat, a, ms, ml, mia] = await Promise.all([
+        getDashboardSnapshot(supabase, filters),
         getPicosPrediccion(supabase, { ...filters, dias: 30 }),
         getPicosResumen(supabase, { ...filters, dias: 30 }),
         getPatronesCategoria(supabase, { ...filters, dias: 30 }),
@@ -76,7 +72,7 @@ export function DashboardScreen() {
         getPronosticoSemanal(supabase),
         getMetricasIaFeedback(supabase),
       ]);
-      setKpis(k); setPorEstado(e); setPorPrioridad(p); setEvolucion(ev); setCarga(c); setPicos(pp); setPicosResumen(pr); setPatrones(pat); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
+      setKpis(snapshot.kpis); setPorEstado(snapshot.porEstado); setPorPrioridad(snapshot.porPrioridad); setEvolucion(snapshot.evolucion); setCarga(snapshot.carga); setPicos(pp); setPicosResumen(pr); setPatrones(pat); setAlertas(a); setPronosticoML(ml); setMetricasIa(mia);
       if (!mesas.length) setMesas(ms);
     } catch (err) {
       reportError(err, { flujo: 'dashboard-load' });
