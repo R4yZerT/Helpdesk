@@ -12,7 +12,7 @@ describe('RF-18 export helpers', () => {
   });
 
   it('toCsv escapa comillas y usa header fijo', () => {
-    const rows = [{ numero: 1, asunto: 'a\"b', estado: 'abierto', prioridad: 'media', mesa: 'TIC', categoria: 1, creado: '2026-09-08', actualizado: '2026-09-08' }];
+    const rows = [{ numero: 1, asunto: 'a"b', estado: 'abierto', prioridad: 'media', mesa: 'TIC', categoria: 1, creado: '2026-09-08', actualizado: '2026-09-08' }];
     const csv = toCsv(rows as any);
     expect(csv.split('\r\n')[0]).toBe('"numero","asunto","estado","prioridad","mesa","categoria","creado","actualizado"');
     expect(csv).toContain('"a""b"'); // comillas duplicadas

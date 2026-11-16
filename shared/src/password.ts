@@ -142,7 +142,6 @@ export function validatePasswordSync(password: string, ctx: PasswordContext = {}
 // SHA-1 en Web Crypto / Node — hex uppercase
 export async function sha1HexUpper(text: string): Promise<string> {
   const data = new TextEncoder().encode(text);
-  // @ts-ignore — crypto disponible en Node 19+ y Deno
   const buf: ArrayBuffer =
     typeof crypto !== 'undefined' && (crypto as unknown as { subtle: SubtleCrypto }).subtle
       ? await (crypto as unknown as { subtle: SubtleCrypto }).subtle.digest('SHA-1', data)

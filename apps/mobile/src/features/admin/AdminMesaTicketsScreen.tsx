@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
 import { useAuth } from '../../context/AuthContext';
 
@@ -92,7 +93,7 @@ export function AdminMesaTicketsScreen() {
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export csv', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: getErrorMessage(e) }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: getErrorMessage(e) }); }
   }, [tickets, mesaId]);
   const onExportPng = useCallback(async () => {
     try {
@@ -103,7 +104,7 @@ export function AdminMesaTicketsScreen() {
       const canvas = await (html2canvas as unknown as (el: HTMLElement, opts: object) => Promise<HTMLCanvasElement>)(el, { backgroundColor: '#F8FAFC', scale: 2, useCORS: true, logging: false });
       const url = canvas.toDataURL('image/png');
       const a = document.createElement('a'); a.href = url; a.download = buildExportFilename('admin-mesa-tickets', 'png'); a.click();
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export png', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG' }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-png' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PNG' }); }
   }, []);
   const onExportPdf = useCallback(async () => {
     try {
@@ -117,7 +118,7 @@ export function AdminMesaTicketsScreen() {
       const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width, canvas.height] });
       pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
       pdf.save(buildExportFilename('admin-mesa-tickets', 'pdf'));
-    } catch (e: unknown) { console.warn('[AdminMesaTickets] export pdf', e); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF' }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesa-export-pdf' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar PDF' }); }
   }, []);
 
   const openAssign = async (t: Ticket) => {

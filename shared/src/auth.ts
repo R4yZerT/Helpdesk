@@ -49,7 +49,7 @@ export async function fetchProfile(
       const { data: sessionData } = await supabase.auth.getSession();
       if (sessionData.session?.user?.id === userId) email = sessionData.session.user.email ?? null;
     }
-  } catch {}
+  } catch { /* best-effort: no bloquea el flujo */ }
 
   return {
     id: row.id,
@@ -102,11 +102,11 @@ export async function updateProfile(
   // el propio usuario sí puede actualizar su metadata (best-effort, no bloquea si falla)
   // Causa conocida: sin esto, Authentication → Users conserva el nombre/correo anterior
   if ('full_name' in patch && clean.full_name) {
-    try { await supabase.auth.updateUser({ data: { full_name: clean.full_name } }); } catch {}
+    try { await supabase.auth.updateUser({ data: { full_name: clean.full_name } }); } catch { /* best-effort: no bloquea el flujo */ }
   }
   // Si se cambió el email, también intentar actualizar auth.users.email (best-effort, puede requerir confirmación)
   if ('email' in patch && clean.email) {
-    try { await supabase.auth.updateUser({ email: clean.email }); } catch {}
+    try { await supabase.auth.updateUser({ email: clean.email }); } catch { /* best-effort: no bloquea el flujo */ }
   }
   return fetchProfile(supabase, userId);
 }

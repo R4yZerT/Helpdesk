@@ -18,7 +18,7 @@ export function NotificationBell({ client, onOpenTicket }: { client: SupabaseCli
       const [c, list] = await Promise.all([countNoLeidas(client), listNotificaciones(client, { limit: 12 })]);
       setCount(c);
       setItems(list);
-    } catch {}
+    } catch { /* sin notificaciones: la campana sigue disponible */ }
   }, [client]);
 
   React.useEffect(() => {
@@ -28,7 +28,7 @@ export function NotificationBell({ client, onOpenTicket }: { client: SupabaseCli
       setItems((prev) => [n, ...prev].slice(0, 12));
       setCount((c) => c + 1);
       // Opcional: vibrar / sonido web
-      try { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) (navigator as any).vibrate?.(100); } catch {}
+      try { if (typeof navigator !== 'undefined' && 'vibrate' in navigator) (navigator as any).vibrate?.(100); } catch { /* vibración opcional */ }
     });
     // Poll fallback cada 60s por si realtime no conecta
     const id = setInterval(refresh, 60000);

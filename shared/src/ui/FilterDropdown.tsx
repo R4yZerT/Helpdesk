@@ -87,7 +87,7 @@ export function FilterDropdown<T extends string | number | boolean>({
             }
           });
           return;
-        } catch {}
+        } catch { /* sin medición: usa apertura simple */ }
       }
       setAnchor(null);
       setOpen(true);

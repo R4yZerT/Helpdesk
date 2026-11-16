@@ -16,7 +16,7 @@ Hallazgos de la auditoría original re-verificados tras PRs #40–#44:
 | H4 | ✅ Resuelto | `TicketDetailScreen` 546 → 366 líneas (`TicketHeader`, `FsmActions`, `TicketProgress`, `TicketTabs` extraídos) |
 | H5 | ✅ Resuelto (2026-09-22) | Dashboards tipados (`Kpis`, `StatsEstado`, `EvolucionPunto`, `AlertaIA`, etc., rama `fix/low-effort-h5-h6-h11`) |
 | H6 | ✅ Resuelto (2026-09-22) | `ErrorBoundary` compartido en `shared/src/ui/` + envoltorio en `RootNavigator` web/mobile |
-| H7 | ⚠️ Vigente | Sin Sentry/LogRocket; `console.warn` sigue como manejo de errores |
+| H7 | ⚠️ Parcial (2026-11-16) | Rutas críticas usan `reportError`; falta verificar eventos reales con DSN |
 | H11 | ✅ Resuelto (2026-09-22) | Tabs con `IconInbox`/`IconPlus`/`IconUser`/`IconGrid`/`IconSettings`/`IconMenu` de `shared/src/ui/icons.tsx`, sin emojis |
 | H14 | ✅ Resuelto | `TecnicoNavigator` extraído de `RootNavigator`; stack duplicado eliminado |
 | Nuevo | ✅ | Tarjeta `PrecisionIa` + `getMetricasIaFeedback` integradas vía `ChartsSection` (PR #40 + merge d249f03) |
@@ -32,7 +32,7 @@ Re-verificación técnica con conteos reales (no solo declaración):
 | H3/H4 | ✅ Resuelto | `CreateTicketScreen.tsx:377`, `TicketDetailScreen.tsx:366`. Extracciones verificadas |
 | H5 | ⚠️ Parcial | Persisten `as any` / `: any` en borde Supabase/Dashboard: `apps/web/.../DashboardScreen.tsx:47-48,77-78,91-94` y `shared/src/ui/dashboard/ChartsSection.tsx:13-16` (`picos: any[]`). Tipos base existen, falta aplicarlos en el borde |
 | H6 | ⚠️ Parcial | `shared/src/ui/ErrorBoundary.tsx:17` + uso solo en `RootNavigator.tsx:101` (web/mobile). Falta boundary por navigator/feature. `ErrorBoundary` además hace `console.warn` si no hay reportero |
-| H7 | ⚠️ Vigente | `apps/web/src/lib/sentry.ts` y `apps/mobile/src/lib/sentry.ts` existen pero son no-op sin `EXPO_PUBLIC_SENTRY_DSN`. 52 `console.warn/error` en `apps/` siguen. Sin telemetría real |
+| H7 | ⚠️ Parcial (2026-11-16) | `sentry.ts` web/mobile existe; rutas críticas de tickets/admin migradas de `console.warn` a `reportError`. Sin DSN no hay envío real; los logs de configuración/push quedan intencionalmente locales |
 | H8 | ⚠️ Vigente | `mapAdjunto` en `shared/src/tickets.ts:288-292` mantiene `storage_path ?? ruta ?? nombre_original ?? nombre ?? filename`. Drift de schema no unificado |
 | H9 | ⚠️ Parcial | Implementado `textSearch('search_vector', q, { type: 'websearch', config: 'spanish' })` con fallback a ILIKE en `shared/src/tickets.ts:377,626` + `fulltext-search.test.ts`. Pendiente: migración `search_vector` + índice GIN + backfill en producción |
 | H10 | ⚠️ Vigente | Sin operaciones masivas (bulk reasignar/cerrar/cambiar prioridad) |
@@ -275,3 +275,65 @@ La auditoría se declara **cerrada** cuando:
 ---
 
 > **Próximo paso (actualizado 2026-09-23):** ejecutar Sprint 1 (Sentry real + cierre H5 `any`). Ver §3. Branch de trabajo sugerida: `docs/cierre-auditoria-h5-h7` o continuar en feature actual.
+
+## 8. Actualización de flujo de tickets (2026-11-13)
+
+Esta sección complementa los hallazgos históricos anteriores; no implica que la
+configuración remota de Supabase o los workflows de producción hayan sido verificados.
+
+- La creación desde web y móvil ya no permite escoger técnico. La base de datos
+  asigna al técnico activo con menor carga ponderada dentro de la misma mesa;
+  prioridad y tickets activos próximos a vencer SLA elevan la carga. Si no hay
+  candidatos, el ticket permanece en cola. Las afinidades fueron retiradas.
+- El dueño puede reabrir un ticket cerrado (estado `devuelto`) y enviar una
+  encuesta de cuatro calificaciones de 1 a 5 con comentario opcional.
+- La creación y reapertura tienen validaciones en migraciones/RLS además de la
+  UI. Las migraciones nuevas requieren ejecución/verificación contra Supabase
+  local o de CI; no se consideran desplegadas en producción por existir en el repo.
+- Los KPIs son consultas/RPC sobre tickets. El fallback de TTR calcula el promedio
+  usando cierres disponibles y presenta `—` si no hay muestra, en vez de inventar
+  un valor. La vista de pronóstico ML lee `pronosticos_picos`, cuyos datos se
+  generan por el proceso ML; su frecuencia efectiva depende del workflow
+  desplegado. La suscripción Realtime del dashboard reacciona a cambios de
+  `tickets` y agrupa ráfagas con 600 ms de debounce; eso no vuelve en tiempo real
+  las métricas alimentadas por procesos programados.
+- Los KPI ahora usan `dashboard_kpis_filtrado`, que aplica fecha, mesa, categoría,
+  estado, prioridad y técnico en Postgres. Los fallbacks de agregaciones recorren
+  páginas de hasta 1000 filas y conservan esos filtros; la exportación también pagina
+  hasta su límite explícito. El resumen ML no se muestra bajo filtros que no puede
+  segmentar. Esto evita resultados silenciosamente parciales, aunque los fallbacks
+  siguen transfiriendo filas y no reemplazan agregaciones SQL dedicadas.
+- El dashboard consolida KPI, estado, prioridad, evolución y carga horaria en una
+  RPC filtrada. Las recargas por cambios de tickets actualizan solo el snapshot y
+  alertas (2 operaciones); forecast y métricas IA, que cambian con mucha menor
+  frecuencia, se consultan por separado al montar. El debounce agrupa ráfagas.
+  Sigue pendiente medir p50/p95 y consolidar los agregados restantes. La
+  configuración efectiva de Cron, Realtime y publicación en producción queda pendiente.
+- Se instrumentaron spans Sentry para carga filtrada, actualización Realtime y datos
+  estáticos en web/móvil. Solo incluyen cantidad/tipo de filtros, nunca valores,
+  identificadores ni contenido de tickets. El SDK está muestreado al 10%; se requiere
+  tráfico real con DSN para observar distribuciones y calcular p50/p95.
+- Límite arquitectónico pendiente: `shared` aún mezcla UI, dominio y acceso a
+  Supabase; conviene separar contratos/datos, casos de uso y componentes visuales
+  en cambios graduales con pruebas de integración RLS.
+
+## 9. Actualización de observabilidad, lint y E2E (2026-11-16)
+
+- H7 queda parcialmente cerrado en código: las rutas críticas de tickets, admin y
+  navegación de web/móvil ya no usan `console.warn` para errores; llaman a
+  `reportError` con un contexto `flujo`. Se retiraron logs de depuración del submit
+  de creación de tickets para no exponer datos del formulario. Los avisos de
+  configuración de Supabase, la indisponibilidad esperada de push en Expo Go y el
+  fallback local de `sentry.ts` se mantienen intencionalmente.
+- Se agregó `shared/src/qa-h7-observabilidad.test.ts` como regresión estática: falla
+  si vuelven logs directos en `apps/*/src/features` o si un flujo crítico deja de
+  usar `reportError`.
+- `pnpm -r lint` pasa sin errores (quedan advertencias de tipado estricto y variables
+  sin usar). `pnpm -r typecheck` y los tests unitarios pasan.
+- E2E web: 24 casos descubiertos, 11 pasan y 13 se omiten por credenciales de rol no
+  configuradas. La ejecución local usa `PLAYWRIGHT_CHANNEL=chrome` cuando el
+  navegador de Playwright no está disponible; no sustituye una corrida autenticada
+  en CI/staging.
+- Sigue pendiente verificar un evento real en Sentry con `EXPO_PUBLIC_SENTRY_DSN`,
+  medir p50/p95 con tráfico real, separar gradualmente `shared` y añadir integración
+  RLS/mobile. Estas tareas no se consideran cerradas por los tests locales.

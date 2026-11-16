@@ -12,3 +12,11 @@ test('reasignar sin destino exige técnico o mesa', async ({ page }) => {
   await page.getByText('Confirmar reasignación').click();
   await expect(page.getByText('Ingresa técnico UUID o mesa ID')).toBeVisible();
 });
+
+test('no permite confirmar la reasignación al técnico actual', async ({ page }) => {
+  await loginComo(page, C!.user, C!.pass);
+  if (!(await abrirPrimerTicket(page))) return;
+  await page.getByText('Reasignar Técnico', { exact: true }).click();
+  await page.getByText('Confirmar reasignación').click();
+  await expect(page.getByText('Ese técnico ya está asignado a este ticket')).toBeVisible();
+});

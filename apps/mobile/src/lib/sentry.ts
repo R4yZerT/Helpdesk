@@ -31,3 +31,13 @@ export function reportMessage(message: string, level: 'info' | 'warning' | 'erro
   if (!dsn) return;
   Sentry.captureMessage(message, level);
 }
+
+export function withPerformanceSpan<T>(
+  name: string,
+  op: string,
+  run: () => Promise<T>,
+  attributes?: Record<string, string | number | boolean>,
+): Promise<T> {
+  if (!dsn) return run();
+  return Sentry.startSpan({ name, op, attributes }, run);
+}

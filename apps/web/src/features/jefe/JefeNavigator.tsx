@@ -48,7 +48,7 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       const st = anyNav?.getState?.();
       const hasTarget = st?.routes?.some((r) => r.name === name);
       if (hasTarget) { nav?.navigate(name as never); return; }
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
     nav?.navigate(name as never);
   };
   const ic = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);

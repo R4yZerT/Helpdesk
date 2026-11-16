@@ -17,7 +17,7 @@ function getErrorMessage(e: unknown): string {
     const o = e as Record<string, unknown>;
     if (typeof o.message === 'string' && o.message.trim()) return o.message;
     if (typeof o.error === 'string' && o.error.trim()) return o.error;
-    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch { /* ignorado: no bloquea el flujo */ }
   }
   return String(e ?? 'Error desconocido');
 }
@@ -119,7 +119,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
           for (const t of list) next[t.id] = t.full_name ?? t.email ?? t.id;
           return next;
         });
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     })();
   }, [mesaId]);
 
@@ -132,7 +132,6 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
       if (alive && Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
     }).catch(() => {});
     return () => { alive = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets]);
 
   // Exportación desde datos completos (no solo la página visible ni screenshots).
@@ -159,7 +158,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
         const map = await fetchTecnicoNombres(supabase as never, missing);
         if (Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
         for (const [k, v] of Object.entries(map)) tecnicoNombres[k] = v;
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     }
     return all;
   }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter, tecnicoNombres]);

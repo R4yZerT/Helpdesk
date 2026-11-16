@@ -5,6 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { validarDestinoReasignacion } from './tickets.js';
 
 const TICKETS_URL = new URL('./tickets.ts', import.meta.url);
+const WEB_TICKET_DETAIL_URL = new URL(
+  '../../apps/web/src/features/tickets/TicketDetailScreen.tsx',
+  import.meta.url,
+);
 const PESO_URL = new URL(
   '../../supabase/migrations/20261018000002_tickets_prioridad_peso.sql',
   import.meta.url,
@@ -106,5 +110,15 @@ describe('QA-H6 validarDestinoReasignacion', () => {
     const client = readFileSync(TICKETS_URL, 'utf-8').replace(/^\/\/.*$/gm, '');
     expect(client).toMatch(/from\('profiles'\)\.select\('id,rol,activo,mesa_id'\)/);
     expect(client).toMatch(/validarDestinoReasignacion\(/);
+  });
+
+  it('la pantalla ejecuta una sola reasignación por confirmación', () => {
+    const screen = readFileSync(WEB_TICKET_DETAIL_URL, 'utf-8');
+    const start = screen.indexOf('const onReassign = async () => {');
+    const end = screen.indexOf('\n  };', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const handler = screen.slice(start, end);
+    expect(handler.match(/\breassignTicket\s*\(/g) ?? []).toHaveLength(1);
   });
 });
