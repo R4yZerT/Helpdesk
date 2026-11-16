@@ -3,7 +3,7 @@
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
+import { Card, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
@@ -189,15 +189,15 @@ export function AdminMesasScreen() {
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR</Text></View>
-        <View style={s.headerRow}>
-        <Text style={s.h1}>Dependencias</Text>
-        <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>
-        </View>
-        <Text style={s.subtitle}>Crea y gestiona dependencias.{secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}</Text>
+      <ScreenHeader
+        kicker="ADMINISTRADOR"
+        kickerDot
+        title="Dependencias"
+        subtitle={`Crea y gestiona dependencias.${secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}`}
+        actions={<Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>}
+      >
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
-      </View>
+      </ScreenHeader>
 
       <View style={s.filterCard}>
         <View style={s.searchWrap}>
@@ -285,13 +285,6 @@ const s = StyleSheet.create({
   muted: { color: theme.colors.muted, fontSize: 12 },
   mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
-  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[3], gap: theme.space[2] - 2 },
-  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] },
-  kickerDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.primary },
-  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: theme.colors.muted, textTransform: 'uppercase' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
-  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, flex: 1 },
-  subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filterCard: { marginHorizontal: theme.space[3], marginBottom: theme.space[3], gap: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },

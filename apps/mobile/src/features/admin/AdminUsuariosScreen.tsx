@@ -1,7 +1,7 @@
 // RF-27 — Admin móvil: tabla de usuarios + edición con cambio de contraseña (paridad web, CSV only)
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, ScreenHeader, formatRol, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
@@ -17,7 +17,6 @@ function pillRol(rol: string) {
 }
 
 export function AdminUsuariosScreen() {
-  const { width } = useWindowDimensions();
   const { profile } = useAuth();
   const adminMesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
   const isGeneralAdmin = adminMesaId == null;
@@ -279,14 +278,13 @@ export function AdminUsuariosScreen() {
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <View style={s.headerRow}>
-          <Text style={s.h1}>Usuarios</Text>
-          <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button"><Text style={s.btnPrimaryText}>+ Nuevo usuario</Text></Pressable>
-        </View>
-        <Text style={s.subtitle}>Gestión centralizada. Usa la tabla para acciones rápidas.</Text>
+      <ScreenHeader
+        title="Usuarios"
+        subtitle="Gestión centralizada. Usa la tabla para acciones rápidas."
+        actions={<Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button"><Text style={s.btnPrimaryText}>+ Nuevo usuario</Text></Pressable>}
+      >
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
-      </View>
+      </ScreenHeader>
 
       {/* Filtros */}
       <View style={s.filterCard}>
@@ -447,10 +445,6 @@ const s = StyleSheet.create({
   muted: { color: theme.colors.muted, fontSize: 12 },
   mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
-  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[2], gap: 6 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
-  h1: { fontSize: 20, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
-  subtitle: { fontSize: 11, color: theme.colors.muted, lineHeight: 14 },
   exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
   exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
   exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
