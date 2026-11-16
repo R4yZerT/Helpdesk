@@ -2,7 +2,7 @@
 // Paridad con apps/web AdminNavigator; en móvil se usa tab bar nativa + campana RF-23.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, IconGrid, IconSettings, IconUser, withScreenBoundary } from '@helpdesk/shared';
+import { IconGrid, IconSettings, IconUser, withScreenBoundary } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
@@ -10,29 +10,12 @@ import { AdminCategoriasScreen } from './AdminCategoriasScreen';
 import { DetalleTecnicoScreen } from '../tecnico/DetalleTecnicoScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { reportError } from '../../lib/sentry';
-import { HeaderBell } from '../../components/HeaderBell';
 import { RequirePermission } from '../../components/RequirePermission';
+import { screenOpts, tabOpts } from '../../navigation/nav-options';
 import type { AdminStackParamList } from '../../navigation/types';
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 const Tab = createBottomTabNavigator();
-
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  headerRight: () => <HeaderBell />,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
-
-const tabOpts = {
-  headerShown: false as const,
-  tabBarActiveTintColor: theme.colors.primary,
-  tabBarInactiveTintColor: theme.colors.muted,
-  tabBarStyle: { height: 62, paddingTop: 6, paddingBottom: 8, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
-};
 
 // H6 — cada pantalla aislada: si una rompe, el resto del navigator sigue vivo
 const UsuariosAislada = withScreenBoundary(AdminUsuariosScreen, { titulo: 'Los usuarios no pudieron cargarse', onError: (e) => reportError(e, { flujo: 'admin-usuarios' }) });
@@ -61,8 +44,8 @@ export function AdminNavigator() {
     <RequirePermission permission="profile:manage">
       <Tab.Navigator screenOptions={tabOpts}>
         <Tab.Screen name="AdminMainTab" options={{ tabBarLabel: 'Admin', tabBarIcon: ({ color }) => <IconSettings size={16} color={color} /> }} component={AdminMainStack} />
-        <Tab.Screen name="AdminMesasTab" options={{ tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <IconGrid size={16} color={color} />, headerShown: true, headerTitle: 'Tickets de mi dependencia', headerRight: () => <HeaderBell /> }} component={MesaTicketsAislada} />
-        <Tab.Screen name="AdminPerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <IconUser size={16} color={color} />, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilAislado} />
+        <Tab.Screen name="AdminMesasTab" options={{ ...screenOpts, tabBarLabel: 'Mesas', tabBarIcon: ({ color }) => <IconGrid size={16} color={color} />, headerShown: true, headerTitle: 'Tickets de mi dependencia' }} component={MesaTicketsAislada} />
+        <Tab.Screen name="AdminPerfilTab" options={{ ...screenOpts, tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <IconUser size={16} color={color} />, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilAislado} />
       </Tab.Navigator>
     </RequirePermission>
   );

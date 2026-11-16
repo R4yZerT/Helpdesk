@@ -16,6 +16,8 @@ export * from './ui/FilterDropdown.js';
 export * from './filters.js';
 export * from './historial.js';
 export * from './ui/layout/AppShell.js';
+export * from './ui/layout/ScreenHeader.js';
+export * from './ui/layout/navigation.js';
 export * from './ui/layout/TopBar.js';
 export * from './ui/layout/FilterBar.js';
 export * from './ui/dashboard/KpiRow.js';

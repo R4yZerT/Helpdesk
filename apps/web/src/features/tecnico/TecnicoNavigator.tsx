@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, IconInbox, IconPlus, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
+import { theme, AppShell, APP_HEADER_OPTIONS, IconInbox, IconPlus, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
 import { BandejaTecnicoScreen } from './BandejaTecnicoScreen';
 import { DetalleTecnicoScreen } from './DetalleTecnicoScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -19,14 +19,6 @@ const BandejaAislada = withScreenBoundary(BandejaTecnicoScreen, { titulo: 'La ba
 const CrearAislado = withScreenBoundary(CreateTicketScreen, { titulo: 'La creación no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-crear' }) });
 const DetalleAislado = withScreenBoundary(DetalleTecnicoScreen, { titulo: 'El detalle no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-detalle' }) });
 const PerfilAislado = withScreenBoundary(PerfilScreen, { titulo: 'El perfil no pudo cargarse', onError: (e) => reportError(e, { flujo: 'tecnico-perfil' }) });
-
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
 
 function titleFor(name: string) {
   if (name === 'Perfil') return 'Mi perfil';
@@ -80,7 +72,7 @@ function TecnicoWeb() {
       topTitle={titleFor(activeName)}
       headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
     >
-      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
+      <Stack.Navigator screenOptions={{ ...APP_HEADER_OPTIONS, headerShown: false }}>
         <Stack.Screen name="Bandeja" component={BandejaAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Bandeja'); } })} />
         <Stack.Screen name="CrearTicket" component={CrearAislado} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
         <Stack.Screen name="DetalleTicket" component={DetalleAislado} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
@@ -94,7 +86,7 @@ export function TecnicoNavigator() {
   if (Platform.OS === 'web') return <TecnicoWeb />;
   // native: stack simple (tabs previstos)
   return (
-    <Stack.Navigator screenOptions={screenOpts}>
+    <Stack.Navigator screenOptions={APP_HEADER_OPTIONS}>
       <Stack.Screen name="Bandeja" options={{ title: 'Bandeja' }} component={BandejaAislada} />
       <Stack.Screen name="CrearTicket" options={{ title: 'Crear solicitud' }} component={CrearAislado} />
       <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={DetalleAislado} />

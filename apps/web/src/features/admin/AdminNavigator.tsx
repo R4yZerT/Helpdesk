@@ -2,7 +2,7 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
+import { theme, AppShell, APP_HEADER_OPTIONS, IconUsers, IconLayers, IconTable, IconTag, IconUpload, NotificationBell, withScreenBoundary } from '@helpdesk/shared';
 import { AdminUsuariosScreen } from './AdminUsuariosScreen';
 import { AdminMesasScreen } from './AdminMesasScreen';
 import { AdminMesaTicketsScreen } from './AdminMesaTicketsScreen';
@@ -26,14 +26,6 @@ const CategoriasAislada = withScreenBoundary(AdminCategoriasScreen, { titulo: 'L
 const ImportAislado = withScreenBoundary(AdminImportScreen, { titulo: 'La importación no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-import' }) });
 const PerfilAislado = withScreenBoundary(PerfilScreen, { titulo: 'El perfil no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-perfil' }) });
 const DetalleAislado = withScreenBoundary(TicketDetailScreen, { titulo: 'El detalle no pudo cargarse', onError: (e) => reportError(e, { flujo: 'admin-detalle' }) });
-
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
 
 function titleFor(name: string) {
   if (name === 'Perfil') return 'Mi perfil';
@@ -99,7 +91,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
       topTitle={titleFor(activeName)}
       headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
     >
-      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }} initialRouteName="MesaTickets">
+      <Stack.Navigator screenOptions={{ ...APP_HEADER_OPTIONS, headerShown: false }} initialRouteName="MesaTickets">
         <Stack.Screen name="MesaTickets" component={MesaTicketsAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MesaTickets'); } })} />
         {isGeneralAdmin ? <Stack.Screen name="Mesas" component={MesasAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Mesas'); } })} /> : null}
         <Stack.Screen name="Usuarios" component={UsuariosAislada} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Usuarios'); } })} />
@@ -124,7 +116,7 @@ export function AdminNavigator() {
   }
   return (
     <RequirePermission permission="profile:manage">
-      <Stack.Navigator screenOptions={screenOpts}>
+      <Stack.Navigator screenOptions={APP_HEADER_OPTIONS}>
         <Stack.Screen name="Usuarios" component={UsuariosAislada} options={{ title: 'Usuarios' }} />
       </Stack.Navigator>
     </RequirePermission>

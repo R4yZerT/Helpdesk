@@ -18,23 +18,14 @@ const mobileStorage = {
 import { UsuarioNavigator } from '../features/usuario/UsuarioNavigator';
 import { AdminNavigator } from '../features/admin/AdminNavigator';
 import { JefeNavigator } from '../features/jefe/JefeNavigator';
-import { HeaderBell } from '../components/HeaderBell';
 import { usePushNotificaciones } from '../hooks/usePushNotificaciones';
 import { navigationRef } from './navigationRef';
+import { screenOpts } from './nav-options';
 import type { AuthStackParamList } from './types';
 import { TecnicoNavigator } from './TecnicoNavigator';
 import { reportError } from '../lib/sentry';
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  headerRight: () => <HeaderBell />,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
 
 function AuthNavigator() {
   // RF-03 recovery: si hay tokens pendientes, entrar directo a Nueva contraseña
