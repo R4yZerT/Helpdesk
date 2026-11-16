@@ -9,6 +9,7 @@
     "serve": "npx serve dist",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:demo": "playwright test e2e/demo-flujo.spec.ts --project=chromium",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix"
   },
