@@ -2,8 +2,8 @@
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Card, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, resolveSecretariaId } from '@helpdesk/shared';
+import { FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Card, EmptyState, ListFooter, ListLoading, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { MesaEquipoModal } from './MesaEquipoModal';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
@@ -200,7 +200,7 @@ export function AdminMesasScreen() {
   );
 
   if (loading && mesas.length === 0) {
-    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>CARGANDO DEPENDENCIAS…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+    return <ListLoading label="CARGANDO DEPENDENCIAS…" fullScreen>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</ListLoading>;
   }
 
   return (
@@ -248,8 +248,8 @@ export function AdminMesasScreen() {
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>SIN DEPENDENCIAS</Text><Text style={s.mutedCenter}>AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA.</Text></View>}
-        ListFooterComponent={loadingMore ? <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+        ListEmptyComponent={<EmptyState title="SIN DEPENDENCIAS" description="AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA." surface style={{ marginTop: theme.space[2], padding: theme.space[8] }} />}
+        ListFooterComponent={<ListFooter loading={loadingMore} style={{ padding: 16 }} />}
         contentContainerStyle={s.listContent}
       />
       </View>
@@ -295,9 +295,6 @@ const s = StyleSheet.create({
   exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
   exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
-  muted: { color: theme.colors.muted, fontSize: 12 },
-  mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
@@ -338,8 +335,6 @@ const s = StyleSheet.create({
   btnGhost: { flex: 1, height: 36, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   btnGhostAccent: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
   btnGhostText: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
-  empty: { alignItems: 'center', padding: theme.space[8], gap: 10, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.space[2] },
-  emptyTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalCard: { width: '100%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], gap: 12, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
   modalTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.text },
