@@ -2,8 +2,8 @@
 // Port de apps/web AdminMesaTicketsScreen; export adaptado a móvil (CSV nativo via hoja de compartir,
 // PNG/PDF solo en mobile --web con import dinámico, igual que DashboardScreen móvil).
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { theme, Card, FeedbackModal, listMyTickets, reassignTicket, type Ticket, formatEstado, formatPrioridad, FilterDropdown, FilterToolbar, PRIORIDAD_OPTIONS, buildExportFilename, downloadCsv } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
@@ -151,12 +151,11 @@ export function AdminMesaTicketsScreen() {
     <View style={s.wrap}>
       {errorMsg ? <View style={s.header}><Text style={s.error}>{errorMsg}</Text></View> : null}
       <View style={s.filterCard}>
-        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />{!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}</View>
-        <View style={s.dropdownRow}>
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" layout="stack">
           <FilterDropdown label="Técnico" value={tecnicoFilter as never} options={[{ value: '' as never, label: 'Todos' }, ...tecnicos.map((t) => ({ value: t.id as never, label: (t.full_name ?? t.email ?? t.id) }))]} onSelect={(v) => { setTecnicoFilter(v as string); if (v) setAsignacionFilter(''); }} placeholder="Todos" />
           <FilterDropdown label="Asignación" value={asignacionFilter as never} options={[{ value: '' as never, label: 'Todas' }, { value: 'asignadas' as never, label: 'Asignadas' }, { value: 'no_asignadas' as never, label: 'Sin asignar' }]} onSelect={(v) => { setAsignacionFilter(v as string); if (v) setTecnicoFilter(''); }} placeholder="Todas" />
           <FilterDropdown label="Prioridad" value={prioridadFilter as never} options={PRIORIDAD_OPTIONS as never} onSelect={(v) => setPrioridadFilter(v as string)} placeholder="Todas" />
-        </View>
+        </FilterToolbar>
       </View>
       <View style={s.exportRow}>
         <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
@@ -215,12 +214,6 @@ const s = StyleSheet.create({
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, gap: 8 },
   filterCard: { marginHorizontal: 12, marginBottom: 12, gap: 12, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 16, borderWidth: 1, borderColor: theme.colors.border },
-  dropdownRow: { flexDirection: 'row', gap: 12, flexWrap: 'wrap' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: 12, height: 40 },
-  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
-  search: { flex: 1, fontSize: 13, color: theme.colors.text },
-  clearBtn: { padding: 6, marginLeft: 6 },
-  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   listContent: { padding: 12, gap: 10, paddingBottom: 24 },

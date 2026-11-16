@@ -1,7 +1,7 @@
 // RF-32 — Admin: categorías maestras ticket_categories
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, formatDominio } from '@helpdesk/shared';
+import { Card, theme, type TicketCategoria, DOMINIOS, type DominioCategoria, listCategoriasPaginated, createCategoria, updateCategoria, setCategoriaActiva, validateCreateCategoria, validateUpdateCategoria, FeedbackModal, FilterDropdown, FilterToolbar, formatDominio } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { reportError } from '../../lib/sentry';
@@ -198,13 +198,12 @@ export function AdminCategoriasScreen() {
         </View>
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
         <View style={s.filters}>
-          <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar subcategoría" placeholderTextColor={theme.colors.mutedSoft} style={s.searchInput} /></View>
-          <View style={s.dropdownRow}>
+          <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar subcategoría" layout="stack">
             {isGeneralAdmin ? (
               <FilterDropdown label="Dependencia" value={dominio as never} onSelect={(v) => setDominio(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, ...DOMINIOS.map((d) => ({ value: d as unknown as never, label: formatDominio(d as DominioCategoria) }))]} />
             ) : null}
             <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
-          </View>
+          </FilterToolbar>
           {hasFilters ? <Pressable onPress={clearFilters} style={[s.clearBtn, { alignSelf: 'flex-start', marginTop: 2 }]}><Text style={s.clearText}>Limpiar filtros</Text></Pressable> : null}
         </View>
       </View>
@@ -290,12 +289,8 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 14, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filters: { gap: 8, marginTop: 4 },
-  dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   lockedPill: { borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 12, height: 36, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   lockedText: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40, gap: 6 },
-  searchIcon: { color: theme.colors.mutedSoft, fontSize: 13 },
-  searchInput: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
   chipsRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   chip: { paddingHorizontal: 10, height: 28, borderRadius: 999, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface, alignItems: 'center', justifyContent: 'center' },
   chipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
