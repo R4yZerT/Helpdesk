@@ -1,5 +1,6 @@
 // RF-08 — Mis solicitudes: server paginado + Realtime + pull-to-refresh (Stitch: grid 2cols, FAB naranja)
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { fetchMesas, fetchTecnicoNombres, listMyTickets, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
 import { Badge, Card, Divider, TecnicoChip } from '@helpdesk/shared';
@@ -66,7 +67,11 @@ export function MisSolicitudesScreen({ navigation }: Props) {
     }
   }, [estado, prioridad, qDebounced]);
 
-  useEffect(() => { fetchPage(0, { reset: true }); }, [fetchPage]);
+  useFocusEffect(
+    useCallback(() => {
+      void fetchPage(0, { reset: true });
+    }, [fetchPage]),
+  );
 
   // Resolver nombres de técnicos vía RPC segura (respeta RLS de profiles)
   useEffect(() => {

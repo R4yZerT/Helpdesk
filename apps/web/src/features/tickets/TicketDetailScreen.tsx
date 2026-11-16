@@ -417,7 +417,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
               {transError ? <Text style={s.error}>{transError}</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {nextEstados.map((e) => (
-                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
                     {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : ticket.estado === 'cerrado' ? 'Reabrir ticket' : 'Devolver al técnico'}</Text>}
                   </Pressable>
                 ))}
@@ -435,7 +435,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
             {transError ? <Text style={s.error}>{transError}</Text> : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {nextEstados.map((e) => (
-                <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
                   {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
                 </Pressable>
               ))}
