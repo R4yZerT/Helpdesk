@@ -85,19 +85,19 @@ export function DetalleTecnicoScreen({ route }: Props) {
       try {
         const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length) setTecnicoNombres(await fetchTecnicoNombres(supabase, ids));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
       try {
         const ms = await fetchMesas(supabase);
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
         setMesasRaw(ms.map((x) => ({ id: x.id, nombre: x.nombre })));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
         setCategoriasRaw(cats.map((c) => ({ id: c.id, dominio: c.dominio, subcategoria: c.subcategoria })));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }, [id]);
 
@@ -178,7 +178,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
       const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl;
       if (url && typeof window !== 'undefined') window.open(url, '_blank');
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
   };
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);

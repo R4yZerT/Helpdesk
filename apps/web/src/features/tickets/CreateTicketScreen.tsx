@@ -97,7 +97,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
       })();
     }, 800);
     return () => { cancelado = true; if (debounceRef.current) clearTimeout(debounceRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.asunto, form.descripcion, categorias, mesas]);
 
   const humanizeError = (msg: string) => {
@@ -156,10 +155,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     }
     setSubmitting(true);
     try {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) {
-        // eslint-disable-next-line no-console
-        console.log('[CreateTicket] submit', form);
-      }
       const { data: { user } } = await supabase.auth.getUser();
       const res = await createTicket(supabase, form);
       // Guarda la sugerencia IA vista al crear — el trigger crea la fila pendiente,
@@ -407,7 +402,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
           </Pressable>
           {/* input web nativo oculto */}
           <View style={{ display: 'none' } as unknown as object}>
-            {/* @ts-ignore web only */}
             <input
               ref={fileInputRef as unknown as never}
               type="file"

@@ -112,7 +112,7 @@ export async function getStatsPorEstado(client: SupabaseClient, f: DashboardFilt
     if (tieneFiltrosNoSoportadosPorRpc(f)) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_por_estado', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ estado: r.estado as EstadoTicket, count: Number(r.cnt) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   const data = await fetchDashboardTicketRows(client, 'estado', f);
   const map = new Map<string, number>();
   for (const r of data) map.set(r.estado, (map.get(r.estado) ?? 0) + 1);
@@ -124,7 +124,7 @@ export async function getStatsPorPrioridad(client: SupabaseClient, f: DashboardF
     if (tieneFiltrosNoSoportadosPorRpc(f)) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_por_prioridad', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ prioridad: r.prioridad as PrioridadTicket, count: Number(r.cnt) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   const data = await fetchDashboardTicketRows(client, 'prioridad', f);
   const map = new Map<string, number>();
   for (const r of data) map.set(r.prioridad, (map.get(r.prioridad) ?? 0) + 1);
@@ -137,7 +137,7 @@ export async function getEvolucionPorMesa(client: SupabaseClient, f: DashboardFi
     if (tieneFiltrosNoSoportadosPorRpc(f) || f.desde || f.hasta) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_evolucion', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dia: String(r.dia).slice(0,10), mesaId: Number(r.mesa_id), count: Number(r.cnt) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   const desde = new Date();
   desde.setDate(desde.getDate() - dias);
   const filas = await fetchDashboardTicketRows(client, 'creado_en,mesa_id', {
@@ -168,7 +168,7 @@ export async function getCargaHoraria(client: SupabaseClient, f: DashboardFilter
     if (tieneFiltrosNoSoportadosPorRpc(f) || f.categoriaId) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_carga_horaria', { p_desde: f.desde ?? null, p_hasta: f.hasta ?? null, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), count: Number(r.cnt), nivel: nivel(Number(r.cnt)) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   const data = await fetchDashboardTicketRows(client, 'creado_en', f);
   const bucket = new Map<string, number>();
   for (const r of data) {
@@ -193,7 +193,7 @@ export async function getPicosPrediccion(client: SupabaseClient, f: DashboardFil
     if (tieneFiltrosNoSoportadosPorRpc(f) || f.desde || f.hasta) throw new Error('El RPC aún no acepta todos los filtros');
     const { data, error } = await (client as any).rpc('dashboard_picos_prediccion', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null, p_categoria_id: f.categoriaId ?? null });
     if (!error && data) return (data as any[]).map((r) => ({ dow: Number(r.dow), hour: Number(r.hour), mesaId: r.mesa_id != null ? Number(r.mesa_id) : null, mesaNombre: r.mesa_nombre ?? null, avgCnt: Number(r.avg_cnt), forecastCnt: Number(r.forecast_cnt), nivel: r.nivel as any, esPico: Boolean(r.es_pico) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   // fallback: promedio histórico por dow/hour desde tickets (sin estacionalidad)
   const desde = new Date(); desde.setDate(desde.getDate() - dias);
   const data = await fetchDashboardTicketRows(client, 'creado_en,mesa_id', {
@@ -224,7 +224,7 @@ export async function getPicosResumen(client: SupabaseClient, f: DashboardFilter
   try {
     const { data, error } = await (client as any).rpc('dashboard_picos_resumen', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r)=>({ mesaId:r.mesa_id!=null?Number(r.mesa_id):null, mesaNombre:r.mesa_nombre??null, avgDia:Number(r.avg_dia), forecast7d:Number(r.forecast_7d), forecast30d:Number(r.forecast_30d), peakHour:r.peak_hour!=null?Number(r.peak_hour):null, peakDow:r.peak_dow!=null?Number(r.peak_dow):null }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   return [];
 }
 export async function getPatronesCategoria(client: SupabaseClient, f: DashboardFilters & { dias?: number } = {}): Promise<PatronCategoria[]> {
@@ -235,7 +235,7 @@ export async function getPatronesCategoria(client: SupabaseClient, f: DashboardF
     }
     const { data, error } = await (client as any).rpc('dashboard_patrones_categoria', { p_dias: dias, p_mesa_ids: f.mesaIds ?? null });
     if (!error && data) return (data as any[]).map((r)=>({ categoriaId:Number(r.categoria_id), subcategoria:r.subcategoria, dominio:r.dominio, cntActual:Number(r.cnt_actual), cntPrevio:Number(r.cnt_previo), variacionPct:Number(r.variacion_pct), sharePct:Number(r.share_pct), tendencia:String(r.tendencia) }));
-  } catch (_) {}
+  } catch (_) { /* fallback local sin RPC */ }
   // fallback paginado: compara periodos sin truncar resultados ni omitir filtros.
   const ahora = new Date();
   const desdeActual = f.desde ? new Date(f.desde) : new Date(ahora.getTime() - dias * 86400000);
@@ -253,7 +253,7 @@ export async function getPatronesCategoria(client: SupabaseClient, f: DashboardF
   for(const r of filasPrevias) cp.set(r.categoria_id,(cp.get(r.categoria_id)??0)+1);
   const totalAct=[...ca.values()].reduce((s,n)=>s+n,0)||1; const ids=new Set([...ca.keys(),...cp.keys()]);
   // nombres: intentar fetch
-  let names=new Map<number,{subcategoria:string,dominio:string}>(); try{ const {data: cats}=await (client.from('ticket_categories').select('id,subcategoria,dominio') as any); for(const c of (cats??[]) as any[]) names.set(c.id,{subcategoria:c.subcategoria??String(c.id),dominio:c.dominio}); }catch(_){}
+  const names=new Map<number,{subcategoria:string,dominio:string}>(); try{ const {data: cats}=await (client.from('ticket_categories').select('id,subcategoria,dominio') as any); for(const c of (cats??[]) as any[]) names.set(c.id,{subcategoria:c.subcategoria??String(c.id),dominio:c.dominio}); }catch(_){ /* sin nombres: usa id */ }
   const out:PatronCategoria[]=[]; for(const id of ids){ const act=ca.get(id)??0, prev=cp.get(id)??0; const vari= prev===0? (act>0?100:0) : Number(((act-prev)/prev*100).toFixed(1)); const share=Number((act/totalAct*100).toFixed(1)); let tendencia='estable'; if(act===0) tendencia='sin_demanda'; else if(prev===0&&act>=5) tendencia='nueva_alta'; else if(prev>0&&act/prev>=1.5) tendencia='al_alza'; else if(prev>0&&act/prev<=0.6) tendencia='a_la_baja'; const n=names.get(id)??{subcategoria:String(id),dominio:'—'}; out.push({categoriaId:id, subcategoria:n.subcategoria, dominio:n.dominio, cntActual:act, cntPrevio:prev, variacionPct:vari, sharePct:share, tendencia}); }
   return out.sort((a,b)=>b.cntActual-a.cntActual).slice(0,30);
 }

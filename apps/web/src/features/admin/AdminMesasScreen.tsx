@@ -19,7 +19,7 @@ function getErrorMessage(e: unknown): string {
     const o = e as Record<string, unknown>;
     if (typeof o.message === 'string' && o.message.trim()) return o.message;
     if (typeof o.error === 'string' && o.error.trim()) return o.error;
-    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch { /* ignorado: no bloquea el flujo */ }
   }
   return String(e ?? 'Error desconocido');
 }

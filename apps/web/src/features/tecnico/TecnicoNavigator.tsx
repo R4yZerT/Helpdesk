@@ -59,7 +59,7 @@ function TecnicoWeb() {
         if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
         return;
       }
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
     nav?.navigate(name as never);
   };
   const iconColor = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);

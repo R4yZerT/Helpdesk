@@ -85,7 +85,7 @@ export function AdminUsuariosScreen() {
     } catch (e) {
       const msg = explainUserError(e);
       setErrorMsg(msg);
-      console.warn('[AdminUsuarios] listUsers', e);
+      reportError(e, { flujo: 'admin-usuarios-list' });
     } finally {
       setLoading(false);
       setLoadingMore(false);

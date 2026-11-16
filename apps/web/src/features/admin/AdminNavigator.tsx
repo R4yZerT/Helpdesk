@@ -75,7 +75,7 @@ function AdminWebInner({ activeName, setActiveName, profile, signOut }: { active
         nav?.navigate(name as never);
         return;
       }
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
     nav?.navigate(name as never);
   };
   const ic = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);

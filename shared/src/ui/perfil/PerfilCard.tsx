@@ -41,7 +41,7 @@ export function PerfilCard({ nombre, email, cedula, rol, mesaNombre, telefono, a
   const telTrim = tel.trim();
   const nomErr = !nomTrim ? 'Nombre requerido (vacío o solo espacios)' : nomTrim.length < 2 ? `Nombre muy corto: mínimo 2 caracteres (recibido: ${nomTrim.length})` : null;
   const mailErr = !mailTrim ? 'Correo requerido' : !EMAIL_RE.test(mailTrim) ? 'Formato de correo inválido (ej: nombre@dominio.com)' : null;
-  const telErr = !telTrim ? null : !/^[0-9 +()\-]{7,20}$/.test(telTrim) ? 'Formato: 7-20, solo dígitos, espacios, + ( ) -' : null;
+  const telErr = !telTrim ? null : !/^[-0-9 +()]{7,20}$/.test(telTrim) ? 'Formato: 7-20, solo dígitos, espacios, + ( ) -' : null;
   const dirty = nomTrim !== (nombre ?? '').trim() || mailTrim !== (email ?? '').trim() || telTrim !== (telefono ?? '').trim();
   const hasErr = !!(nomErr || mailErr || telErr);
 

@@ -241,7 +241,6 @@ export function TicketDetailScreen({ route, navigation }: Props) {
       if (reassignMesa !== mesaActual) patch.mesaId = Number(reassignMesa);
       if (!Object.keys(patch).length) { setReassignError('Sin cambios por aplicar'); return; }
       await reassignTicket(supabase, id, patch);
-      await reassignTicket(supabase, id, patch);
       setShowReassign(false);
       setReassignTecnico('');
       setReassignMesa('');
@@ -297,7 +296,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
       const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl;
       if (url && typeof window !== 'undefined') window.open(url, '_blank');
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
   };
   const isOwner = profile?.id === ticket.usuarioId;
   const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;

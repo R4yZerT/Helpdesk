@@ -16,7 +16,7 @@ Hallazgos de la auditoría original re-verificados tras PRs #40–#44:
 | H4 | ✅ Resuelto | `TicketDetailScreen` 546 → 366 líneas (`TicketHeader`, `FsmActions`, `TicketProgress`, `TicketTabs` extraídos) |
 | H5 | ✅ Resuelto (2026-09-22) | Dashboards tipados (`Kpis`, `StatsEstado`, `EvolucionPunto`, `AlertaIA`, etc., rama `fix/low-effort-h5-h6-h11`) |
 | H6 | ✅ Resuelto (2026-09-22) | `ErrorBoundary` compartido en `shared/src/ui/` + envoltorio en `RootNavigator` web/mobile |
-| H7 | ⚠️ Vigente | Sin Sentry/LogRocket; `console.warn` sigue como manejo de errores |
+| H7 | ⚠️ Parcial (2026-11-16) | Rutas críticas usan `reportError`; falta verificar eventos reales con DSN |
 | H11 | ✅ Resuelto (2026-09-22) | Tabs con `IconInbox`/`IconPlus`/`IconUser`/`IconGrid`/`IconSettings`/`IconMenu` de `shared/src/ui/icons.tsx`, sin emojis |
 | H14 | ✅ Resuelto | `TecnicoNavigator` extraído de `RootNavigator`; stack duplicado eliminado |
 | Nuevo | ✅ | Tarjeta `PrecisionIa` + `getMetricasIaFeedback` integradas vía `ChartsSection` (PR #40 + merge d249f03) |
@@ -32,7 +32,7 @@ Re-verificación técnica con conteos reales (no solo declaración):
 | H3/H4 | ✅ Resuelto | `CreateTicketScreen.tsx:377`, `TicketDetailScreen.tsx:366`. Extracciones verificadas |
 | H5 | ⚠️ Parcial | Persisten `as any` / `: any` en borde Supabase/Dashboard: `apps/web/.../DashboardScreen.tsx:47-48,77-78,91-94` y `shared/src/ui/dashboard/ChartsSection.tsx:13-16` (`picos: any[]`). Tipos base existen, falta aplicarlos en el borde |
 | H6 | ⚠️ Parcial | `shared/src/ui/ErrorBoundary.tsx:17` + uso solo en `RootNavigator.tsx:101` (web/mobile). Falta boundary por navigator/feature. `ErrorBoundary` además hace `console.warn` si no hay reportero |
-| H7 | ⚠️ Vigente | `apps/web/src/lib/sentry.ts` y `apps/mobile/src/lib/sentry.ts` existen pero son no-op sin `EXPO_PUBLIC_SENTRY_DSN`. 52 `console.warn/error` en `apps/` siguen. Sin telemetría real |
+| H7 | ⚠️ Parcial (2026-11-16) | `sentry.ts` web/mobile existe; rutas críticas de tickets/admin migradas de `console.warn` a `reportError`. Sin DSN no hay envío real; los logs de configuración/push quedan intencionalmente locales |
 | H8 | ⚠️ Vigente | `mapAdjunto` en `shared/src/tickets.ts:288-292` mantiene `storage_path ?? ruta ?? nombre_original ?? nombre ?? filename`. Drift de schema no unificado |
 | H9 | ⚠️ Parcial | Implementado `textSearch('search_vector', q, { type: 'websearch', config: 'spanish' })` con fallback a ILIKE en `shared/src/tickets.ts:377,626` + `fulltext-search.test.ts`. Pendiente: migración `search_vector` + índice GIN + backfill en producción |
 | H10 | ⚠️ Vigente | Sin operaciones masivas (bulk reasignar/cerrar/cambiar prioridad) |
@@ -316,3 +316,24 @@ configuración remota de Supabase o los workflows de producción hayan sido veri
 - Límite arquitectónico pendiente: `shared` aún mezcla UI, dominio y acceso a
   Supabase; conviene separar contratos/datos, casos de uso y componentes visuales
   en cambios graduales con pruebas de integración RLS.
+
+## 9. Actualización de observabilidad, lint y E2E (2026-11-16)
+
+- H7 queda parcialmente cerrado en código: las rutas críticas de tickets, admin y
+  navegación de web/móvil ya no usan `console.warn` para errores; llaman a
+  `reportError` con un contexto `flujo`. Se retiraron logs de depuración del submit
+  de creación de tickets para no exponer datos del formulario. Los avisos de
+  configuración de Supabase, la indisponibilidad esperada de push en Expo Go y el
+  fallback local de `sentry.ts` se mantienen intencionalmente.
+- Se agregó `shared/src/qa-h7-observabilidad.test.ts` como regresión estática: falla
+  si vuelven logs directos en `apps/*/src/features` o si un flujo crítico deja de
+  usar `reportError`.
+- `pnpm -r lint` pasa sin errores (quedan advertencias de tipado estricto y variables
+  sin usar). `pnpm -r typecheck` y los tests unitarios pasan.
+- E2E web: 24 casos descubiertos, 11 pasan y 13 se omiten por credenciales de rol no
+  configuradas. La ejecución local usa `PLAYWRIGHT_CHANNEL=chrome` cuando el
+  navegador de Playwright no está disponible; no sustituye una corrida autenticada
+  en CI/staging.
+- Sigue pendiente verificar un evento real en Sentry con `EXPO_PUBLIC_SENTRY_DSN`,
+  medir p50/p95 con tráfico real, separar gradualmente `shared` y añadir integración
+  RLS/mobile. Estas tareas no se consideran cerradas por los tests locales.

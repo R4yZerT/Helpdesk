@@ -194,10 +194,6 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
     }
     setSubmitting(true);
     try {
-      if (typeof __DEV__ !== 'undefined' && __DEV__) {
-        // eslint-disable-next-line no-console
-        console.log('[CreateTicket] submit', form);
-      }
       const { data: { user } } = await supabase.auth.getUser();
       const res = await createTicket(supabase, form);
       // Guarda la sugerencia IA vista al crear — el trigger crea la fila pendiente,
