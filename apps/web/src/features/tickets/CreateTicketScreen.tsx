@@ -49,6 +49,8 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
   // Si el usuario elige dependencia/categoría manualmente, la IA no debe sobrescribir.
   const eleccionManualRef = useRef(false);
   const [tecnicosMesa, setTecnicosMesa] = useState<TecnicoDeMesa[]>([]);
+  const [tecnicoError, setTecnicoError] = useState<string | null>(null);
+  const [tecnicoReload, setTecnicoReload] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [adjuntos, setAdjuntos] = useState<{ name: string; size: number; type: string; file: File }[]>([]);
   const [adjuntoError, setAdjuntoError] = useState<string | null>(null);
@@ -74,13 +76,23 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
 
   // Técnicos disponibles de la dependencia seleccionada (para confirmar/cambiar)
   useEffect(() => {
+    setTecnicosMesa([]);
+    setTecnicoError(null);
     if (form.mesaId == null) { setTecnicosMesa([]); return; }
     let alive = true;
     listTecnicosPorMesa(supabase, form.mesaId)
-      .then((t) => { if (alive) setTecnicosMesa(t.filter((x) => x.activo)); })
-      .catch(() => { if (alive) setTecnicosMesa([]); });
+      .then((tecnicos) => {
+        if (alive) setTecnicosMesa(tecnicos);
+      })
+      .catch((error: unknown) => {
+        reportError(error, { flujo: 'crear-ticket-tecnicos', mesaId: String(form.mesaId) });
+        if (alive) {
+          setTecnicosMesa([]);
+          setTecnicoError('No se pudieron cargar los técnicos de esta dependencia. Puedes reintentar o dejar la solicitud en cola.');
+        }
+      });
     return () => { alive = false; };
-  }, [form.mesaId]);
+  }, [form.mesaId, tecnicoReload]);
 
   // IA: analiza asunto+descripcion con debounce 800ms, min 20 chars.
   // BETO primero (micro-API), reglas locales como fallback. Solo auto-aplica si el
@@ -410,6 +422,18 @@ export function CreateTicketScreen({ navigation }: { navigation?: { goBack: () =
               setForm(f => ({ ...f, tecnicoAsignadoId: v === '' ? null : String(v) }));
             }}
           />
+          {tecnicoError ? (
+            <View style={{ gap: 6 }}>
+              <Text style={s.error}>{tecnicoError}</Text>
+              <Pressable
+                onPress={() => setTecnicoReload((version) => version + 1)}
+                accessibilityRole="button"
+                accessibilityLabel="Reintentar cargar técnicos"
+              >
+                <Text style={s.sectionHint}>Reintentar</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <Text style={s.sectionHint}>Vacío = cola de la dependencia. La IA no sugiere técnico: lo asigna el jefe de mesa.</Text>
           {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
           {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}

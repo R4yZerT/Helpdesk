@@ -2,7 +2,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { credenciales, loginComo } from './helpers';
 
-test.use({ video: 'on' });
+test.use({ video: 'on', actionTimeout: 20_000 });
 test.setTimeout(300_000);
 
 const solicitante = credenciales('E2E_TEST');
@@ -47,6 +47,10 @@ async function totalDashboard(page: Page): Promise<number> {
   return Number(delta.match(/^(\d+) total$/)?.[1]);
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ page }) => {
   const asunto = `Demo E2E HelpDesk ${Date.now()}`;
   const solucion = 'Se reinició el servicio y se verificó la conexión con el usuario.';
@@ -69,7 +73,7 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await page.getByRole('button', { name: /^Dependencia \*/ }).click();
   await page.getByRole('button', { name: demoMesa, exact: true }).click();
   await page.getByRole('button', { name: /^Categoría \*/ }).click();
-  await page.getByRole('button', { name: demoCategoria, exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(`^${escapeRegExp(demoCategoria)} · `) }).click();
   await page.getByRole('button', { name: /^Técnico \(opcional\):/ }).click();
   await page.getByRole('button', { name: tecnicoNombre, exact: true }).click();
 
@@ -89,7 +93,7 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await expect(page.getByLabel('Buscar bandeja técnico')).toBeVisible({ timeout: 20_000 });
   await page.getByLabel('Buscar bandeja técnico').fill(asunto);
   const ticketEnBandeja = page.getByRole('button', {
-    name: new RegExp(`^Ticket #.*${asunto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+    name: new RegExp(`^Ticket #.*${escapeRegExp(asunto)}$`),
   });
   await expect(ticketEnBandeja).toBeVisible({ timeout: 30_000 });
   await ticketEnBandeja.click();
