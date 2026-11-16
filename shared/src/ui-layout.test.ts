@@ -8,12 +8,14 @@ import * as TestRenderer from 'react-test-renderer';
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
+  ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { create: (s: unknown) => s },
 }));
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const { ScreenHeader } = await import('./ui/layout/ScreenHeader.js');
+const { EmptyState, ListFooter, ListLoading } = await import('./ui/ListStates.js');
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -55,6 +57,36 @@ describe('ScreenHeader compartido', () => {
   });
 });
 
+describe('estados de lista compartidos', () => {
+  it('muestra carga, contenido vacío y estado opcional de paginación', () => {
+    let loading!: TestRenderer.ReactTestRenderer;
+    let empty!: TestRenderer.ReactTestRenderer;
+    let footer!: TestRenderer.ReactTestRenderer;
+    let hiddenFooter!: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      loading = TestRenderer.create(
+        React.createElement(ListLoading, { label: 'Cargando usuarios…' }),
+      );
+      empty = TestRenderer.create(
+        React.createElement(
+          EmptyState,
+          { title: 'Sin usuarios', description: 'Ajusta filtros.' },
+          React.createElement('Text', null, 'Crear usuario'),
+        ),
+      );
+      footer = TestRenderer.create(React.createElement(ListFooter, { loading: true }));
+      hiddenFooter = TestRenderer.create(React.createElement(ListFooter, { loading: false }));
+    });
+
+    expect(textos(loading)).toContain('Cargando usuarios…');
+    expect(textos(empty)).toContain('Sin usuarios');
+    expect(textos(empty)).toContain('Ajusta filtros.');
+    expect(textos(empty)).toContain('Crear usuario');
+    expect(footer.root.findAllByType('ActivityIndicator' as never)).toHaveLength(1);
+    expect(hiddenFooter.toJSON()).toBeNull();
+  });
+});
+
 describe('navegación y headers sin duplicación local', () => {
   const WEB_NAVEGADORES = [
     'apps/web/src/features/admin/AdminNavigator.tsx',
@@ -93,6 +125,25 @@ describe('navegación y headers sin duplicación local', () => {
       'apps/web/src/features/admin/AdminUsuariosScreen.tsx',
     ];
     const faltantes = pantallas.filter((rel) => !leer(rel).includes('ScreenHeader'));
+    expect(faltantes).toEqual([]);
+  });
+
+  it('las pantallas admin comparten loading, empty state y paginación', () => {
+    const pantallas = [
+      'apps/mobile/src/features/admin/AdminMesasScreen.tsx',
+      'apps/mobile/src/features/admin/AdminUsuariosScreen.tsx',
+      'apps/web/src/features/admin/AdminMesasScreen.tsx',
+      'apps/web/src/features/admin/AdminUsuariosScreen.tsx',
+    ];
+    const faltantes = pantallas.filter((rel) => {
+      const fuente = leer(rel);
+      return (
+        !fuente.includes('<ListLoading') ||
+        !fuente.includes('<EmptyState') ||
+        !fuente.includes('<ListFooter') ||
+        /emptyTitle:\s*\{/.test(fuente)
+      );
+    });
     expect(faltantes).toEqual([]);
   });
 });

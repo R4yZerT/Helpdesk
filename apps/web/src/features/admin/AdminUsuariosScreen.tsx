@@ -1,7 +1,7 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, ScreenHeader, formatRol } from '@helpdesk/shared';
+import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, EmptyState, FilterDropdown, ListFooter, ListLoading, ScreenHeader, formatRol } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { reportError } from '../../lib/sentry';
@@ -293,7 +293,7 @@ export function AdminUsuariosScreen() {
   };
 
   if (loading && users.length === 0) {
-    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando usuarios…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+    return <ListLoading label="Cargando usuarios…" fullScreen>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</ListLoading>;
   }
 
   return (
@@ -351,8 +351,8 @@ export function AdminUsuariosScreen() {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-          ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin usuarios</Text><Text style={s.mutedCenter}>Ajusta filtros o crea el primer usuario.</Text></View>}
-          ListFooterComponent={loadingMore ? <View style={{ padding: 12, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+          ListEmptyComponent={<EmptyState title="Sin usuarios" description="Ajusta filtros o crea el primer usuario." style={{ marginTop: 12 }} titleStyle={{ fontSize: 13 }} />}
+          ListFooterComponent={<ListFooter loading={loadingMore} />}
           contentContainerStyle={s.tableContent}
         />
       </View>
@@ -461,9 +461,6 @@ export function AdminUsuariosScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
-  muted: { color: theme.colors.muted, fontSize: 12 },
-  mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
   exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
   exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
@@ -537,8 +534,6 @@ const s = StyleSheet.create({
   iconBtnOn: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   iconBtnOff: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   iconBtnText: { fontSize: 12, fontWeight: '800', color: theme.colors.text },
-  empty: { alignItems: 'center', padding: 24, gap: 8, marginTop: 12 },
-  emptyTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.text },
   // Modales
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalCard: { width: '100%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], gap: 12, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
