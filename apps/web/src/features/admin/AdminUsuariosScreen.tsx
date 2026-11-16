@@ -1,7 +1,7 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, EmptyState, FilterDropdown, ListFooter, ListLoading, ScreenHeader, formatRol } from '@helpdesk/shared';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, EmptyState, FilterDropdown, FilterToolbar, ListFooter, ListLoading, ScreenHeader, formatRol } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { reportError } from '../../lib/sentry';
@@ -308,18 +308,13 @@ export function AdminUsuariosScreen() {
 
       {/* Filtros */}
       <View style={s.filterCard}>
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
-          {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
-        </View>
-        <View style={s.dropdownRow}>
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por nombre" layout="stack">
           <FilterDropdown label="Rol" value={rol} onSelect={(v) => setRol(v as never)} options={[{ value: 'todos', label: 'Todos' }, ...ROLES.map((r) => ({ value: r, label: formatRol(r as never) }))]} />
           {isGeneralAdmin ? (
             <FilterDropdown label="Dependencia" value={(mesaId as unknown as string) as never} onSelect={(v) => setMesaId(v === 'todos' ? 'todos' : (v as unknown as number))} options={[{ value: 'todos' as const, label: 'Todas' }, ...mesas.map((m) => ({ value: String(m.id) as unknown as never, label: m.nombre }))]} />
           ) : null}
           <FilterDropdown label="Estado" value={activo as never} onSelect={(v) => setActivo(v as never)} options={[{ value: 'todos' as const, label: 'Todos' }, { value: true as const, label: 'Activos' }, { value: false as const, label: 'Inactivos' }]} />
-        </View>
+        </FilterToolbar>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
@@ -473,16 +468,6 @@ const s = StyleSheet.create({
     backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[3],
     borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft,
   },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt,
-    borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.space[3], height: 40,
-  },
-  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
-  search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  clearBtn: { padding: 6, marginLeft: 6 },
-  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
-  dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   chipsScroll: { gap: 12 },
   chipsBlock: { gap: 6, marginRight: 12 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },

@@ -3,7 +3,7 @@
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, EmptyState, ListFooter, ListLoading, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
+import { Card, EmptyState, ListFooter, ListLoading, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, FilterToolbar, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
@@ -200,12 +200,9 @@ export function AdminMesasScreen() {
       </ScreenHeader>
 
       <View style={s.filterCard}>
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
-          {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
-        </View>
-        <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por nombre" accessibilityLabel="Buscar mesas">
+          <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
+        </FilterToolbar>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''} · Pág. {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters} style={s.linkBtn}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
@@ -285,11 +282,6 @@ const s = StyleSheet.create({
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filterCard: { marginHorizontal: theme.space[3], marginBottom: theme.space[3], gap: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40 },
-  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
-  search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  clearBtn: { padding: 6, marginLeft: 6 },
-  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
   chipsBlock: { gap: 6 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
