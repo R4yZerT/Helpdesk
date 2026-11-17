@@ -2,7 +2,8 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, APP_HEADER_OPTIONS, NotificationBell, IconLayers, IconPlus, IconTag } from '@helpdesk/shared';
+import type { NavigationProp } from '@react-navigation/native';
+import { theme, AppShell, APP_HEADER_OPTIONS, NotificationBell, IconLayers, IconPlus, IconTag, withScreenBoundary } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
 import { AlertasIAScreen } from './AlertasIAScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -10,9 +11,31 @@ import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import type { JefeStackParamList } from '../../navigation/types';
 import { supabase } from '../../lib/supabase';
+import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
 
 const Stack = createNativeStackNavigator<JefeStackParamList>();
+
+const DashboardAislado = withScreenBoundary(DashboardScreen, {
+  titulo: 'El dashboard no pudo cargarse',
+  onError: (error) => reportError(error, { flujo: 'jefe-dashboard' }),
+});
+const CrearTicketAislado = withScreenBoundary(CreateTicketScreen, {
+  titulo: 'La nueva solicitud no pudo cargarse',
+  onError: (error) => reportError(error, { flujo: 'jefe-crear-ticket' }),
+});
+const AlertasAisladas = withScreenBoundary(AlertasIAScreen, {
+  titulo: 'Las alertas IA no pudieron cargarse',
+  onError: (error) => reportError(error, { flujo: 'jefe-alertas-ia' }),
+});
+const PerfilAislado = withScreenBoundary(PerfilScreen, {
+  titulo: 'El perfil no pudo cargarse',
+  onError: (error) => reportError(error, { flujo: 'jefe-perfil' }),
+});
+const DetalleAislado = withScreenBoundary(TicketDetailScreen, {
+  titulo: 'El detalle del ticket no pudo cargarse',
+  onError: (error) => reportError(error, { flujo: 'jefe-detalle-ticket' }),
+});
 
 function titleFor(name: string) {
   if (name === 'Perfil') return 'Mi perfil';
@@ -23,23 +46,17 @@ function titleFor(name: string) {
 }
 
 function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeName: string; setActiveName: (n: string) => void; profile: { full_name?: string | null; email?: string | null; rol: string } | null; signOut: () => void }) {
-  const [nav, setNav] = React.useState<import('@react-navigation/native').NavigationProp<JefeStackParamList> | null>(null);
+  const navRef = React.useRef<NavigationProp<JefeStackParamList> | null>(null);
   const isActive = (id: string) => {
     if (id === 'dashboard') return activeName === 'Dashboard';
     if (id === 'crear') return activeName === 'CrearTicket';
     if (id === 'alertas') return activeName === 'Alertas';
     return false;
   };
-  const navigate = (name: string) => {
+  const navigate = React.useCallback((name: keyof JefeStackParamList) => {
     if (activeName === name) return;
-    try {
-      const anyNav = nav as unknown as { getState?: () => { routes: { name: string }[] } };
-      const st = anyNav?.getState?.();
-      const hasTarget = st?.routes?.some((r) => r.name === name);
-      if (hasTarget) { nav?.navigate(name as never); return; }
-    } catch { /* ignorado: no bloquea el flujo */ }
-    nav?.navigate(name as never);
-  };
+    navRef.current?.navigate(name as never);
+  }, [activeName]);
   const ic = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
   const onPerfil = React.useCallback(() => {
     navigate('Perfil');
@@ -57,14 +74,14 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       onLogout={signOut}
       onUserPress={onPerfil}
       topTitle={titleFor(activeName)}
-      headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
+      headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => navRef.current?.navigate('DetalleTicket', { id })} />}
     >
       <Stack.Navigator screenOptions={{ ...APP_HEADER_OPTIONS, headerShown: false }} initialRouteName="Dashboard">
-        <Stack.Screen name="Dashboard" component={DashboardScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
-        <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-        <Stack.Screen name="Alertas" component={AlertasIAScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })} />
-        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
-        <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
+        <Stack.Screen name="Dashboard" component={DashboardAislado} listeners={({ navigation }) => ({ focus: () => { navRef.current = navigation; setActiveName('Dashboard'); } })} />
+        <Stack.Screen name="CrearTicket" component={CrearTicketAislado} listeners={({ navigation }) => ({ focus: () => { navRef.current = navigation; setActiveName('CrearTicket'); } })} />
+        <Stack.Screen name="Alertas" component={AlertasAisladas} listeners={({ navigation }) => ({ focus: () => { navRef.current = navigation; setActiveName('Alertas'); } })} />
+        <Stack.Screen name="Perfil" component={PerfilAislado} listeners={({ navigation }) => ({ focus: () => { navRef.current = navigation; setActiveName('Perfil'); } })} />
+        <Stack.Screen name="DetalleTicket" component={DetalleAislado} listeners={({ navigation }) => ({ focus: () => { navRef.current = navigation; setActiveName('DetalleTicket'); } })} />
       </Stack.Navigator>
     </AppShell>
   );
