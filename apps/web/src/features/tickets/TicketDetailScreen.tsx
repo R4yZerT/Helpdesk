@@ -1,7 +1,7 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, listTecnicosPorMesa, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, FilterDropdown, TicketCommentList, TicketCommentComposer, TicketHistoryList, TicketSatisfactionCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -76,6 +76,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   // Técnicos activos de la dependencia elegida en la reasignación
   const [tecnicosMesa, setTecnicosMesa] = useState<{ id: string; nombre: string }[]>([]);
+  const [tecnicosMesaLoading, setTecnicosMesaLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
   const [mesas, setMesas] = useState<Record<number, string>>({});
@@ -122,15 +123,33 @@ export function TicketDetailScreen({ route, navigation }: Props) {
 
   // Cargar técnicos activos de la dependencia elegida al reasignar
   useEffect(() => {
-    if (!showReassign || !reassignMesa) return;
+    if (!showReassign || !reassignMesa) {
+      setTecnicosMesaLoading(false);
+      return;
+    }
+    const mesaId = Number(reassignMesa);
+    if (!Number.isInteger(mesaId) || mesaId <= 0) {
+      setTecnicosMesa([]);
+      setTecnicosMesaLoading(false);
+      setReassignError('Selecciona una dependencia válida');
+      return;
+    }
     let alive = true;
-    (async () => {
-      try {
-        const { data } = await supabase.from('profiles').select('id,full_name,email').eq('mesa_id', Number(reassignMesa)).eq('rol', 'tecnico').eq('activo', true).order('full_name');
+    setTecnicosMesa([]);
+    setTecnicosMesaLoading(true);
+    setReassignError(null);
+    void listTecnicosPorMesa(supabase, mesaId)
+      .then((tecnicos) => {
+        if (alive) setTecnicosMesa(tecnicos.map((tecnico) => ({ id: tecnico.id, nombre: tecnico.fullName || tecnico.email || 'Técnico' })));
+      })
+      .catch((e: unknown) => {
         if (!alive) return;
-        setTecnicosMesa(((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map((t) => ({ id: t.id, nombre: t.full_name ?? t.email ?? 'Técnico' })));
-      } catch (e) { reportError(e, { flujo: 'detalle-tecnicos-mesa' }); }
-    })();
+        reportError(e, { flujo: 'detalle-tecnicos-mesa' });
+        setReassignError(e instanceof Error ? e.message : 'No se pudieron cargar los técnicos');
+      })
+      .finally(() => {
+        if (alive) setTecnicosMesaLoading(false);
+      });
     return () => { alive = false; };
   }, [showReassign, reassignMesa]);
 
@@ -453,7 +472,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
           <View style={{ gap: 8 }}>
             <Text style={s.mutedSmall}>Asignado actual: {nombreAsignadoActual}</Text>
             <FilterDropdown label="Dependencia" value={reassignMesa as never} options={Object.entries(mesas).map(([idMesa, nombre]) => ({ value: idMesa as never, label: nombre }))} onSelect={(v) => { setReassignMesa(v as string); setReassignTecnico(''); }} placeholder="Seleccionar dependencia" />
-            <FilterDropdown label="Técnico de la dependencia" value={reassignTecnico as never} options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicosMesa.map((t) => ({ value: t.id as never, label: t.nombre }))]} onSelect={(v) => setReassignTecnico(v as string)} placeholder={tecnicosMesa.length ? 'Seleccionar técnico' : 'Sin técnicos en esta dependencia'} />
+            <FilterDropdown label="Técnico de la dependencia" value={reassignTecnico as never} options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicosMesa.map((t) => ({ value: t.id as never, label: t.nombre }))]} onSelect={(v) => setReassignTecnico(v as string)} disabled={tecnicosMesaLoading} placeholder={tecnicosMesaLoading ? 'Cargando técnicos…' : tecnicosMesa.length ? 'Seleccionar técnico' : 'Sin técnicos en esta dependencia'} />
             {reassignError ? <Text style={s.error}>{reassignError}</Text> : null}
             <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && { opacity: 0.6 }]}>{reassignLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Confirmar reasignación</Text>}</Pressable>
           </View>
