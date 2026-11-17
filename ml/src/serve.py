@@ -23,6 +23,7 @@ from typing import Any
 
 import torch
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -63,6 +64,17 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
 
 
 app = FastAPI(title="BETO tickets", lifespan=lifespan)
+
+# CORS: el navegador llama a BETO desde otro origen (Netlify, nginx :3000, Expo :8081).
+# Sin este middleware el preflight OPTIONS devuelve 405 y la app cae siempre a las reglas.
+# BETO no usa cookies ni credenciales: el default "*" solo publica un clasificador de solo lectura.
+ORIGENES = [o.strip() for o in os.environ.get("BETO_CORS_ORIGINS", "*").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ORIGENES,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 
 class ClassifyIn(BaseModel):

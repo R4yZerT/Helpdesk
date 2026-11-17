@@ -26,6 +26,13 @@ describe('BETO prod: imagen y compose', () => {
     expect(r).not.toMatch(/^torch==/m);
   });
 
+  it('serve.py responde CORS al navegador (preflight desde otro origen)', () => {
+    const s = repo('ml/src/serve.py');
+    expect(s).toContain('CORSMiddleware');
+    expect(s).toContain('BETO_CORS_ORIGINS');
+    expect(s).toMatch(/allow_origins=/);
+  });
+
   it('compose levanta beto con modelo read-only y web lo espera', () => {
     const c = repo('docker-compose.yml');
     expect(c).toMatch(/beto:/);
