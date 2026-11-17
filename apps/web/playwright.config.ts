@@ -16,7 +16,7 @@ export default defineConfig({
     ...(channel ? { channel } : {}),
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } },
     // H16 — smoke mobile mínimo: mismos flujos sin backend en viewport móvil
     {
       name: 'mobile',

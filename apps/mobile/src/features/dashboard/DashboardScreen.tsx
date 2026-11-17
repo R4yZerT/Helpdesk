@@ -5,10 +5,7 @@ import { FilterBar, theme, getDashboardSnapshot, listAlertasIA, generarAlertasIA
 import { supabase } from '../../lib/supabase';
 import { reportError, withPerformanceSpan } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
-import { KpiRow } from '@helpdesk/shared/ui/dashboard/KpiRow.js';
-import { EstadoPrioridadRow } from '@helpdesk/shared/ui/dashboard/EstadoPrioridadRow.js';
-import { ChartsSection } from '@helpdesk/shared/ui/dashboard/ChartsSection.js';
-import { CargaAlertasSection } from '@helpdesk/shared/ui/dashboard/CargaAlertasSection.js';
+import { KpiRow, EstadoPrioridadRow, ChartsSection, CargaAlertasSection } from '@helpdesk/shared';
 
 export function DashboardScreen() {
   const fb = useFeedback();
