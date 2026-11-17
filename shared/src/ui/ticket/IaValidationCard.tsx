@@ -2,7 +2,7 @@
 // El técnico asignado confirma (sí) o reclasifica (no, obligatorio).
 // Sin respuesta el registro queda pendiente y NO es apto para entrenamiento.
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   confirmarClasificacion,
@@ -18,13 +18,20 @@ type Props = {
   ticketId: string;
   ticketMesaId: number | null;
   ticketCategoriaId: number | null;
+  ticketTecnicoAsignadoId: string | null;
   validadorId: string | null;
   mesas: { id: number; nombre: string }[];
   categorias: { id: number; dominio: string; subcategoria: string }[];
   onValidated?: (fb: TicketIaFeedback) => void;
 };
 
-export function IaValidationCard({ supabase, ticketId, ticketMesaId, ticketCategoriaId, validadorId, mesas, categorias, onValidated }: Props) {
+// Fuentes reales de una sugerencia; 'desconocida' = fila creada sin sugerencia.
+const FUENTE_LABEL: Record<string, string> = {
+  beto: 'BETO',
+  reglas: 'reglas locales',
+};
+
+export function IaValidationCard({ supabase, ticketId, ticketMesaId, ticketCategoriaId, ticketTecnicoAsignadoId, validadorId, mesas, categorias, onValidated }: Props) {
   const [fb, setFb] = useState<TicketIaFeedback | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,21 +50,25 @@ export function IaValidationCard({ supabase, ticketId, ticketMesaId, ticketCateg
     return () => { alive = false; };
   }, [supabase, ticketId]);
 
-  if (loading) {
-    return (
-      <View style={s.box}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={s.muted}>Revisando clasificación IA…</Text>
-      </View>
-    );
-  }
+  if (loading) return null;
   // Sin fila (tickets legacy) o ya validada → no bloquear.
   if (!fb || fb.estado !== 'pendiente') return null;
-  if (!validadorId) return null;
+  // Solo valida el técnico al que se asignó automáticamente este ticket.
+  if (!validadorId || validadorId !== ticketTecnicoAsignadoId) return null;
+  // No presentar como IA una clasificación manual o de origen desconocido.
+  if (!(fb.fuente in FUENTE_LABEL)) return null;
+  // El trigger crea una fila vacía por ticket: sin sugerencia no hay nada que validar.
+  const haySugerencia = fb.sugeridoCategoriaId != null && fb.sugeridoMesaId != null;
+  if (!haySugerencia) return null;
 
-  const mesaSug = mesas.find((m) => m.id === fb.sugeridoMesaId)?.nombre ?? `#${fb.sugeridoMesaId ?? '—'}`;
+  const mesaSug = mesas.find((m) => m.id === fb.sugeridoMesaId)?.nombre ?? 'No disponible';
   const catSug = categorias.find((c) => c.id === fb.sugeridoCategoriaId);
-  const conf = fb.confianza != null ? `${Math.round(fb.confianza * 100)}%` : '—';
+  const catSugLabel = catSug ? `${catSug.dominio} · ${catSug.subcategoria}` : 'No disponible';
+  const conf = fb.confianza != null ? `${Math.round(fb.confianza * 100)}%` : null;
+  const fuente = FUENTE_LABEL[fb.fuente] ?? null;
+  const mesaActual = mesas.find((m) => m.id === ticketMesaId)?.nombre ?? 'No disponible';
+  const catActual = categorias.find((c) => c.id === ticketCategoriaId);
+  const catActualLabel = catActual ? `${catActual.dominio} · ${catActual.subcategoria}` : 'No disponible';
 
   const onSi = async () => {
     setSaving(true);
@@ -83,15 +94,31 @@ export function IaValidationCard({ supabase, ticketId, ticketMesaId, ticketCateg
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setSaving(false); }
   };
 
-  const catOptions = (nuevaMesa === '' ? categorias : categorias.filter(() => true)).map((c) => ({ value: c.id, label: `${c.dominio} · ${c.subcategoria}` }));
+  const catOptions = categorias.map((c) => ({ value: c.id, label: `${c.dominio} · ${c.subcategoria}` }));
 
   return (
-    <View style={s.card} accessibilityRole="alert">
-      <Text style={s.title}>✦ Valida la clasificación IA (obligatorio)</Text>
-      <Text style={s.text}>
-        Sugerido: {catSug ? `${catSug.dominio} · ${catSug.subcategoria}` : `Cat ${fb.sugeridoCategoriaId ?? '—'}`} · {mesaSug} · conf {conf} · fuente {fb.fuente}
-      </Text>
-      <Text style={s.textMuted}>Actual del ticket: mesa {ticketMesaId ?? '—'} · categoría {ticketCategoriaId ?? '—'}. ¿Está bien clasificado?</Text>
+    <View style={s.card}>
+      <View style={s.heading}>
+        <Text style={s.title}>Validar clasificación sugerida</Text>
+        <Text style={s.intro}>Como técnico asignado, confirma si la clasificación coincide con el problema reportado.</Text>
+      </View>
+      <View style={s.compare}>
+        <View style={s.compareItem}>
+          <Text style={s.label}>Sugerencia de IA</Text>
+          <Text style={s.value}>{catSugLabel}</Text>
+          <Text style={s.detail}>Dependencia: {mesaSug}</Text>
+          {conf || fuente ? (
+            <Text style={s.detail}>
+              {[fuente ? `Fuente: ${fuente}` : null, conf ? `Confianza: ${conf}` : null].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
+        </View>
+        <View style={s.compareItem}>
+          <Text style={s.label}>Clasificación actual</Text>
+          <Text style={s.value}>{catActualLabel}</Text>
+          <Text style={s.detail}>Dependencia: {mesaActual}</Text>
+        </View>
+      </View>
       {!modoCorregir ? (
         <View style={s.row}>
           <Pressable onPress={onSi} disabled={saving} style={[s.btn, s.btnYes]} accessibilityRole="button" accessibilityLabel="Sí, clasificación correcta">
@@ -133,12 +160,15 @@ export function IaValidationCard({ supabase, ticketId, ticketMesaId, ticketCateg
 }
 
 const s = StyleSheet.create({
-  box: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10 },
-  card: { backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12, gap: 8 },
-  title: { fontSize: 12, fontWeight: '800', color: '#92400E' },
-  text: { fontSize: 12, color: theme.colors.textSoft, fontWeight: '600' },
-  textMuted: { fontSize: 11, color: theme.colors.muted },
-  muted: { fontSize: 11, color: theme.colors.muted },
+  card: { backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border, borderLeftWidth: 4, borderLeftColor: theme.colors.primary, borderRadius: 12, padding: 14, gap: 12, ...theme.shadow.soft },
+  heading: { gap: 4 },
+  title: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
+  intro: { fontSize: 12, lineHeight: 17, color: theme.colors.textSoft },
+  compare: { gap: 8 },
+  compareItem: { backgroundColor: theme.colors.surfaceAlt, borderRadius: 10, padding: 10, gap: 3 },
+  label: { fontSize: 10, fontWeight: '800', color: theme.colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 },
+  value: { fontSize: 13, fontWeight: '700', color: theme.colors.text },
+  detail: { fontSize: 11, color: theme.colors.textSoft },
   row: { flexDirection: 'row', gap: 8 },
   col: { gap: 8 },
   btn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', borderWidth: 1 },
