@@ -20,7 +20,6 @@ type Props = {
   nextEstados: string[];
   onTransition: (e: string) => void;
   onReassign: () => void;
-  onCancelTicket: () => void;
   onSetShowTrans: (v: boolean) => void;
   onSetShowReassign: (v: boolean) => void;
   onSolucion: (v: string) => void;
@@ -28,7 +27,7 @@ type Props = {
   onReassignMesa: (v: string) => void;
 };
 
-export function FsmActions({ detail, tecnicoNombres, profileRol, canReassign, showTrans, showReassign, solucion, reassignTecnico, reassignMesa, transLoading, transError, reassignError, isSolicitante, nextEstados, onTransition, onReassign, onCancelTicket, onSetShowTrans, onSetShowReassign, onSolucion, onReassignTecnico, onReassignMesa }: Props) {
+export function FsmActions({ detail, tecnicoNombres, profileRol, canReassign, showTrans, showReassign, solucion, reassignTecnico, reassignMesa, transLoading, transError, reassignError, isSolicitante, nextEstados, onTransition, onReassign, onSetShowTrans, onSetShowReassign, onSolucion, onReassignTecnico, onReassignMesa }: Props) {
   const { ticket } = detail;
   const formatEstado = (e: string) => {
     const m: Record<string, string> = { abierto: 'Abierto', en_proceso: 'En proceso', solucionado: 'Solucionado', cerrado: 'Cerrado', devuelto: 'Devuelto' };

@@ -190,8 +190,9 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const { ticket } = detail;
   const nombreActor = (id?: string | null) => (id ? (tecnicoNombres[id] ?? 'Usuario') : null);
   const isOwner = profile?.id === ticket.usuarioId;
-  const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;
-  const canCancel = canEdit;
+  // El ticket se autoasigna al crearse: cancelar no puede depender del técnico.
+  const canCancel = isOwner && ticket.estado === 'abierto';
+  const canEdit = canCancel && !ticket.tecnicoAsignadoId;
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
@@ -229,9 +230,11 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         <View style={{ gap: 12, flex: isWide ? 8 : undefined }}>
           <Card style={{ gap: 12 }}>
             {/* Description / edit handled in TicketHeader */}
-            {canEdit && !editing ? (
+            {canCancel && !editing ? (
               <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                <Pressable onPress={startEdit} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface }}><Text style={{ color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 }}>Editar</Text></Pressable>
+                {canEdit ? (
+                  <Pressable onPress={startEdit} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface }}><Text style={{ color: theme.colors.textSoft, fontWeight: '700', fontSize: 12 }}>Editar</Text></Pressable>
+                ) : null}
                 <Pressable onPress={onCancelTicket} style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 13, borderRadius: 12, backgroundColor: theme.colors.danger, borderWidth: 1, borderColor: '#FECACA' }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Cancelar solicitud</Text></Pressable>
               </View>
             ) : null}
@@ -275,7 +278,6 @@ export function TicketDetailScreen({ route, navigation }: Props) {
             nextEstados={nextEstados}
             onTransition={onTransition}
             onReassign={onReassign}
-            onCancelTicket={onCancelTicket}
             onSetShowTrans={setShowTrans}
             onSetShowReassign={setShowReassign}
             onSolucion={setSolucion}
