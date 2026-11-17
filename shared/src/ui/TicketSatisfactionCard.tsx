@@ -1,33 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { submitTicketSatisfaccion } from '../tickets.js';
-import { FilterDropdown } from './FilterDropdown.js';
+import { fetchTicketSatisfaccion, submitTicketSatisfaccion, validateTicketSatisfaccion } from '../tickets.js';
 import { theme } from './theme.js';
 
-const QUESTIONS = [
-  ['calidadServicio', '¿Cómo fue la atención del técnico?'],
-  ['tiempoRespuesta', '¿Cómo califica el tiempo de respuesta?'],
-  ['comunicacion', '¿Cómo fue la comunicación durante la atención?'],
-  ['solucionResolvio', '¿La solución resolvió su problema?'],
-] as const;
-
-type Scores = { calidadServicio: number; tiempoRespuesta: number; comunicacion: number; solucionResolvio: number };
-
 export function TicketSatisfactionCard({ client, ticketId }: { client: SupabaseClient; ticketId: string }) {
-  const [scores, setScores] = useState<Scores>({ calidadServicio: 0, tiempoRespuesta: 0, comunicacion: 0, solucionResolvio: 0 });
+  const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void client.from('ticket_satisfaccion').select('id').eq('ticket_id', ticketId).maybeSingle()
-      .then(({ data, error: queryError }) => {
+    setLoading(true);
+    void fetchTicketSatisfaccion(client, ticketId)
+      .then((satisfaction) => {
         if (!active) return;
-        if (queryError) setError(queryError.message);
-        else setSubmitted(!!data);
+        setSubmitted(!!satisfaction);
+        if (satisfaction) {
+          setRating(satisfaction.calificacion);
+          setComment(satisfaction.comentario ?? '');
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => { active = false; };
   }, [client, ticketId]);
@@ -36,7 +37,12 @@ export function TicketSatisfactionCard({ client, ticketId }: { client: SupabaseC
     setError(null);
     setBusy(true);
     try {
-      await submitTicketSatisfaccion(client, ticketId, { ...scores, comentario: comment });
+      const validationError = validateTicketSatisfaccion({ calificacion: rating, comentario: comment });
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+      await submitTicketSatisfaccion(client, ticketId, { calificacion: rating, comentario: comment });
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -48,18 +54,23 @@ export function TicketSatisfactionCard({ client, ticketId }: { client: SupabaseC
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Encuesta de satisfacción</Text>
-      {submitted ? <Text style={styles.done}>Gracias por compartir su experiencia.</Text> : (
+      {loading ? <ActivityIndicator color={theme.colors.primary} /> : submitted ? <Text style={styles.done}>Gracias por compartir su experiencia. Calificación: {rating} de 5.</Text> : (
         <>
-          {QUESTIONS.map(([key, label]) => (
-            <FilterDropdown<number>
-              key={key}
-              label={label}
-              value={scores[key] || ''}
-              options={[1, 2, 3, 4, 5].map((score) => ({ value: score, label: `${score} · ${score === 1 ? 'Muy malo' : score === 5 ? 'Excelente' : 'Regular'}` }))}
-              placeholder="Selecciona una calificación"
-              onSelect={(value) => setScores((current) => ({ ...current, [key]: Number(value) }))}
-            />
-          ))}
+          <Text style={styles.prompt}>¿Qué tan satisfecho estás con la atención recibida?</Text>
+          <View style={styles.stars} accessibilityRole="radiogroup" accessibilityLabel="Calificación de satisfacción">
+            {[1, 2, 3, 4, 5].map((value) => (
+              <Pressable
+                key={value}
+                onPress={() => { setRating(value); setError(null); }}
+                style={[styles.star, value <= rating && styles.starSelected]}
+                accessibilityRole="radio"
+                accessibilityLabel={`${value} ${value === 1 ? 'estrella' : 'estrellas'}`}
+                accessibilityState={{ selected: rating === value }}
+              >
+                <Text style={[styles.starText, value <= rating && styles.starTextSelected]}>{value <= rating ? '★' : '☆'}</Text>
+              </Pressable>
+            ))}
+          </View>
           <TextInput
             value={comment}
             onChangeText={setComment}
@@ -69,7 +80,7 @@ export function TicketSatisfactionCard({ client, ticketId }: { client: SupabaseC
             style={styles.input}
           />
           {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-          <Pressable onPress={send} disabled={busy || Object.values(scores).some((score) => score === 0)} style={[styles.button, (busy || Object.values(scores).some((score) => score === 0)) && styles.disabled]}>
+          <Pressable onPress={send} disabled={busy || rating === 0} style={[styles.button, (busy || rating === 0) && styles.disabled]}>
             <Text style={styles.buttonText}>{busy ? 'Enviando…' : 'Enviar encuesta'}</Text>
           </Pressable>
         </>
@@ -82,6 +93,12 @@ const styles = StyleSheet.create({
   card: { gap: 12, padding: 14, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 14, backgroundColor: theme.colors.surface },
   title: { color: theme.colors.text, fontWeight: '800', fontSize: 16 },
   done: { color: theme.colors.success, fontWeight: '700' },
+  prompt: { color: theme.colors.textSoft, fontSize: 14 },
+  stars: { flexDirection: 'row', gap: 8 },
+  star: { minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, backgroundColor: theme.colors.surfaceAlt },
+  starSelected: { borderColor: theme.colors.accent, backgroundColor: theme.colors.orange50 },
+  starText: { color: theme.colors.mutedSoft, fontSize: 24, lineHeight: 28 },
+  starTextSelected: { color: theme.colors.accentStrong },
   input: { minHeight: 76, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt, textAlignVertical: 'top' },
   error: { color: theme.colors.danger, fontSize: 12 },
   button: { minHeight: 42, borderRadius: 10, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
