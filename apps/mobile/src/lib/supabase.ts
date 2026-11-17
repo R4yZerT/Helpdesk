@@ -12,6 +12,8 @@ const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 export const supabaseConfigError =
   !url || !anonKey ? 'Falta EXPO_PUBLIC_SUPABASE_URL / ANON_KEY en .env' : null;
 
+// Guarda intencional (H7): aviso de arranque; ocurre antes de que Sentry inicie, por eso usa consola.
+// eslint-disable-next-line no-console
 if (supabaseConfigError) console.warn('[supabase]', supabaseConfigError);
 
 export const supabase = (() => {

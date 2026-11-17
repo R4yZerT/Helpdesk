@@ -22,6 +22,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      // Guarda intencional (H7): rastro local solo en dev; el error ya se propaga a Sentry vía onError.
       // eslint-disable-next-line no-console
       console.error('[ErrorBoundary]', error, info.componentStack);
     }

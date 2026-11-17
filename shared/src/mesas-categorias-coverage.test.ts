@@ -52,6 +52,7 @@ function fakeClient(builder: never) {
   };
   return {
     from: vi.fn(() => api),
+    rpc: vi.fn(),
     __api: api,
   } as never;
 }
@@ -204,17 +205,43 @@ describe('mesas: updateMesa / setMesaActiva', () => {
 });
 
 describe('mesas: técnicos', () => {
-  it('listTecnicosPorMesa mapea snake_case y email null a ""', async () => {
-    const rows = [{ id: 'u1', full_name: 'Ana', email: null, activo: true, mesa_id: 2 }];
-    const out = await listTecnicosPorMesa(fakeClient(makeBuilder({ data: rows, error: null })) as never, 2);
+  it('listTecnicosPorMesa usa el RPC y mapea los datos mínimos', async () => {
+    const client = fakeClient(makeBuilder({ data: null, error: null })) as unknown as {
+      rpc: ReturnType<typeof vi.fn>;
+    };
+    client.rpc.mockResolvedValue({
+      data: [{ id: 'u1', full_name: 'Ana' }],
+      error: null,
+    });
+
+    const out = await listTecnicosPorMesa(client as never, 2);
+
+    expect(client.rpc).toHaveBeenCalledWith('list_active_technicians_by_mesa', { p_mesa_id: 2 });
     expect(out).toEqual([{ id: 'u1', fullName: 'Ana', email: '', activo: true, mesaId: 2 }]);
   });
 
   it('listTecnicosPorMesa retorna [] con data null y lanza ante error', async () => {
-    expect(await listTecnicosPorMesa(fakeClient(makeBuilder({ data: null, error: null })) as never, 1)).toEqual([]);
+    const emptyClient = fakeClient(makeBuilder({ data: null, error: null })) as unknown as {
+      rpc: ReturnType<typeof vi.fn>;
+    };
+    emptyClient.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await listTecnicosPorMesa(emptyClient as never, 1)).toEqual([]);
+
+    const errorClient = fakeClient(makeBuilder({ data: null, error: null })) as unknown as {
+      rpc: ReturnType<typeof vi.fn>;
+    };
+    errorClient.rpc.mockResolvedValue({ data: null, error: { message: 'e' } });
     await expect(
-      listTecnicosPorMesa(fakeClient(makeBuilder({ data: null, error: { message: 'e' } })) as never, 1),
+      listTecnicosPorMesa(errorClient as never, 1),
     ).rejects.toEqual({ message: 'e' });
+  });
+
+  it('listTecnicosPorMesa rechaza una mesa inválida sin llamar al RPC', async () => {
+    const client = fakeClient(makeBuilder({ data: null, error: null })) as unknown as {
+      rpc: ReturnType<typeof vi.fn>;
+    };
+    await expect(listTecnicosPorMesa(client as never, 0)).rejects.toThrow('Mesa inválida');
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   it('asignarTecnicoAMesa ok con mesaId y con null', async () => {

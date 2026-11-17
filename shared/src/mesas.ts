@@ -132,20 +132,19 @@ export type TecnicoDeMesa = {
   mesaId: number | null;
 };
 
-/** Técnicos asignados a una mesa (rol=tecnico + mesa_id). */
+/** Técnicos activos de una mesa activa, con datos mínimos para asignar una solicitud. */
 export async function listTecnicosPorMesa(supabase: SupabaseClient, mesaId: number): Promise<TecnicoDeMesa[]> {
-  const { data, error } = await (supabase.from('profiles') as any)
-    .select('id, full_name, email, activo, mesa_id')
-    .eq('rol', 'tecnico')
-    .eq('mesa_id', mesaId)
-    .order('full_name', { ascending: true });
+  if (!Number.isInteger(mesaId) || mesaId <= 0) throw new Error('Mesa inválida');
+  const { data, error } = await supabase.rpc('list_active_technicians_by_mesa', {
+    p_mesa_id: mesaId,
+  });
   if (error) throw error;
-  return ((data ?? []) as Array<{ id: string; full_name: string; email: string | null; activo: boolean; mesa_id: number | null }>).map((r) => ({
+  return ((data ?? []) as Array<{ id: string; full_name: string }>).map((r) => ({
     id: r.id,
     fullName: r.full_name,
-    email: r.email ?? '',
-    activo: r.activo,
-    mesaId: r.mesa_id,
+    email: '',
+    activo: true,
+    mesaId,
   }));
 }
 

@@ -13,6 +13,8 @@ export const supabaseConfigError =
     : null;
 
 if (supabaseConfigError) {
+  // Guarda intencional (H7): aviso de arranque; ocurre antes de que Sentry inicie, por eso usa consola.
+  // eslint-disable-next-line no-console
   console.warn('[supabase]', supabaseConfigError, { url: url || '(vacío)' });
 }
 
