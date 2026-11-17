@@ -20,7 +20,6 @@ type Props = {
   nextEstados: string[];
   onTransition: (e: string) => void;
   onReassign: () => void;
-  onCancelTicket: () => void;
   onSetShowTrans: (v: boolean) => void;
   onSetShowReassign: (v: boolean) => void;
   onSolucion: (v: string) => void;
@@ -28,7 +27,7 @@ type Props = {
   onReassignMesa: (v: string) => void;
 };
 
-export function FsmActions({ detail, tecnicoNombres, profileRol, canReassign, showTrans, showReassign, solucion, reassignTecnico, reassignMesa, transLoading, transError, reassignError, isSolicitante, nextEstados, onTransition, onReassign, onCancelTicket, onSetShowTrans, onSetShowReassign, onSolucion, onReassignTecnico, onReassignMesa }: Props) {
+export function FsmActions({ detail, tecnicoNombres, profileRol, canReassign, showTrans, showReassign, solucion, reassignTecnico, reassignMesa, transLoading, transError, reassignError, isSolicitante, nextEstados, onTransition, onReassign, onSetShowTrans, onSetShowReassign, onSolucion, onReassignTecnico, onReassignMesa }: Props) {
   const { ticket } = detail;
   const formatEstado = (e: string) => {
     const m: Record<string, string> = { abierto: 'Abierto', en_proceso: 'En proceso', solucionado: 'Solucionado', cerrado: 'Cerrado', devuelto: 'Devuelto' };
@@ -45,7 +44,7 @@ export function FsmActions({ detail, tecnicoNombres, profileRol, canReassign, sh
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {nextEstados.map((e) => (
                 <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} style={[{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface }, e === 'cerrado' && { backgroundColor: theme.colors.primary, borderColor: '#FED7AA' }]}>
-                  {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? { color: '#fff', fontWeight: '700', fontSize: 12 } : { color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>{e === 'cerrado' ? 'Confirmar cierre' : 'Devolver al técnico'}</Text>}
+                  {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? { color: '#fff', fontWeight: '700', fontSize: 12 } : { color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>{e === 'cerrado' ? 'Confirmar cierre' : ticket.estado === 'cerrado' ? 'Reabrir ticket' : 'Devolver al técnico'}</Text>}
                 </Pressable>
               ))}
             </View>

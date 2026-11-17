@@ -1,157 +1,87 @@
-// Módulo funcionario-usuario — híbrido: Tabs en native, AppShell sidebar en web (RF-05/06/08/09)
+// Módulo funcionario-usuario — híbrido: Tabs en native, AppShell compartido en web (RF-05/06/08/09)
 import * as React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, IconInbox, IconPlus, IconUser, IconMenu } from '@helpdesk/shared';
-import { Sidebar } from '@helpdesk/shared';
+import type { NavigationProp } from '@react-navigation/native';
+import { AppShell, IconInbox, IconPlus, IconUser, NotificationBell, theme } from '@helpdesk/shared';
+import { supabase } from '../../lib/supabase';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { MisSolicitudesScreen } from '../tickets/MisSolicitudesScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
 import type { UsuarioStackParamList } from '../../navigation/types';
-import type { Profile } from '@helpdesk/shared';
 import { PerfilScreen } from '../perfil/PerfilScreen';
 import { useAuth } from '../../context/AuthContext';
-import { HeaderBell } from '../../components/HeaderBell';
+import { screenOpts, tabOpts } from '../../navigation/nav-options';
 
 const Stack = createNativeStackNavigator<UsuarioStackParamList>();
 const Tab = createBottomTabNavigator();
 
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
+function titleFor(name: keyof UsuarioStackParamList) {
+  if (name === 'Perfil') return 'Mi perfil';
+  if (name === 'CrearTicket') return 'Nueva solicitud';
+  if (name === 'DetalleTicket') return 'Detalle';
+  return 'Mis solicitudes';
+}
 
 // --- Stack interno para bandeja (lista + detalle)
 function MisStack() {
   return (
-    <Stack.Navigator screenOptions={{ ...screenOpts, headerRight: () => <HeaderBell /> }}>
+    <Stack.Navigator screenOptions={screenOpts}>
       <Stack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes' }} component={MisSolicitudesScreen} />
       <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
     </Stack.Navigator>
   );
 }
 
-// --- Web: AppShell estándar — sidebar w-64 fijo (BREAKPOINT 1024) + drawer overlay móvil
-// Estandarizado con shared/src/ui/layout/AppShell.tsx (SIDEBAR_W 256, BREAKPOINT 1024, overlay rgba)
-// Usado en DashboardScreen y todas las vistas web con sidebar
+// --- Web: AppShell unificado (mismo header/sidebar/footer que el resto de módulos)
 function UsuarioWeb() {
-  const [activeName, setActiveName] = React.useState('MisSolicitudes');
+  const [activeName, setActiveName] = React.useState<keyof UsuarioStackParamList>('MisSolicitudes');
+  const [nav, setNav] = React.useState<NavigationProp<UsuarioStackParamList> | null>(null);
   const { profile, signOut } = useAuth();
-  return <UsuarioWebInner activeName={activeName} setActiveName={setActiveName} profile={profile} signOut={signOut} />;
-}
 
-function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { activeName: string; setActiveName: (n: string) => void; profile: Profile | null; signOut: () => void }) {
-  const { width } = useWindowDimensions();
-  const isDesktop = width >= 1024; // BREAKPOINT AppShell estándar
-  const [drawerOpen, setDrawerOpen] = React.useState(false);
-  const [nav, setNav] = React.useState<import('@react-navigation/native').NavigationProp<UsuarioStackParamList> | null>(null);
   const isActive = (id: string) => {
-    if (id === 'mis') return activeName === 'MisSolicitudes' || activeName === 'DetalleTicket' || activeName === 'MisStack';
+    if (id === 'mis') return activeName === 'MisSolicitudes' || activeName === 'DetalleTicket';
     if (id === 'crear') return activeName === 'CrearTicket';
-    return false;
+    return activeName === 'Perfil';
   };
-  const navigateAndClose = (name: string) => {
-    nav?.navigate(name as never);
-    setDrawerOpen(false);
-  };
-  const sidebarContent = (
-    <Sidebar
-      items={[
-        { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigateAndClose('MisSolicitudes') },
-        { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigateAndClose('CrearTicket') },
-      ]}
-      user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol } : undefined}
-      onLogout={signOut}
-    />
+  const navigate = React.useCallback(
+    (name: keyof UsuarioStackParamList) => {
+      if (activeName === name) return;
+      nav?.navigate(name as never);
+    },
+    [activeName, nav],
   );
+  const iconColor = (active: boolean) => (active ? theme.colors.primaryDark : theme.colors.muted);
+  const items = [
+    { id: 'mis', label: 'Mis solicitudes', active: isActive('mis'), onPress: () => navigate('MisSolicitudes'), icon: <IconInbox size={14} color={iconColor(isActive('mis'))} /> },
+    { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigate('CrearTicket'), icon: <IconPlus size={14} color={iconColor(isActive('crear'))} /> },
+    { id: 'perfil', label: 'Mi perfil', active: isActive('perfil'), onPress: () => navigate('Perfil'), icon: <IconUser size={14} color={iconColor(isActive('perfil'))} /> },
+  ];
 
-  // Cerrar drawer al pasar a desktop
-  React.useEffect(() => {
-    if (isDesktop) setDrawerOpen(false);
-  }, [isDesktop]);
-
-  // Cerrar drawer al cambiar de sección
-  React.useEffect(() => {
-    setDrawerOpen(false);
-  }, [activeName]);
-
-  if (isDesktop) {
-    return (
-      <View style={w.root}>
-        <View style={w.sidebar}>
-          {sidebarContent}
-        </View>
-        <View style={w.main}>
-          <Stack.Navigator screenOptions={screenOpts}>
-            <Stack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes' }} component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MisSolicitudes'); } })} />
-            <Stack.Screen name="CrearTicket" options={{ title: 'Nueva solicitud' }} component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-            <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
-          </Stack.Navigator>
-        </View>
-      </View>
-    );
-  }
-
-  // Móvil / tablet estrecho: header con burger + drawer overlay (no ocupa 60% fijo)
-  const mobileTitle = activeName === 'CrearTicket' ? 'Nueva solicitud' : activeName === 'DetalleTicket' ? 'Detalle' : 'Mis solicitudes';
   return (
-    <View style={w.rootMobile}>
-      <View style={w.mobileTopBar}>
-        <Pressable onPress={() => setDrawerOpen((v) => !v)} style={w.burger} accessibilityRole="button" accessibilityLabel="Abrir menú">
-          <IconMenu size={18} color={theme.colors.text} />
-        </Pressable>
-        <Text style={w.mobileTitle}>{mobileTitle}</Text>
-        <View style={w.burgerSpacer} />
-      </View>
-      <View style={w.mainMobile}>
-        <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
-          <Stack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MisSolicitudes'); } })} />
-          <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-          <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
-        </Stack.Navigator>
-        {drawerOpen ? (
-          <Pressable style={w.overlay} onPress={() => setDrawerOpen(false)} accessibilityRole="button" accessibilityLabel="Cerrar menú">
-            <View style={w.drawer}>{sidebarContent}</View>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
+    <AppShell
+      items={items}
+      user={profile ? { name: (profile.full_name ?? profile.email ?? 'Usuario') as string, role: profile.rol, avatarUrl: profile.avatar_url } : undefined}
+      onLogout={signOut}
+      onUserPress={() => navigate('Perfil')}
+      topTitle={titleFor(activeName)}
+      headerAction={<NotificationBell client={supabase} onOpenTicket={(id: string) => nav?.navigate('DetalleTicket', { id })} />}
+    >
+      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
+        <Stack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation); setActiveName('MisSolicitudes'); } })} />
+        <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation); setActiveName('CrearTicket'); } })} />
+        <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />
+        <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation); setActiveName('Perfil'); } })} />
+      </Stack.Navigator>
+    </AppShell>
   );
 }
-
-const w = StyleSheet.create({
-  root: { flex: 1, flexDirection: 'row', backgroundColor: theme.colors.bg },
-  rootMobile: { flex: 1, flexDirection: 'column', backgroundColor: theme.colors.bg },
-  sidebar: { width: 256, backgroundColor: theme.colors.surface, borderRightWidth: 1, borderRightColor: theme.colors.border, padding: 16 },
-  main: { flex: 1, minWidth: 0 as unknown as number },
-  mainMobile: { flex: 1, minWidth: 0 as unknown as number, position: 'relative' },
-  mobileTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border, paddingHorizontal: 8, height: 56 },
-  burger: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  burgerText: { fontSize: 18, color: theme.colors.text },
-  burgerSpacer: { width: 44 },
-  mobileTitle: { fontSize: 14, fontWeight: '800', color: theme.colors.text },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.35)', zIndex: 50, flexDirection: 'row' },
-  drawer: { width: 256, backgroundColor: theme.colors.surface, padding: 16, borderRightWidth: 1, borderRightColor: theme.colors.border, height: '100%' }, // SIDEBAR_W AppShell
-  logoutBtn: { marginTop: 12, paddingVertical: 10, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  logoutText: { fontSize: 12, fontWeight: '700', color: theme.colors.muted },
-});
 
 // --- Native: Bottom Tabs (Mis solicitudes + Nueva + Perfil)
 function UsuarioMobileTabs() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.muted,
-        tabBarStyle: { height: 62, paddingTop: 6, paddingBottom: 8, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
-      }}
-    >
+    <Tab.Navigator screenOptions={tabOpts}>
       <Tab.Screen
         name="MisTab"
         options={{
@@ -164,25 +94,22 @@ function UsuarioMobileTabs() {
       <Tab.Screen
         name="CrearTicket"
         options={{
+          ...screenOpts,
           title: 'Nueva',
           tabBarLabel: 'Nueva',
           tabBarIcon: ({ color }) => <IconPlus size={20} color={color} />,
           headerShown: true,
-          headerStyle: { backgroundColor: theme.colors.surface } as never,
-          headerTintColor: theme.colors.primary,
-          headerTitleStyle: { fontWeight: '800', fontSize: 14 } as never,
-          headerRight: () => <HeaderBell />,
         }}
         component={CreateTicketScreen}
       />
       <Tab.Screen
         name="PerfilTab"
         options={{
+          ...screenOpts,
           title: 'Mi perfil',
           tabBarLabel: 'Perfil',
           tabBarIcon: ({ color }) => <IconUser size={16} color={color} />,
           headerShown: true,
-          headerRight: () => <HeaderBell />,
         }}
         component={PerfilScreen}
       />

@@ -1,7 +1,7 @@
 // RF-12 — Bandeja técnico asignados orden prioridad/antigüedad + Realtime
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { listAssignedTickets, fetchMesas, ejecutarBulk, BulkPanel, type BulkAccion, type BulkResultado, type EstadoTicket, type PrioridadTicket, type Ticket, type Mesa } from '@helpdesk/shared';
+import { listAssignedTickets, fetchMesas, ejecutarBulk, BulkPanel, ScreenHeader, type BulkAccion, type BulkResultado, type EstadoTicket, type PrioridadTicket, type Ticket } from '@helpdesk/shared';
 import { theme } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -111,13 +111,11 @@ export function BandejaTecnicoScreen({ navigation }: Props) {
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <Text style={s.kicker}>Técnico · Orden prioridad → antigüedad</Text>
-        <Text style={s.h1}>Bandeja asignada</Text>
+      <ScreenHeader kicker="Técnico · Orden prioridad → antigüedad" title="Bandeja asignada" surface>
         <Pressable onPress={() => { setModoBulk((v) => !v); setSeleccion([]); setResultadoBulk(null); }} accessibilityRole="button" accessibilityLabel="Selección en lote">
           <Text style={s.bulkToggle}>{modoBulk ? 'Cancelar selección' : 'Selección en lote'}</Text>
         </Pressable>
-      </View>
+      </ScreenHeader>
       <TicketFilters
         q={q}
         setQ={setQ}
@@ -168,9 +166,6 @@ const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
   muted: { color: theme.colors.muted, fontSize: 12 },
-  header: { padding: 16, gap: 8, backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
-  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1, color: theme.colors.muted, textTransform: 'uppercase' },
-  h1: { fontSize: 18, fontWeight: '800', color: theme.colors.text },
   empty: { alignItems: 'center', padding: 24 },
   listContent: { padding: 12, gap: 10, paddingBottom: 24 },
   footer: { padding: 16, alignItems: 'center' },

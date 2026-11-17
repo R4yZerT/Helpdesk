@@ -1,12 +1,11 @@
 // RF-27 — Admin: tabla de usuarios + edición con cambio de contraseña
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, FilterDropdown, formatRol } from '@helpdesk/shared';
+import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ROLES, type AdminUser, type CreateUserInput, type Mesa, describeUserChanges, explainUserError, listMesas, listUsers, setUserActivo, theme, updateUser, validateCreateUser, validatePasswordSync, validateUpdateUser, IconEye, IconEyeOff, IconLock, FeedbackModal, EmptyState, FilterDropdown, FilterToolbar, ListFooter, ListLoading, ScreenHeader, formatRol } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
 import { reportError } from '../../lib/sentry';
 import { useAuth } from '../../context/AuthContext';
-import { TecnicoAfinidadesModal } from './TecnicoAfinidadesModal';
 
 const PAGE_SIZE = 10;
 
@@ -18,7 +17,6 @@ function pillRol(rol: string) {
 }
 
 export function AdminUsuariosScreen() {
-  const { width } = useWindowDimensions();
   const { profile } = useAuth();
   const adminMesaId = (profile as unknown as { mesa_id?: number | null })?.mesa_id ?? (profile as unknown as { mesaId?: number | null })?.mesaId ?? null;
   const isGeneralAdmin = adminMesaId == null;
@@ -53,7 +51,6 @@ export function AdminUsuariosScreen() {
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'info'; title: string; message?: string } | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<AdminUser | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
-  const [afinUser, setAfinUser] = useState<AdminUser | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -289,9 +286,6 @@ export function AdminUsuariosScreen() {
         <View style={s.tdEstado}><View style={[s.estadoPill, item.activo ? s.activoOn : s.activoOff]}><Text style={[s.estadoText, item.activo ? s.estadoTextOn : s.estadoTextOff]}>{item.activo ? 'Activo' : 'Inactivo'}</Text></View></View>
         <View style={s.tdActs}>
           <Pressable onPress={() => openEdit(item)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Editar ${item.fullName}`}><Text style={s.iconBtnText}>✎</Text></Pressable>
-          {item.rol === 'tecnico' ? (
-            <Pressable onPress={() => setAfinUser(item)} style={s.iconBtn} accessibilityRole="button" accessibilityLabel={`Afinidades de ${item.fullName}`}><Text style={s.iconBtnText}>★</Text></Pressable>
-          ) : null}
           <Pressable onPress={() => toggleActivo(item)} style={[s.iconBtn, item.activo ? s.iconBtnOff : s.iconBtnOn]} accessibilityRole="button" accessibilityLabel={item.activo ? 'Desactivar' : 'Activar'}><Text style={[s.iconBtnText, item.activo ? { color: '#991B1B' } : { color: '#15803D' }]}>{item.activo ? '◯' : '●'}</Text></Pressable>
         </View>
       </View>
@@ -299,34 +293,28 @@ export function AdminUsuariosScreen() {
   };
 
   if (loading && users.length === 0) {
-    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>Cargando usuarios…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+    return <ListLoading label="Cargando usuarios…" fullScreen>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</ListLoading>;
   }
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <View style={s.headerRow}>
-          <Text style={s.h1}>Usuarios</Text>
-          <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button"><Text style={s.btnPrimaryText}>+ Nuevo usuario</Text></Pressable>
-        </View>
-        <Text style={s.subtitle}>Gestión centralizada. Usa la tabla para acciones rápidas.</Text>
+      <ScreenHeader
+        title="Usuarios"
+        subtitle="Gestión centralizada. Usa la tabla para acciones rápidas."
+        actions={<Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button"><Text style={s.btnPrimaryText}>+ Nuevo usuario</Text></Pressable>}
+      >
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
-      </View>
+      </ScreenHeader>
 
       {/* Filtros */}
       <View style={s.filterCard}>
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />
-          {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
-        </View>
-        <View style={s.dropdownRow}>
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por nombre" layout="stack">
           <FilterDropdown label="Rol" value={rol} onSelect={(v) => setRol(v as never)} options={[{ value: 'todos', label: 'Todos' }, ...ROLES.map((r) => ({ value: r, label: formatRol(r as never) }))]} />
           {isGeneralAdmin ? (
             <FilterDropdown label="Dependencia" value={(mesaId as unknown as string) as never} onSelect={(v) => setMesaId(v === 'todos' ? 'todos' : (v as unknown as number))} options={[{ value: 'todos' as const, label: 'Todas' }, ...mesas.map((m) => ({ value: String(m.id) as unknown as never, label: m.nombre }))]} />
           ) : null}
           <FilterDropdown label="Estado" value={activo as never} onSelect={(v) => setActivo(v as never)} options={[{ value: 'todos' as const, label: 'Todos' }, { value: true as const, label: 'Activos' }, { value: false as const, label: 'Inactivos' }]} />
-        </View>
+        </FilterToolbar>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
@@ -358,8 +346,8 @@ export function AdminUsuariosScreen() {
           onEndReached={onEndReached}
           onEndReachedThreshold={0.4}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-          ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>Sin usuarios</Text><Text style={s.mutedCenter}>Ajusta filtros o crea el primer usuario.</Text></View>}
-          ListFooterComponent={loadingMore ? <View style={{ padding: 12, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+          ListEmptyComponent={<EmptyState title="Sin usuarios" description="Ajusta filtros o crea el primer usuario." style={{ marginTop: 12 }} titleStyle={{ fontSize: 13 }} />}
+          ListFooterComponent={<ListFooter loading={loadingMore} />}
           contentContainerStyle={s.tableContent}
         />
       </View>
@@ -461,7 +449,6 @@ export function AdminUsuariosScreen() {
       {feedback ? <FeedbackModal visible={feedback.visible} variant={feedback.variant as never} title={feedback.title} message={feedback.message} onClose={() => setFeedback(null)} onConfirm={() => setFeedback(null)} /> : null}
       <FeedbackModal visible={confirmEdit} variant="confirm" title={`Confirmar cambios · ${editUser?.fullName ?? ''}`} message={editSummary ? `Se aplicarán estos cambios:\n${editSummary}` : undefined} confirmText="Confirmar cambios" cancelText="Revisar" loading={saving} onConfirm={doSubmitEdit} onClose={() => { setConfirmEdit(false); setPendingEdit(null); }} onCancel={() => { setConfirmEdit(false); setPendingEdit(null); }} />
       <FeedbackModal visible={showCreateConfirm} variant="confirm" title="Confirmar creación de usuario" message={`Se creará el usuario con estos datos:\n${createSummary}`} confirmText="Crear usuario" cancelText="Revisar" loading={saving} onConfirm={doSubmitCreate} onClose={() => setShowCreateConfirm(false)} onCancel={() => setShowCreateConfirm(false)} />
-      <TecnicoAfinidadesModal tecnico={afinUser} onClose={() => setAfinUser(null)} />
       <FeedbackModal visible={!!confirmToggle} variant="confirm" title={confirmToggle?.activo ? 'Desactivar usuario' : 'Activar usuario'} message={confirmToggle ? `¿${confirmToggle.activo ? 'Desactivar' : 'Activar'} a ${confirmToggle.fullName}?` : undefined} confirmText={confirmToggle?.activo ? 'Desactivar' : 'Activar'} cancelText="Cancelar" loading={toggleLoading} onConfirm={doToggleActivo} onClose={() => setConfirmToggle(null)} onCancel={() => setConfirmToggle(null)} />
     </View>
   );
@@ -469,14 +456,7 @@ export function AdminUsuariosScreen() {
 
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
-  muted: { color: theme.colors.muted, fontSize: 12 },
-  mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
-  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[2], gap: 6 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
-  h1: { fontSize: 20, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.3, flex: 1 },
-  subtitle: { fontSize: 11, color: theme.colors.muted, lineHeight: 14 },
   exportRow: { flexDirection: 'row', gap: 8, marginHorizontal: theme.space[3], marginBottom: 8, justifyContent: 'flex-end' },
   exportBtn: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, height: 32, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.primary },
   exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
@@ -488,16 +468,6 @@ const s = StyleSheet.create({
     backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[3],
     borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft,
   },
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt,
-    borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm,
-    paddingHorizontal: theme.space[3], height: 40,
-  },
-  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
-  search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  clearBtn: { padding: 6, marginLeft: 6 },
-  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
-  dropdownRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   chipsScroll: { gap: 12 },
   chipsBlock: { gap: 6, marginRight: 12 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
@@ -549,8 +519,6 @@ const s = StyleSheet.create({
   iconBtnOn: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   iconBtnOff: { backgroundColor: '#FEF2F2', borderColor: '#FECACA' },
   iconBtnText: { fontSize: 12, fontWeight: '800', color: theme.colors.text },
-  empty: { alignItems: 'center', padding: 24, gap: 8, marginTop: 12 },
-  emptyTitle: { fontSize: 13, fontWeight: '700', color: theme.colors.text },
   // Modales
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalCard: { width: '100%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], gap: 12, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },

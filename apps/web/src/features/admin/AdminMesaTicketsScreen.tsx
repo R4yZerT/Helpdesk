@@ -1,8 +1,8 @@
 // RF replanteo — Admin: tickets de su dependencia (mesa) con asignación a técnico de la misma dependencia
 // Scoping: admin ve solo tickets donde mesa_id == profile.mesa_id (TIC solo TIC). Si admin sin mesa -> vacio + aviso.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { theme, Card, Badge, Divider, TecnicoChip, FeedbackModal, listMyTickets, ejecutarBulk, BulkPanel, fetchTecnicoNombres, type BulkAccion, type BulkResultado, type Ticket, type PrioridadTicket, formatEstado, formatPrioridad, FilterDropdown, FilterToolbar, PRIORIDAD_OPTIONS } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { exportTableCsv, exportTablePdf, exportTablePng, type ExportTable } from '../../lib/exportTable';
@@ -17,7 +17,7 @@ function getErrorMessage(e: unknown): string {
     const o = e as Record<string, unknown>;
     if (typeof o.message === 'string' && o.message.trim()) return o.message;
     if (typeof o.error === 'string' && o.error.trim()) return o.error;
-    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch { /* ignorado: no bloquea el flujo */ }
   }
   return String(e ?? 'Error desconocido');
 }
@@ -119,7 +119,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
           for (const t of list) next[t.id] = t.full_name ?? t.email ?? t.id;
           return next;
         });
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     })();
   }, [mesaId]);
 
@@ -132,7 +132,6 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
       if (alive && Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
     }).catch(() => {});
     return () => { alive = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickets]);
 
   // Exportación desde datos completos (no solo la página visible ni screenshots).
@@ -159,7 +158,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
         const map = await fetchTecnicoNombres(supabase as never, missing);
         if (Object.keys(map).length > 0) setTecnicoNombres((prev) => ({ ...prev, ...map }));
         for (const [k, v] of Object.entries(map)) tecnicoNombres[k] = v;
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     }
     return all;
   }, [mesaId, qDeb, tecnicoFilter, asignacionFilter, prioridadFilter, tecnicoNombres]);
@@ -202,12 +201,11 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
     <View style={s.wrap}>
       {errorMsg? <View style={s.header}><Text style={s.error}>{errorMsg}</Text></View>:null}
       <View style={s.filterCard}>
-        <View style={s.searchWrap}><Text style={s.searchIcon}>⌕</Text><TextInput value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" />{!!q && <Pressable onPress={()=>setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}</View>
-        <View style={s.dropdownRow}>
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por ticket (#, asunto)" layout="stack">
           <FilterDropdown label="Técnico" value={tecnicoFilter as never} options={[{ value: '' as never, label: 'Todos' }, ...tecnicos.map(t=> ({ value: t.id as never, label: (t.full_name ?? t.email ?? t.id) }))]} onSelect={v=> { setTecnicoFilter(v as string); if (v) setAsignacionFilter(''); }} placeholder="Todos" />
           <FilterDropdown label="Asignación" value={asignacionFilter as never} options={[{ value: '' as never, label: 'Todas' }, { value: 'asignadas' as never, label: 'Asignadas' }, { value: 'no_asignadas' as never, label: 'Sin asignar' }]} onSelect={v=> { setAsignacionFilter(v as string); if (v) setTecnicoFilter(''); }} placeholder="Todas" />
           <FilterDropdown label="Prioridad" value={prioridadFilter as never} options={PRIORIDAD_OPTIONS as never} onSelect={v=> setPrioridadFilter(v as string)} placeholder="Todas" />
-        </View>
+        </FilterToolbar>
       </View>
       <View style={s.exportRow}>
         <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
@@ -286,12 +284,6 @@ const s = StyleSheet.create({
   h1:{fontSize:22, fontWeight:'800', color:theme.colors.text},
   subtitle:{fontSize:12, color:theme.colors.muted, lineHeight:16},
   filterCard:{marginHorizontal:12, marginBottom:12, gap:12, backgroundColor:theme.colors.surface, borderRadius:theme.radius.lg, padding:16, borderWidth:1, borderColor:theme.colors.border},
-  dropdownRow:{flexDirection:'row', gap:12, flexWrap:'wrap'},
-  searchWrap:{flexDirection:'row', alignItems:'center', backgroundColor:theme.colors.surfaceAlt, borderWidth:1, borderColor:theme.colors.borderStrong, borderRadius:theme.radius.sm, paddingHorizontal:12, height:40},
-  searchIcon:{color:theme.colors.mutedSoft, marginRight:8, fontSize:14},
-  search:{flex:1, fontSize:13, color:theme.colors.text},
-  clearBtn:{padding:6, marginLeft:6},
-  clearText:{fontSize:18, color:theme.colors.muted, fontWeight:'600'},
   btnPrimary:{backgroundColor:theme.colors.primary, paddingHorizontal:16, height:40, borderRadius:theme.radius.sm, alignItems:'center', justifyContent:'center'},
   btnPrimaryText:{color:'#fff', fontWeight:'800', fontSize:12},
   listContent:{padding:12, gap:10, paddingBottom:24},

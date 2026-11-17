@@ -31,7 +31,6 @@ export type JefeStackParamList = {
   Dashboard: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
-  Reportes: undefined;
   Alertas: undefined;
   Perfil: undefined;
 };

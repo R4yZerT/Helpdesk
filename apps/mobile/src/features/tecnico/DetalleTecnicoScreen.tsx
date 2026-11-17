@@ -1,7 +1,7 @@
-// RF-09/10/13/14/15 — Detalle Técnico (Stitch split 8+4, FSM naranja, SLA 35m)
+// RF-09/10/13/14/15 — Detalle Técnico
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail } from '@helpdesk/shared';
+import { addComentario, fetchMesas, fetchCategorias, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, validateComentario, ESTADOS, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, getSlaEstado, getSlaProgreso, getSlaMinutosRestantes, getSlaVencimiento, formatSlaRestante, slaEstadoLabel, slaEstadoTone, type TicketDetail } from '@helpdesk/shared';
 import { Badge, Card, Divider, TecnicoChip, theme, TicketCommentList, TicketCommentComposer, TicketHistoryList, IaValidationCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -64,19 +64,19 @@ export function DetalleTecnicoScreen({ route }: Props) {
       try {
         const ids = [d.ticket.tecnicoAsignadoId, d.ticket.usuarioId, ...d.estados.flatMap((e) => [e.tecnicoDe, e.tecnicoPara, e.usuarioId])].filter((x): x is string => !!x);
         if (ids.length) setTecnicoNombres(await fetchTecnicoNombres(supabase, ids));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
       try {
         const ms = await fetchMesas(supabase);
         const m = ms.find((x) => x.id === d.ticket.mesaId);
         if (m) setMesaNombre(m.nombre);
         setMesas(Object.fromEntries(ms.map((x) => [x.id, x.nombre])));
         setMesasRaw(ms.map((x) => ({ id: x.id, nombre: x.nombre })));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
       try {
         const cats = await fetchCategorias(supabase);
         setCategorias(Object.fromEntries(cats.map((c) => [c.id, `${c.dominio} · ${c.subcategoria}`])));
         setCategoriasRaw(cats.map((c) => ({ id: c.id, dominio: c.dominio, subcategoria: c.subcategoria })));
-      } catch {}
+      } catch { /* ignorado: no bloquea el flujo */ }
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setLoading(false); }
   }, [id]);
 
@@ -142,25 +142,30 @@ export function DetalleTecnicoScreen({ route }: Props) {
       const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60);
       const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl;
       if (url) await Linking.openURL(url);
-    } catch {}
+    } catch { /* ignorado: no bloquea el flujo */ }
   };
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
   const nextEstados = nextEstadosParaRol(profile?.rol, ticket.estado as any, ESTADOS);
-  const slaPct = ticket.estado === 'cerrado' || ticket.estado === 'solucionado' ? 100 : ticket.prioridad === 'critica' ? 25 : ticket.prioridad === 'alta' ? 55 : 75;
+  const slaVence = ticket.slaVenceEn ? new Date(ticket.slaVenceEn) : getSlaVencimiento(ticket.creadoEn, ticket.prioridad as never);
+  const slaEstado = getSlaEstado({ creadoEn: ticket.creadoEn, prioridad: ticket.prioridad as never, estado: ticket.estado, venceEn: slaVence.toISOString(), fechaResolucion: ticket.fechaResolucion });
+  const slaPct = Math.round(Math.min(100, getSlaProgreso(ticket.creadoEn, slaVence.toISOString())));
+  const slaRestante = formatSlaRestante(getSlaMinutosRestantes(slaVence));
+  const slaTone = slaEstadoTone(slaEstado);
+  const slaColor = slaTone === 'success' ? theme.colors.success : slaTone === 'warning' ? theme.colors.accent : slaTone === 'danger' ? theme.colors.danger : theme.colors.muted;
+  const categoriaNombre = categorias[ticket.categoriaId] ?? 'Categoría no disponible';
 
   const header = (
     <View style={s.header}>
-      <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Expediente técnico · #{String(ticket.numero).padStart(4, '0')}</Text></View>
+      <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>Expediente técnico</Text></View>
       <View style={s.pillsRow}>
         <View style={s.codePill}><Text style={s.codePillText}>#{String(ticket.numero).padStart(4, '0')}</Text></View>
         <Badge label={formatPrioridad(ticket.prioridad as never)} tone={tonoPrioridad(ticket.prioridad)} />
         <Badge label={formatEstado(ticket.estado as never)} tone={tonoEstado(ticket.estado)} />
-        <View style={s.slaBadge}><View style={s.slaPulse} /><Text style={s.slaBadgeText}>SLA Activo</Text></View>
       </View>
       <Text style={s.asunto}>{ticket.asunto}</Text>
-      <Text style={s.meta}>{mesaNombre || `Mesa ${ticket.mesaId ?? '—'}`} · Cat {ticket.categoriaId} · Reportado {new Date(ticket.creadoEn).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+      <Text style={s.meta}>{mesaNombre || 'Sin dependencia'} · {categoriaNombre} · Reportado {formatFechaHora(ticket.creadoEn)}</Text>
       <TecnicoChip nombre={ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : null} />
     </View>
   );
@@ -170,7 +175,6 @@ export function DetalleTecnicoScreen({ route }: Props) {
       <Card style={{ gap: theme.space[3] }}>
         <Text style={s.section}>Descripción del usuario</Text>
         <Text style={s.desc}>{ticket.descripcion}</Text>
-        <View style={s.terminal}><Text style={s.terminalText}>Ticket #{String(ticket.numero).padStart(4, '0')} · {formatEstado(ticket.estado as never)} · Prioridad {formatPrioridad(ticket.prioridad as never)} · Técnico {ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'asignado') : '—'}</Text></View>
         {(ticket.solucionAplicada || ticket.fechaResolucion) ? (
           <View style={s.solBox}>
             <Text style={s.solLabel}>Solución aplicada{ticket.fechaResolucion ? ` · Resuelto ${new Date(ticket.fechaResolucion).toLocaleString('es-ES', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}` : ''}</Text>
@@ -266,14 +270,10 @@ export function DetalleTecnicoScreen({ route }: Props) {
       </Card>
       <Card style={{ gap: theme.space[2] }}>
         <Text style={s.section}>Control SLA</Text>
-        <Text style={s.slaBig}>{ticket.estado==='cerrado'||ticket.estado==='solucionado'?'Cumplido':'35 min restantes'}</Text>
-        <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: ticket.estado==='solucionado'||ticket.estado==='cerrado'? theme.colors.success : ticket.prioridad==='critica'? theme.colors.danger : theme.colors.primary }]} /></View>
-        <View style={s.slaAlert}><Text style={s.slaAlertText}>{ticket.prioridad==='critica'?'Crítico <60 min · Riesgo alto': ticket.prioridad==='alta'?'Alta <4h · vigilar':'Dentro de compromiso'}</Text></View>
-        <View style={s.attrGrid}>
-          <Text style={s.attrLabel}>Prioridad</Text><Text style={s.attrValue}>{formatPrioridad(ticket.prioridad as never)}</Text>
-          <Text style={s.attrLabel}>Estado</Text><Text style={s.attrValue}>{formatEstado(ticket.estado as never)}</Text>
-          <Text style={s.attrLabel}>Dependencia</Text><Text style={s.attrValue}>{mesaNombre || String(ticket.mesaId)}</Text>
-          <Text style={s.attrLabel}>Asignado</Text><Text style={s.attrValue}>{ticket.tecnicoAsignadoId ? (tecnicoNombres[ticket.tecnicoAsignadoId] ?? 'Técnico asignado') : 'Sin asignar'}</Text>
+        <Text style={[s.slaBig, { color: slaColor }]}>{ticket.estado==='cerrado'||ticket.estado==='solucionado' ? slaEstadoLabel(slaEstado) : slaRestante}</Text>
+        <View style={s.slaBar}><View style={[s.slaFill, { width: `${slaPct}%`, backgroundColor: slaColor }]} /></View>
+        <View style={[s.slaAlert, { backgroundColor: theme.colors.surfaceAlt, borderColor: theme.colors.border }]}>
+          <Text style={[s.slaAlertText, { color: theme.colors.textSoft }]}>{slaEstadoLabel(slaEstado)} · Vence {formatFechaHora(slaVence.toISOString())}</Text>
         </View>
       </Card>
     </View>
@@ -287,6 +287,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
         ticketId={id}
         ticketMesaId={detail.ticket.mesaId ?? null}
         ticketCategoriaId={detail.ticket.categoriaId ?? null}
+        ticketTecnicoAsignadoId={detail.ticket.tecnicoAsignadoId ?? null}
         validadorId={profile?.id ?? null}
         mesas={mesasRaw}
         categorias={categoriasRaw}
@@ -315,9 +316,6 @@ const s = StyleSheet.create({
   pillsRow: { flexDirection:'row', alignItems:'center', gap: theme.space[2], flexWrap:'wrap' }, // 8
   codePill: { backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, paddingHorizontal: theme.space[2], paddingVertical: theme.space[1], borderRadius: theme.space[2] }, // 8/4/8
   codePillText: { fontSize:11, fontWeight:'800', color: theme.colors.text, fontFamily: theme.font.mono },
-  slaBadge: { flexDirection:'row', alignItems:'center', gap: theme.space[2] - 2, backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', paddingHorizontal: theme.space[2], paddingVertical: theme.space[1], borderRadius: theme.radius.full },
-  slaBadgeText: { fontSize:10, fontWeight:'800', color:'#991B1B', textTransform:'uppercase', letterSpacing:0.6 },
-  slaPulse: { width:6, height:6, borderRadius:999, backgroundColor: theme.colors.danger },
   asunto: { fontSize:20, fontWeight:'800', color: theme.colors.text, lineHeight:26, letterSpacing:-0.3 },
   meta: { fontSize:11, color: theme.colors.muted, fontWeight:'600' },
   desc: { fontSize:13, color: theme.colors.textSoft, lineHeight:19 },
@@ -353,8 +351,6 @@ const s = StyleSheet.create({
   actionRow: { flexDirection:'row', gap: theme.space[2], flexWrap:'wrap' },
   retryBtn: { marginTop: theme.space[3] - 2, backgroundColor: theme.colors.primary, paddingVertical: theme.space[3] - 2, paddingHorizontal: theme.space[4], borderRadius: theme.radius.md - 2, alignSelf:'flex-start' },
   retryText: { color:'#fff', fontWeight:'700', fontSize:12 },
-  terminal: { backgroundColor: theme.colors.text, borderRadius: theme.radius.sm, padding: theme.space[3] },
-  terminalText: { color:'#A7F3D0', fontSize:11, fontFamily: theme.font.mono, fontWeight:'600' },
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: theme.radius.sm, padding: theme.space[3] - 2, borderWidth:1, borderColor: theme.colors.border, gap: theme.space[1] }, // 10/10/4
   solLabel: { fontSize:10, fontWeight:'800', letterSpacing:0.6, textTransform:'uppercase', color: theme.colors.primary },
   solText: { fontSize:12, color: theme.colors.textSoft, lineHeight:16 },
@@ -373,11 +369,8 @@ const s = StyleSheet.create({
   slaBig: { fontSize:18, fontWeight:'800', color: theme.colors.danger, letterSpacing:-0.3 },
   slaBar: { height:8, borderRadius:999, backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, overflow:'hidden' },
   slaFill: { height:'100%', borderRadius:999 },
-  slaAlert: { backgroundColor:'#FEF2F2', borderWidth:1, borderColor:'#FECACA', borderRadius: theme.radius.sm, padding: theme.space[2] },
-  slaAlertText: { fontSize:11, color:'#7F1D1D', fontWeight:'600', textAlign:'center' },
-  attrGrid: { flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] - 2, marginTop: theme.space[1], borderTopWidth:1, borderTopColor: theme.colors.border, paddingTop: theme.space[2] }, // 6/4/8
-  attrLabel: { fontSize:10, color: theme.colors.mutedSoft, fontWeight:'700', textTransform:'uppercase', letterSpacing:0.6, width:90 },
-  attrValue: { fontSize:11, color: theme.colors.textSoft, fontWeight:'600', flex:1 },
+  slaAlert: { borderWidth:1, borderRadius: theme.radius.sm, padding: theme.space[2] },
+  slaAlertText: { fontSize:11, fontWeight:'600', textAlign:'center' },
   adjRow: { flexDirection:'row', alignItems:'center', gap:10, backgroundColor: theme.colors.surfaceAlt, borderWidth:1, borderColor: theme.colors.border, borderRadius:10, padding:8 },
   adjThumb: { width:56, height:56, borderRadius:8, backgroundColor: theme.colors.border } as any,
   adjName: { fontSize:12, fontWeight:'700', color: theme.colors.text, flex:1 },

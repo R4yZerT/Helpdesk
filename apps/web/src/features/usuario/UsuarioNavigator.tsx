@@ -3,7 +3,7 @@ import * as React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { theme, AppShell, IconInbox, IconPlus, IconUser, NotificationBell, PaletteHost, listMyTickets, type ComandoNav, type TicketResultado } from '@helpdesk/shared';
+import { theme, AppShell, APP_HEADER_OPTIONS, IconInbox, IconPlus, IconUser, NotificationBell, PaletteHost, listMyTickets, type ComandoNav, type TicketResultado } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
@@ -17,18 +17,10 @@ import { useAuth } from '../../context/AuthContext';
 const Stack = createNativeStackNavigator<UsuarioStackParamList>();
 const Tab = createBottomTabNavigator();
 
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
-
 // --- Stack interno para bandeja (lista + detalle)
 function MisStack() {
   return (
-    <Stack.Navigator screenOptions={screenOpts}>
+    <Stack.Navigator screenOptions={APP_HEADER_OPTIONS}>
       <Stack.Screen name="MisSolicitudes" options={{ title: 'Mis solicitudes' }} component={MisSolicitudesScreen} />
       <Stack.Screen name="DetalleTicket" options={{ title: 'Detalle' }} component={TicketDetailScreen} />
     </Stack.Navigator>
@@ -83,7 +75,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
         if (st2?.routes?.[st2.index]?.name !== name) nav?.navigate(name as never);
         return;
       }
-    } catch (e) { reportError(e, { flujo: 'usuario-navigate', destino: name }); }
+    } catch (e) { reportError(e, { flujo: 'usuario-navegacion' }); }
     nav?.navigate(name as never);
   };
   const iconColor = (a: boolean) => (a ? theme.colors.primaryDark : theme.colors.muted);
@@ -124,7 +116,7 @@ function UsuarioWebInner({ activeName, setActiveName, profile, signOut }: { acti
       topTitle={titleFor(activeName)}
       headerAction={<NotificationBell client={supabase as any} onOpenTicket={(id: string) => (nav as any)?.navigate('DetalleTicket', { id })} />}
     >
-      <Stack.Navigator screenOptions={{ ...screenOpts, headerShown: false }}>
+      <Stack.Navigator screenOptions={{ ...APP_HEADER_OPTIONS, headerShown: false }}>
         <Stack.Screen name="MisSolicitudes" component={MisSolicitudesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('MisSolicitudes'); } })} />
         <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
         <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={{ focus: () => setActiveName('DetalleTicket') }} />

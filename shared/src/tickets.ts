@@ -41,8 +41,6 @@ export type CreateTicketInput = {
   descripcion: string;
   prioridad: PrioridadTicket;
   mesaId: number | null;
-  /** Sugerencia de auto-asignación confirmada por el usuario (opcional) */
-  tecnicoAsignadoId?: string | null;
 };
 
 export type CreateTicketErrors = Partial<Record<keyof CreateTicketInput, string>>;
@@ -61,9 +59,6 @@ export function validateCreateTicket(input: CreateTicketInput): CreateTicketErro
   if (!isPrioridadTicket(input.prioridad)) errors.prioridad = 'Prioridad inválida';
   if (input.mesaId === null || !Number.isInteger(input.mesaId) || input.mesaId <= 0) {
     errors.mesaId = 'Selecciona una dependencia';
-  }
-  if (input.tecnicoAsignadoId !== undefined && input.tecnicoAsignadoId !== null && !String(input.tecnicoAsignadoId).trim()) {
-    (errors as Record<string, string>).tecnicoAsignadoId = 'Técnico inválido';
   }
   return errors;
 }
@@ -132,6 +127,81 @@ export type TicketComentario = {
   interno: boolean;
   creadoEn: string;
 };
+
+export type TicketSatisfaccion = {
+  ticketId: string;
+  usuarioId: string;
+  calificacion: number;
+  comentario: string | null;
+  creadoEn: string;
+};
+
+export type TicketSatisfaccionInput = {
+  calificacion: number;
+  comentario?: string;
+};
+
+export function validateTicketSatisfaccion(input: TicketSatisfaccionInput): string | null {
+  if (!Number.isInteger(input.calificacion) || input.calificacion < 1 || input.calificacion > 5) {
+    return 'Selecciona una calificación de 1 a 5 estrellas';
+  }
+  if ((input.comentario?.trim().length ?? 0) > 1000) return 'El comentario máximo es 1000 caracteres';
+  return null;
+}
+
+function mapTicketSatisfaccion(row: Record<string, unknown>): TicketSatisfaccion {
+  return {
+    ticketId: row.ticket_id as string,
+    usuarioId: row.usuario_id as string,
+    calificacion: row.calificacion as number,
+    comentario: (row.comentario as string | null) ?? null,
+    creadoEn: row.creado_en as string,
+  };
+}
+
+export async function fetchTicketSatisfaccion(
+  client: SupabaseClient,
+  ticketId: string,
+): Promise<TicketSatisfaccion | null> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error('Sesión requerida');
+
+  const { data, error } = await client
+    .from('ticket_satisfacciones')
+    .select('ticket_id,usuario_id,calificacion,comentario,creado_en')
+    .eq('ticket_id', ticketId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapTicketSatisfaccion(data as unknown as Record<string, unknown>) : null;
+}
+
+export async function submitTicketSatisfaccion(
+  client: SupabaseClient,
+  ticketId: string,
+  input: TicketSatisfaccionInput,
+): Promise<TicketSatisfaccion> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  const validationError = validateTicketSatisfaccion(input);
+  if (validationError) throw new Error(validationError);
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error('Sesión requerida');
+
+  const { data, error } = await client
+    .from('ticket_satisfacciones')
+    .insert({
+      ticket_id: ticketId,
+      usuario_id: authData.user.id,
+      calificacion: input.calificacion,
+      comentario: input.comentario?.trim() || null,
+    })
+    .select('ticket_id,usuario_id,calificacion,comentario,creado_en')
+    .single();
+  if (error) throw new Error(error.message);
+  return mapTicketSatisfaccion(data as unknown as Record<string, unknown>);
+}
 
 export type TicketDetail = {
   ticket: Ticket;
@@ -245,8 +315,6 @@ export async function createTicket(
     mesa_id: input.mesaId,
     ...(usuario_id ? { usuario_id } : {}),
     ...(opts?.id ? { id: opts.id } : {}),
-    // Auto-asignación sugerida y confirmada por el usuario (RLS insert no la restringe)
-    ...(input.tecnicoAsignadoId ? { tecnico_asignado_id: input.tecnicoAsignadoId } : {}),
   };
   const { data, error } = await client.from('tickets').insert(payload).select('id,numero').single();
   if (error) throw new Error(error.message);
@@ -501,7 +569,7 @@ const ESTADOS_TRANSICION: Record<EstadoTicket, readonly EstadoTicket[]> = {
   en_proceso: ['solucionado', 'cerrado', 'devuelto', 'programado'],
   programado: ['en_proceso', 'solucionado', 'cerrado'],
   solucionado: ['cerrado', 'devuelto'],
-  cerrado: [],
+  cerrado: ['devuelto'],
   devuelto: ['en_proceso', 'programado', 'cerrado'],
 };
 

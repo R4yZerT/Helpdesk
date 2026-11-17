@@ -32,10 +32,12 @@ muestra cuántas van pendientes: ese número es el termómetro del loop.
 Pueden validar el técnico asignado, el jefe o el admin (regla
 `puede_validar_ia` + RLS en base de datos).
 
-### 2. Export de ejemplos validados (mensual, automático)
+### 2. Export de ejemplos validados (manual)
 
-El workflow `retrain-beto.yml` (GitHub Actions) corre el día 1 de cada mes
-a las 05:00 UTC, o manualmente desde Actions → *Run workflow*:
+El workflow `retrain-beto.yml` (GitHub Actions) se lanza a mano desde
+Actions → *Run workflow*. No tiene cron: necesita
+`data/processed/tickets_clean.parquet` (generado fuera del repo) y el bucket
+`modelos-ia`. Pasos que ejecuta:
 
 1. `export_dataset_validado.py` → descarga solo filas
    `confirmada`/`corregida` a `dataset_validado.csv`.
@@ -94,7 +96,7 @@ del notebook 02. Sin este paso, el gate se vuelve fácil de pasar con el tiempo.
 | Paso | Modo |
 |---|---|
 | Validar clasificaciones | Manual (técnicos, en la app, día a día) |
-| Export + unión + entrenamiento + gate | Automático (mensual) o manual (Actions) |
+| Export + unión + entrenamiento + gate | Manual (Actions → *Run workflow*) |
 | Publicación al bucket | Automática **solo si aprueba el gate** |
 | Activación en producción | Manual (descargar + reiniciar + healthcheck) |
 | Actualizar `baseline_beto.json` | Manual (al desplegar un mejor modelo) |
@@ -124,4 +126,4 @@ del notebook 02. Sin este paso, el gate se vuelve fácil de pasar con el tiempo.
   picos (`forecast-semanal.yml`) es un sistema aparte.
 
 Referencia técnica completa: `documentation/modelos-ia.md` (sección
-"Reentrenamiento mensual").
+"Reentrenamiento manual").

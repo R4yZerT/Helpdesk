@@ -29,13 +29,6 @@ describe('validateCreateTicket', () => {
   it('mesa null es invalido (requerida)', () => {
     expect(validateCreateTicket({ ...base, mesaId: null }).mesaId).toBeDefined();
   });
-  it('tecnicoAsignadoId vacío es inválido', () => {
-    expect(validateCreateTicket({ ...base, tecnicoAsignadoId: '' } as never).tecnicoAsignadoId).toBeDefined();
-  });
-  it('tecnicoAsignadoId undefined pasa (opcional)', () => {
-    const r = validateCreateTicket({ ...base, tecnicoAsignadoId: undefined } as never);
-    expect(r.tecnicoAsignadoId).toBeUndefined();
-  });
 });
 
 describe('isCreateTicketValid', () => {

@@ -19,7 +19,7 @@ export async function shareCsvNativo(filename: string, csv: string): Promise<boo
     await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: filename });
     return true;
   } catch (e) {
-    reportError(e, { flujo: 'share-csv-nativo' });
+    reportError(e, { flujo: 'compartir-csv-nativo' });
     return false;
   }
 }

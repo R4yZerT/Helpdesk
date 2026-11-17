@@ -11,6 +11,7 @@ export type UsuarioStackParamList = {
   MisSolicitudes: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
+  Perfil: undefined;
 };
 // Alias compatibilidad
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -26,7 +27,6 @@ export type JefeStackParamList = {
   Dashboard: undefined;
   CrearTicket: undefined;
   DetalleTicket: { id: string };
-  Reportes: undefined;
   Alertas: undefined;
   Perfil: undefined;
 };

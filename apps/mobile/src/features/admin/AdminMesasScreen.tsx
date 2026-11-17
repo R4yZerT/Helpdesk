@@ -2,8 +2,8 @@
 // Módulo Dependencias: CRUD de dependencias. RLS mesa:write.
 // Stitch tokens: #0E87E2 / #FD7C06 / bg #F6F8FB / surface #FFF / border #E2E8F0
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Card, theme, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
+import { FlatList, Modal, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Card, EmptyState, ListFooter, ListLoading, theme, ScreenHeader, type Mesa, listMesasPaginated, createMesa, updateMesa, setMesaActiva, validateCreateMesa, validateUpdateMesa, FeedbackModal, FilterDropdown, FilterToolbar, buildExportFilename, downloadCsv, resolveSecretariaId } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
 import { shareCsvNativo } from '../../lib/share-csv';
@@ -19,7 +19,7 @@ function getErrorMessage(e: unknown): string {
     const o = e as Record<string, unknown>;
     if (typeof o.message === 'string' && o.message.trim()) return o.message;
     if (typeof o.error === 'string' && o.error.trim()) return o.error;
-    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch {}
+    try { const j = JSON.stringify(o); if (j !== '{}') return j; } catch { /* ignorado: no bloquea el flujo */ }
   }
   return String(e ?? 'Error desconocido');
 }
@@ -113,7 +113,7 @@ export function AdminMesasScreen() {
         return;
       }
       downloadCsv(filename, meta);
-    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e instanceof Error ? e.message : String(e) }); }
+    } catch (e: unknown) { reportError(e, { flujo: 'admin-mesas-export-csv' }); setFeedback({ visible: true, variant: 'error', title: 'Error al exportar CSV', message: e instanceof Error ? e.message : 'Error al exportar CSV' }); }
   }, [mesas]);
   const onExportPng = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PNG solo disponible en web — en móvil usa CSV' }); }, []);
   const onExportPdf = useCallback(async () => { setFeedback({ visible: true, variant: 'info', title: 'Exportar PDF solo disponible en web — en móvil usa CSV' }); }, []);
@@ -184,28 +184,25 @@ export function AdminMesasScreen() {
   );
 
   if (loading && mesas.length === 0) {
-    return <View style={s.center}><ActivityIndicator color={theme.colors.primary} /><Text style={s.muted}>CARGANDO DEPENDENCIAS…</Text>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</View>;
+    return <ListLoading label="CARGANDO DEPENDENCIAS…" fullScreen>{errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}</ListLoading>;
   }
 
   return (
     <View style={s.wrap}>
-      <View style={s.header}>
-        <View style={s.kickerRow}><View style={s.kickerDot} /><Text style={s.kicker}>ADMINISTRADOR</Text></View>
-        <View style={s.headerRow}>
-        <Text style={s.h1}>Dependencias</Text>
-        <Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>
-        </View>
-        <Text style={s.subtitle}>Crea y gestiona dependencias.{secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}</Text>
+      <ScreenHeader
+        kicker="ADMINISTRADOR"
+        kickerDot
+        title="Dependencias"
+        subtitle={`Crea y gestiona dependencias.${secretariaId ? ` Solo ves las de tu secretaría (#${secretariaId}) — paginado ${PAGE_SIZE} por página.` : ' Ves todas las dependencias paginadas.'}`}
+        actions={<Pressable onPress={() => { setCreateOpen(true); setFormError(null); }} style={s.btnPrimary} accessibilityRole="button" accessibilityLabel="Crear mesa"><Text style={s.btnPrimaryText}>+ NUEVA DEPENDENCIA</Text></Pressable>}
+      >
         {errorMsg ? <Text style={s.error}>{errorMsg}</Text> : null}
-      </View>
+      </ScreenHeader>
 
       <View style={s.filterCard}>
-        <View style={s.searchWrap}>
-          <Text style={s.searchIcon}>⌕</Text>
-          <TextInput value={q} onChangeText={setQ} placeholder="Buscar por nombre" placeholderTextColor={theme.colors.mutedSoft} style={s.search} returnKeyType="search" accessibilityLabel="Buscar mesas" />
-          {!!q && <Pressable onPress={() => setQ('')} style={s.clearBtn}><Text style={s.clearText}>×</Text></Pressable>}
-        </View>
-        <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
+        <FilterToolbar value={q} onChangeText={setQ} placeholder="Buscar por nombre" accessibilityLabel="Buscar mesas">
+          <FilterDropdown label="Estado" value={activa as never} onSelect={(v) => setActiva(v as never)} options={[{ value: 'todos' as const, label: 'Todas' }, { value: true as const, label: 'Activas' }, { value: false as const, label: 'Inactivas' }]} />
+        </FilterToolbar>
         <View style={s.filterFooter}>
           <Text style={s.filterCount}>{total} resultados{hasActiveFilters ? ' · filtrado' : ''} · Pág. {page + 1} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}</Text>
           {hasActiveFilters ? <Pressable onPress={clearFilters} style={s.linkBtn}><Text style={s.linkText}>Limpiar filtros</Text></Pressable> : null}
@@ -234,8 +231,8 @@ export function AdminMesasScreen() {
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
-        ListEmptyComponent={<View style={s.empty}><Text style={s.emptyTitle}>SIN DEPENDENCIAS</Text><Text style={s.mutedCenter}>AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA.</Text></View>}
-        ListFooterComponent={loadingMore ? <View style={{ padding: 16, alignItems: 'center' }}><ActivityIndicator color={theme.colors.primary} /></View> : null}
+        ListEmptyComponent={<EmptyState title="SIN DEPENDENCIAS" description="AJUSTA FILTROS O CREA LA PRIMERA DEPENDENCIA." surface style={{ marginTop: theme.space[2], padding: theme.space[8] }} />}
+        ListFooterComponent={<ListFooter loading={loadingMore} style={{ padding: 16 }} />}
         contentContainerStyle={s.listContent}
       />
       </View>
@@ -281,25 +278,10 @@ const s = StyleSheet.create({
   exportBtnGhost: { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
   exportBtnText: { color: '#fff', fontWeight: '800', fontSize: 11 },
   wrap: { flex: 1, backgroundColor: theme.colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: theme.colors.bg, padding: 24 },
-  muted: { color: theme.colors.muted, fontSize: 12 },
-  mutedCenter: { color: theme.colors.muted, fontSize: 12, textAlign: 'center' },
   error: { color: theme.colors.danger, fontSize: 11, fontWeight: '600' },
-  header: { paddingHorizontal: theme.space[4], paddingTop: theme.space[4], paddingBottom: theme.space[3], gap: theme.space[2] - 2 },
-  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2] },
-  kickerDot: { width: 6, height: 6, borderRadius: 999, backgroundColor: theme.colors.primary },
-  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1, color: theme.colors.muted, textTransform: 'uppercase' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[3] },
-  h1: { fontSize: 22, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.4, flex: 1 },
-  subtitle: { fontSize: 12, color: theme.colors.muted, lineHeight: 16 },
   btnPrimary: { backgroundColor: theme.colors.primary, paddingHorizontal: 16, height: 40, borderRadius: theme.radius.sm, alignItems: 'center', justifyContent: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   filterCard: { marginHorizontal: theme.space[3], marginBottom: theme.space[3], gap: theme.space[3], backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surfaceAlt, borderWidth: 1, borderColor: theme.colors.borderStrong, borderRadius: theme.radius.sm, paddingHorizontal: theme.space[3], height: 40 },
-  searchIcon: { color: theme.colors.mutedSoft, marginRight: 8, fontSize: 14 },
-  search: { flex: 1, fontSize: 13, color: theme.colors.text, paddingVertical: 0 },
-  clearBtn: { padding: 6, marginLeft: 6 },
-  clearText: { fontSize: 18, color: theme.colors.muted, fontWeight: '600' },
   chipsBlock: { gap: 6 },
   chipsLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: theme.colors.mutedSoft },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
@@ -331,8 +313,6 @@ const s = StyleSheet.create({
   btnGhost: { flex: 1, height: 36, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   btnGhostAccent: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
   btnGhostText: { fontSize: 11, fontWeight: '700', color: theme.colors.text },
-  empty: { alignItems: 'center', padding: theme.space[8], gap: 10, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, marginTop: theme.space[2] },
-  emptyTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: 16 },
   modalCard: { width: '100%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: theme.space[4], gap: 12, borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.soft },
   modalTitle: { fontSize: 16, fontWeight: '800', color: theme.colors.text },

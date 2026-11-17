@@ -4,13 +4,17 @@ import { ESTADOS } from './tickets.js';
 import { formatDuracion, formatFechaHora, nextEstadosParaRol } from './historial.js';
 
 describe('nextEstadosParaRol', () => {
-  it('solicitante no ve acciones si no está solucionado', () => {
+  it('solicitante no ve acciones si el ticket sigue abierto', () => {
     expect(nextEstadosParaRol('usuario', 'abierto', ESTADOS)).toEqual([]);
     expect(nextEstadosParaRol('usuario', 'en_proceso', ESTADOS)).toEqual([]);
   });
 
   it('solicitante solo confirma cierre o devuelve desde solucionado', () => {
     expect(nextEstadosParaRol('usuario', 'solucionado', ESTADOS)).toEqual(['cerrado', 'devuelto']);
+  });
+
+  it('solicitante puede reabrir ticket cerrado', () => {
+    expect(nextEstadosParaRol('usuario', 'cerrado', ESTADOS)).toEqual(['devuelto']);
   });
 
   it('técnico/jefe/admin ven toda la FSM', () => {

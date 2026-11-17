@@ -114,12 +114,8 @@ describe('validateCreateTicket (bordes no cubiertos)', () => {
     expect(validateCreateTicket({ ...baseCreate, categoriaId: 1.5 }).categoriaId).toBeDefined();
     expect(validateCreateTicket({ ...baseCreate, categoriaId: -2 }).categoriaId).toBeDefined();
   });
-  it('mesaId 0 o no entero falla; tecnico null pasa y blancos fallan', () => {
+  it('mesaId 0 o no entero falla', () => {
     expect(validateCreateTicket({ ...baseCreate, mesaId: 0 }).mesaId).toBeDefined();
-    expect(validateCreateTicket({ ...baseCreate, tecnicoAsignadoId: null }).tecnicoAsignadoId).toBeUndefined();
-    expect(
-      validateCreateTicket({ ...baseCreate, tecnicoAsignadoId: '   ' }).tecnicoAsignadoId,
-    ).toBeDefined();
   });
 });
 
@@ -285,11 +281,9 @@ describe('createTicket', () => {
         };
       }),
     }) as never;
-    await createTicket(mk({ data: { id: 'a', numero: 1 }, error: null }), {
-      ...baseCreate, tecnicoAsignadoId: 'tec-1',
-    }, { id: 'fijo' });
+    await createTicket(mk({ data: { id: 'a', numero: 1 }, error: null }), baseCreate, { id: 'fijo' });
     expect(spyPayload[0]['prioridad']).toBe('media');
-    expect(spyPayload[0]['tecnico_asignado_id']).toBe('tec-1');
+    expect(spyPayload[0]['tecnico_asignado_id']).toBeUndefined();
     expect(spyPayload[0]['id']).toBe('fijo');
     await expect(createTicket(mk({ data: null, error: { message: 'insert mal' } }), baseCreate)).rejects.toThrow('insert mal');
   });
@@ -411,7 +405,7 @@ describe('updateTicket / cancelTicket', () => {
 describe('transitionTicket', () => {
   const row = ticketRow({ estado: 'en_proceso' });
   // Fake: lectura de estado actual + update condicional + insert de comentario.
-  function transitionClient(actual: string, readError: string | null, updateData: unknown, updateError: string | null) {
+  function transitionClient(actual: string, readError: string | null, updateData: unknown, updateError: string | null, commentError: string | null = 'rls') {
     return {
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })) },
       from: vi.fn((table: string) => {
@@ -433,7 +427,7 @@ describe('transitionTicket', () => {
             })),
           };
         }
-        return { insert: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn(async () => ({ data: null, error: { message: 'rls' } })) })) })) };
+        return { insert: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn(async () => ({ data: null, error: commentError ? { message: commentError } : null })) })) })) };
       }),
     } as never;
   }
@@ -456,6 +450,18 @@ describe('transitionTicket', () => {
     expect(ok.estado).toBe('solucionado');
     await expect(transitionTicket(transitionClient('en_proceso', null, null, null), 't1', 'solucionado', { solucionAplicada: 'Se cambió el fusible' })).rejects.toThrow('Recarga');
     await expect(transitionTicket(transitionClient('en_proceso', null, null, 'update mal'), 't1', 'solucionado', { solucionAplicada: 'Se cambió el fusible' })).rejects.toThrow('update mal');
+  });
+  it('comentario es opcional; su fallo no revierte estado y se notifica por onError', async () => {
+    const okRow = ticketRow({ estado: 'solucionado' });
+    const onError = vi.fn();
+    const result = await transitionTicket(
+      transitionClient('en_proceso', null, okRow, null, 'comentario rechazado'),
+      't1',
+      'solucionado',
+      { solucionAplicada: 'Se cambió el fusible', comentario: 'Revisé el equipo', onError },
+    );
+    expect(result.estado).toBe('solucionado');
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'comentario rechazado' }));
   });
 });
 

@@ -2,34 +2,17 @@
 // Dashboard reutiliza DashboardScreen (shared); Alertas usa AlertasIAScreen.
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, IconGrid, IconPlus, IconUser } from '@helpdesk/shared';
+import { IconGrid, IconPlus, IconUser } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
 import { AlertasIAScreen } from './AlertasIAScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { DetalleTecnicoScreen } from '../tecnico/DetalleTecnicoScreen';
 import { PerfilScreen } from '../perfil/PerfilScreen';
-import { HeaderBell } from '../../components/HeaderBell';
+import { screenOpts, tabOpts } from '../../navigation/nav-options';
 import type { JefeStackParamList } from '../../navigation/types';
 
 const Stack = createNativeStackNavigator<JefeStackParamList>();
 const Tab = createBottomTabNavigator();
-
-const screenOpts = {
-  headerStyle: { backgroundColor: theme.colors.surface } as const,
-  headerTintColor: theme.colors.primary,
-  headerTitleStyle: { fontWeight: '800' as const, fontSize: 14 },
-  headerShadowVisible: false,
-  headerRight: () => <HeaderBell />,
-  contentStyle: { backgroundColor: theme.colors.bg },
-};
-
-const tabOpts = {
-  headerShown: false as const,
-  tabBarActiveTintColor: theme.colors.primary,
-  tabBarInactiveTintColor: theme.colors.muted,
-  tabBarStyle: { height: 62, paddingTop: 6, paddingBottom: 8, borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface },
-  tabBarLabelStyle: { fontSize: 11, fontWeight: '700' as const },
-};
 
 function JefeMainStack() {
   return (
@@ -46,8 +29,8 @@ export function JefeNavigator() {
   return (
     <Tab.Navigator screenOptions={tabOpts}>
       <Tab.Screen name="JefeDashTab" options={{ tabBarLabel: 'Dashboard', tabBarIcon: ({ color }) => <IconGrid size={16} color={color} /> }} component={JefeMainStack} />
-      <Tab.Screen name="JefeCrearTab" options={{ tabBarLabel: 'Nueva', tabBarIcon: ({ color }) => <IconPlus size={20} color={color} />, headerShown: true, headerTitle: 'Nueva solicitud', headerStyle: { backgroundColor: theme.colors.surface } as never, headerTintColor: theme.colors.primary, headerRight: () => <HeaderBell /> }} component={CreateTicketScreen} />
-      <Tab.Screen name="JefePerfilTab" options={{ tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <IconUser size={16} color={color} />, headerShown: true, headerTitle: 'Mi perfil', headerRight: () => <HeaderBell /> }} component={PerfilScreen} />
+      <Tab.Screen name="JefeCrearTab" options={{ ...screenOpts, tabBarLabel: 'Nueva', tabBarIcon: ({ color }) => <IconPlus size={20} color={color} />, headerShown: true, headerTitle: 'Nueva solicitud' }} component={CreateTicketScreen} />
+      <Tab.Screen name="JefePerfilTab" options={{ ...screenOpts, tabBarLabel: 'Perfil', tabBarIcon: ({ color }) => <IconUser size={16} color={color} />, headerShown: true, headerTitle: 'Mi perfil' }} component={PerfilScreen} />
     </Tab.Navigator>
   );
 }

@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(newSession);
       if (newSession?.user) {
         setLoading(true);
-        try { await loadProfile(newSession.user.id); } catch {}
+        try { await loadProfile(newSession.user.id); } catch { /* ignorado: no bloquea el flujo */ }
         finally { setLoading(false); }
       } else {
         setProfile(null);

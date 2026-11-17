@@ -160,6 +160,7 @@ def entrenar_serie(nombre: str, serie: pd.DataFrame, test_dias: int, forecast_di
         media = round(float(base_pred.mean()), 1)
         forecast = [
             {"fecha": (serie.index.max() + pd.Timedelta(days=i)).strftime("%Y-%m-%d"),
+             "dow": int((serie.index.max() + pd.Timedelta(days=i)).dayofweek),
              "forecast": media,
              "lo": round(max(0.0, media + q10_err), 1),
              "hi": round(max(0.0, media + q90_err), 1)}
@@ -214,6 +215,11 @@ def main() -> None:
     for nombre, dep in series.items():
         serie = cargar_serie(df, dep)
         etiqueta = "global" if dep is None else dep
+        # Una serie sin tickets (mesa renombrada o nueva) no aporta señal:
+        # se omite en vez de publicar ceros o romper el pipeline.
+        if serie["y"].sum() == 0:
+            print(f"\n[{etiqueta}] sin tickets en el histórico — se omite")
+            continue
         print(f"\n[{etiqueta}] días={len(serie)} media_dia={serie['y'].mean():.1f} max={serie['y'].max()}")
         res = entrenar_serie(nombre, serie, args.test_dias, args.forecast_dias, args.umbral_pico_q)
         todo[etiqueta] = res

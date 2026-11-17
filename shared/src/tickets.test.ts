@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { canTransition, validateCreateTicket } from './tickets.js';
+import { canTransition, validateCreateTicket, validateTicketSatisfaccion } from './tickets.js';
+
+describe('validación de encuesta de satisfacción', () => {
+  const valid = { calificacion: 4 };
+
+  it('acepta una calificación válida y comentario opcional', () => {
+    expect(validateTicketSatisfaccion(valid)).toBeNull();
+    expect(validateTicketSatisfaccion({ ...valid, comentario: 'Buena atención' })).toBeNull();
+  });
+
+  it('rechaza calificaciones fuera del rango 1–5 o no enteras', () => {
+    expect(validateTicketSatisfaccion({ calificacion: 6 })).toBeTruthy();
+    expect(validateTicketSatisfaccion({ calificacion: 2.5 })).toBeTruthy();
+    expect(validateTicketSatisfaccion({ calificacion: 0 })).toBeTruthy();
+  });
+
+  it('limita el comentario a 1000 caracteres', () => {
+    expect(validateTicketSatisfaccion({ ...valid, comentario: 'a'.repeat(1001) })).toBeTruthy();
+  });
+});
 
 describe('RF-06 validateCreateTicket', () => {
   const base = {
@@ -65,9 +84,9 @@ describe('RF-13 canTransition (matriz FSM)', () => {
     expect(canTransition('devuelto', 'cerrado')).toBe(true);
     expect(canTransition('devuelto', 'solucionado')).toBe(false);
   });
-  it('cerrado es terminal (sin salidas)', () => {
+  it('cerrado solo puede reabrirse como devuelto', () => {
     for (const d of ['abierto', 'en_proceso', 'programado', 'solucionado', 'devuelto', 'cerrado'] as const) {
-      expect(canTransition('cerrado', d)).toBe(false);
+      expect(canTransition('cerrado', d)).toBe(d === 'devuelto');
     }
   });
 });

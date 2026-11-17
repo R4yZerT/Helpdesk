@@ -53,7 +53,7 @@ export function TicketTabs({ detail, activeTab, tecnicoNombres, mesas, categoria
         ) : (
           <View style={{ gap: 8 }}>
             {adjuntos.map((a) => (
-              <Pressable key={a.id} onPress={async () => { try { const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60); const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl; if (url) await Linking.openURL(url); } catch (e) { reportError(e, { flujo: 'ticket-adjunto-open' }); } }} style={styles.adjRow}>
+              <Pressable key={a.id} onPress={async () => { try { const { data } = await supabase.storage.from('ticket-adjuntos').createSignedUrl(a.storagePath, 60); const url = data?.signedUrl ?? supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl; if (url) await Linking.openURL(url); } catch (e) { reportError(e, { flujo: 'ticket-adjunto-abrir' }); } }} style={styles.adjRow}>
                 {String(a.mime ?? '').startsWith('image/') ? (
                   <Image source={{ uri: supabase.storage.from('ticket-adjuntos').getPublicUrl(a.storagePath).data.publicUrl }} style={styles.adjThumb} />
                 ) : (

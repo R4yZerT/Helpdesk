@@ -2,7 +2,7 @@
 import { StyleSheet } from 'react-native';
 import { Text, TextInput, View } from 'react-native';
 import { FilterDropdown, resolverMesaId, theme } from '@helpdesk/shared';
-import type { CreateTicketInput, TicketCategoria, Mesa, TecnicoDeMesa, PrediccionCategoria } from '@helpdesk/shared';
+import type { CreateTicketInput, TicketCategoria, Mesa, PrediccionCategoria } from '@helpdesk/shared';
 
 type Props = {
   form: CreateTicketInput;
@@ -10,7 +10,6 @@ type Props = {
   touched: Record<string, boolean>;
   categorias: TicketCategoria[];
   mesas: Mesa[];
-  tecnicosMesa: TecnicoDeMesa[];
   sugerencia: PrediccionCategoria | null;
   iaLoading: boolean;
   onChange: (f: CreateTicketInput) => void;
@@ -19,12 +18,11 @@ type Props = {
   onApplySugerencia: () => void;
 };
 
-export function TicketForm({ form, errors, touched, categorias, mesas, tecnicosMesa, sugerencia, iaLoading, onChange, onTouched, onSelectCategoria, onApplySugerencia }: Props) {
+export function TicketForm({ form, errors, touched, categorias, mesas, sugerencia, iaLoading, onChange, onTouched, onSelectCategoria, onApplySugerencia }: Props) {
   const sugerenciaCat = sugerencia ? categorias.find(c => c.id === sugerencia.categoriaId) : null;
   const isSugerenciaAplicada = sugerencia ? form.categoriaId === sugerencia.categoriaId : false;
   const mesaOptions = mesas.map(m => ({ value: m.id, label: m.nombre }));
   const categoriaOptions = (form.mesaId ? categorias.filter(c => resolverMesaId(c.dominio, mesas) === form.mesaId).map(c => ({ value: c.id, label: `${c.subcategoria} · ${c.dominio}` })) : []);
-  const tecnicoOptions = [{ value: '', label: 'Sin asignar (cola de mesa)' }, ...tecnicosMesa.map(t => ({ value: t.id, label: t.fullName }))];
   const iaFuente = sugerencia?.fuente === 'beto' ? 'modelo BETO' : 'reglas locales';
 
   return (
@@ -84,7 +82,7 @@ export function TicketForm({ form, errors, touched, categorias, mesas, tecnicosM
           label="Dependencia *" value={form.mesaId ?? ''} options={mesaOptions} placeholder="Seleccionar dependencia"
           onSelect={(v) => {
             const id = v === '' ? null : Number(v);
-            onChange({ ...form, mesaId: id, categoriaId: id ? form.categoriaId : 0, tecnicoAsignadoId: null });
+            onChange({ ...form, mesaId: id, categoriaId: id ? form.categoriaId : 0 });
             onTouched({ ...touched, mesaId: true });
           }}
         />
@@ -100,11 +98,7 @@ export function TicketForm({ form, errors, touched, categorias, mesas, tecnicosM
         />
       </View>
       <Text style={s.sectionHint}>La IA sugiere dependencia y categoría. Al cambiar categoría, prioridad y dependencia se recalculan.</Text>
-      <FilterDropdown<string>
-        label="Técnico (opcional)" value={form.tecnicoAsignadoId ?? ''} options={tecnicoOptions} placeholder={form.mesaId ? 'Seleccionar técnico' : 'Elige dependencia primero'}
-        onSelect={(v) => onChange({ ...form, tecnicoAsignadoId: v === '' ? null : String(v) })}
-      />
-      <Text style={s.sectionHint}>Vacío = cola de la dependencia. La IA no sugiere técnico.</Text>
+      <Text style={s.sectionHint}>El técnico se asigna automáticamente según su carga activa y la urgencia del SLA.</Text>
       {touched.categoriaId && errors.categoriaId ? <Text style={s.error}>{errors.categoriaId}</Text> : null}
       {touched.mesaId && errors.mesaId ? <Text style={s.error}>{errors.mesaId}</Text> : null}
 
