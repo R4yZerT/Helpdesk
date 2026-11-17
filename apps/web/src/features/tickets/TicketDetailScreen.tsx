@@ -1,7 +1,7 @@
 // RF-09/10/11/13/14/15 — Detalle Stitch: split 8+4, FSM naranja, SLA 35m, Timeline 5 nodos
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
+import { addComentario, cancelTicket, fetchTecnicoNombres, getTicketDetail, listTecnicosPorMesa, reassignTicket, transitionTicket, updateTicket, validateComentario, validateUpdateTicket, ESTADOS, fetchMesas, fetchCategorias, nextEstadosParaRol, formatEstado, formatPrioridad, formatFechaHora, type TicketDetail, getSlaEstado, getSlaProgreso, formatSlaRestante, getSlaMinutosRestantes, getSlaVencimiento, slaEstadoLabel } from '@helpdesk/shared';
 import { Badge, Card, Divider, theme, FeedbackModal, FilterDropdown, TicketCommentList, TicketCommentComposer, TicketHistoryList, TicketSatisfactionCard } from '@helpdesk/shared';
 import { supabase } from '../../lib/supabase';
 import { reportError } from '../../lib/sentry';
@@ -76,6 +76,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const [reassignError, setReassignError] = useState<string | null>(null);
   // Técnicos activos de la dependencia elegida en la reasignación
   const [tecnicosMesa, setTecnicosMesa] = useState<{ id: string; nombre: string }[]>([]);
+  const [tecnicosMesaLoading, setTecnicosMesaLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'archivos'>('comentarios');
   const [mesaNombre, setMesaNombre] = useState<string>('');
   const [mesas, setMesas] = useState<Record<number, string>>({});
@@ -84,7 +85,6 @@ export function TicketDetailScreen({ route, navigation }: Props) {
   const [feedback, setFeedback] = useState<{ visible: boolean; variant: 'success' | 'error' | 'warning' | 'info' | 'confirm'; title: string; message?: string } | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -122,15 +122,32 @@ export function TicketDetailScreen({ route, navigation }: Props) {
 
   // Cargar técnicos activos de la dependencia elegida al reasignar
   useEffect(() => {
-    if (!showReassign || !reassignMesa) return;
+    if (!showReassign || !reassignMesa) {
+      setTecnicosMesaLoading(false);
+      return;
+    }
+    const mesaId = Number(reassignMesa);
+    if (!Number.isInteger(mesaId) || mesaId <= 0) {
+      setTecnicosMesa([]);
+      setReassignError('Selecciona una dependencia válida');
+      return;
+    }
     let alive = true;
-    (async () => {
-      try {
-        const { data } = await supabase.from('profiles').select('id,full_name,email').eq('mesa_id', Number(reassignMesa)).eq('rol', 'tecnico').eq('activo', true).order('full_name');
+    setTecnicosMesa([]);
+    setTecnicosMesaLoading(true);
+    setReassignError(null);
+    void listTecnicosPorMesa(supabase, mesaId)
+      .then((tecnicos) => {
+        if (alive) setTecnicosMesa(tecnicos.map((tecnico) => ({ id: tecnico.id, nombre: tecnico.fullName || tecnico.email || 'Técnico' })));
+      })
+      .catch((e: unknown) => {
         if (!alive) return;
-        setTecnicosMesa(((data ?? []) as Array<{ id: string; full_name: string | null; email: string | null }>).map((t) => ({ id: t.id, nombre: t.full_name ?? t.email ?? 'Técnico' })));
-      } catch (e) { reportError(e, { flujo: 'detalle-tecnicos-mesa' }); }
-    })();
+        reportError(e, { flujo: 'detalle-tecnicos-mesa' });
+        setReassignError(e instanceof Error ? e.message : 'No se pudieron cargar los técnicos');
+      })
+      .finally(() => {
+        if (alive) setTecnicosMesaLoading(false);
+      });
     return () => { alive = false; };
   }, [showReassign, reassignMesa]);
 
@@ -418,7 +435,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
               {transError ? <Text style={s.error}>{transError}</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {nextEstados.map((e) => (
-                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                  <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" accessibilityLabel={e === 'cerrado' ? 'Confirmar cierre' : 'Devolver al técnico'} style={[s.btn, e === 'cerrado' ? s.btnPrimary : s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
                     {transLoading === e ? <ActivityIndicator size="small" color={e === 'cerrado' ? '#fff' : theme.colors.primary} /> : <Text style={e === 'cerrado' ? s.btnPrimaryText : s.btnGhostText}>{e === 'cerrado' ? 'Confirmar cierre' : ticket.estado === 'cerrado' ? 'Reabrir ticket' : 'Devolver al técnico'}</Text>}
                   </Pressable>
                 ))}
@@ -429,14 +446,14 @@ export function TicketDetailScreen({ route, navigation }: Props) {
           )
         ) : (
         <>
-        <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnAccent]}><Text style={s.btnAccentText}>{showTrans ? 'Ocultar' : 'Solucionar Incidente'}</Text></Pressable>
+        <Pressable onPress={() => setShowTrans((v) => !v)} style={[s.btn, s.btnAccent]} accessibilityRole="button" accessibilityLabel={showTrans ? 'Ocultar solucionador' : 'Solucionar Incidente'}><Text style={s.btnAccentText}>{showTrans ? 'Ocultar' : 'Solucionar Incidente'}</Text></Pressable>
         {showTrans && nextEstados.length > 0 ? (
           <View style={{ gap: 8 }}>
             <TextInput value={solucion} onChangeText={setSolucion} placeholder="Describe la solución" style={s.input} multiline maxLength={5000} />
             {transError ? <Text style={s.error}>{transError}</Text> : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {nextEstados.map((e) => (
-                <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
+                <Pressable key={e} onPress={() => onTransition(e)} disabled={!!transLoading} accessibilityRole="button" accessibilityLabel={formatEstado(e as never)} style={[s.btn, s.btnGhost, { paddingHorizontal: 12, paddingVertical: 8 }]}>
                   {transLoading === e ? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
                 </Pressable>
               ))}
@@ -445,7 +462,7 @@ export function TicketDetailScreen({ route, navigation }: Props) {
         ) : null}
         <View style={s.ghostStack}>
           <Pressable onPress={() => setShowTrans(true)} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Requerir Información</Text></Pressable>
-          {(canReassign) ? <Pressable onPress={() => (showReassign ? setShowReassign(false) : openReassign())} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
+          {(canReassign) ? <Pressable onPress={() => (showReassign ? setShowReassign(false) : openReassign())} style={[s.btn, s.btnGhost]} accessibilityRole="button" accessibilityLabel={showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}><Text style={s.btnGhostText}>{showReassign ? 'Ocultar reasignar' : 'Reasignar Técnico'}</Text></Pressable> : null}
         </View>
         </>
         )}
@@ -453,9 +470,9 @@ export function TicketDetailScreen({ route, navigation }: Props) {
           <View style={{ gap: 8 }}>
             <Text style={s.mutedSmall}>Asignado actual: {nombreAsignadoActual}</Text>
             <FilterDropdown label="Dependencia" value={reassignMesa as never} options={Object.entries(mesas).map(([idMesa, nombre]) => ({ value: idMesa as never, label: nombre }))} onSelect={(v) => { setReassignMesa(v as string); setReassignTecnico(''); }} placeholder="Seleccionar dependencia" />
-            <FilterDropdown label="Técnico de la dependencia" value={reassignTecnico as never} options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicosMesa.map((t) => ({ value: t.id as never, label: t.nombre }))]} onSelect={(v) => setReassignTecnico(v as string)} placeholder={tecnicosMesa.length ? 'Seleccionar técnico' : 'Sin técnicos en esta dependencia'} />
+            <FilterDropdown label="Técnico de la dependencia" value={reassignTecnico as never} options={[{ value: '' as never, label: 'Sin asignar' }, ...tecnicosMesa.map((t) => ({ value: t.id as never, label: t.nombre }))]} onSelect={(v) => setReassignTecnico(v as string)} disabled={tecnicosMesaLoading} placeholder={tecnicosMesaLoading ? 'Cargando técnicos…' : tecnicosMesa.length ? 'Seleccionar técnico' : 'Sin técnicos en esta dependencia'} />
             {reassignError ? <Text style={s.error}>{reassignError}</Text> : null}
-            <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && { opacity: 0.6 }]}>{reassignLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Confirmar reasignación</Text>}</Pressable>
+            <Pressable onPress={onReassign} disabled={reassignLoading} style={[s.btn, s.btnPrimary, reassignLoading && { opacity: 0.6 }]} accessibilityRole="button" accessibilityLabel="Confirmar reasignación">{reassignLoading ? <ActivityIndicator color="#fff" /> : <Text style={s.btnPrimaryText}>Confirmar reasignación</Text>}</Pressable>
           </View>
         ) : null}
         {nextEstados.length === 0 && !canReassign && !showTrans ? <Text style={s.mutedSmall}>Sin acciones disponibles</Text> : null}
@@ -549,6 +566,14 @@ const s = StyleSheet.create({
   rowTitle: { fontSize: 12, fontWeight: '700', color: theme.colors.text },
   composer: { backgroundColor: theme.colors.surface, borderRadius: theme.radius.lg, padding: 14, borderWidth: 1, borderColor: theme.colors.border, gap: 10, ...theme.shadow.soft },
   input: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 13, color: theme.colors.text, minHeight: 44, textAlignVertical: 'top', backgroundColor: theme.colors.surfaceAlt },
+  surveyLoading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  surveyThanks: { gap: 6, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 10, padding: 12 },
+  surveyThanksTitle: { fontSize: 14, fontWeight: '800', color: '#15803D' },
+  surveyStars: { flexDirection: 'row', gap: 8 },
+  surveyStar: { minWidth: 42, minHeight: 42, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, backgroundColor: theme.colors.surfaceAlt },
+  surveyStarSelected: { borderColor: theme.colors.accent, backgroundColor: '#FFF7ED' },
+  surveyStarText: { color: theme.colors.mutedSoft, fontSize: 24, lineHeight: 28 },
+  surveyStarTextSelected: { color: '#B45309' },
   editInput: { borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, color: theme.colors.text, backgroundColor: theme.colors.surfaceAlt },
   solBox: { backgroundColor: theme.colors.surfaceAlt, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: theme.colors.border, gap: 4 },
   solLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: theme.colors.primary },
