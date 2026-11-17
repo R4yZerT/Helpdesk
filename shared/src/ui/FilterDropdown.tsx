@@ -146,7 +146,8 @@ export function FilterDropdown<T extends string | number | boolean>({
                     }}
                     style={({ pressed }) => [s.option, active && s.optionActive, pressed && s.optionPressed]}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
+                  accessibilityLabel={opt.label}
+                  accessibilityState={{ selected: active }}
                   >
                     <Text style={[s.optionText, active && s.optionTextActive]} numberOfLines={1}>
                       {opt.label}
