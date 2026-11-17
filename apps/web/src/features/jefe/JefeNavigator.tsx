@@ -2,9 +2,8 @@
 import * as React from 'react';
 import { Platform } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { theme, AppShell, APP_HEADER_OPTIONS, NotificationBell, IconLayers, IconPlus, IconTag, IconUpload } from '@helpdesk/shared';
+import { theme, AppShell, APP_HEADER_OPTIONS, NotificationBell, IconLayers, IconPlus, IconTag } from '@helpdesk/shared';
 import { DashboardScreen } from '../dashboard/DashboardScreen';
-import { ReportesScreen } from './ReportesScreen';
 import { AlertasIAScreen } from './AlertasIAScreen';
 import { CreateTicketScreen } from '../tickets/CreateTicketScreen';
 import { TicketDetailScreen } from '../tickets/TicketDetailScreen';
@@ -19,7 +18,6 @@ function titleFor(name: string) {
   if (name === 'Perfil') return 'Mi perfil';
   if (name === 'DetalleTicket') return 'Detalle';
   if (name === 'CrearTicket') return 'Nueva solicitud';
-  if (name === 'Reportes') return 'Reportes';
   if (name === 'Alertas') return 'Alertas IA';
   return 'Dashboard';
 }
@@ -29,7 +27,6 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
   const isActive = (id: string) => {
     if (id === 'dashboard') return activeName === 'Dashboard';
     if (id === 'crear') return activeName === 'CrearTicket';
-    if (id === 'reportes') return activeName === 'Reportes';
     if (id === 'alertas') return activeName === 'Alertas';
     return false;
   };
@@ -50,7 +47,6 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
   const items = [
     { id: 'dashboard', label: 'Dashboard', active: isActive('dashboard'), onPress: () => navigate('Dashboard'), icon: <IconLayers size={14} color={ic(isActive('dashboard'))} /> },
     { id: 'crear', label: 'Nueva solicitud', active: isActive('crear'), onPress: () => navigate('CrearTicket'), icon: <IconPlus size={14} color={ic(isActive('crear'))} /> },
-    { id: 'reportes', label: 'Reportes', active: isActive('reportes'), onPress: () => navigate('Reportes'), icon: <IconUpload size={14} color={ic(isActive('reportes'))} /> },
     { id: 'alertas', label: 'Alertas IA', active: isActive('alertas'), onPress: () => navigate('Alertas'), icon: <IconTag size={14} color={ic(isActive('alertas'))} /> },
   ];
 
@@ -66,7 +62,6 @@ function JefeWebInner({ activeName, setActiveName, profile, signOut }: { activeN
       <Stack.Navigator screenOptions={{ ...APP_HEADER_OPTIONS, headerShown: false }} initialRouteName="Dashboard">
         <Stack.Screen name="Dashboard" component={DashboardScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Dashboard'); } })} />
         <Stack.Screen name="CrearTicket" component={CreateTicketScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('CrearTicket'); } })} />
-        <Stack.Screen name="Reportes" component={ReportesScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Reportes'); } })} />
         <Stack.Screen name="Alertas" component={AlertasIAScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Alertas'); } })} />
         <Stack.Screen name="Perfil" component={PerfilScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('Perfil'); } })} />
         <Stack.Screen name="DetalleTicket" component={TicketDetailScreen} listeners={({ navigation }) => ({ focus: () => { setNav(navigation as unknown as never); setActiveName('DetalleTicket'); } })} />
