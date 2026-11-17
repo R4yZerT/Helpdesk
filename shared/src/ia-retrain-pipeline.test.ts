@@ -58,10 +58,12 @@ describe('retrain: publicación y workflow', () => {
     expect(m).toMatch(/public[\s\S]*false/i);
   });
 
-  it('workflow retrain-beto.yml: mensual + manual, publica solo si promoted', () => {
+  it('workflow retrain-beto.yml: solo manual, publica solo si promoted', () => {
     const w = repo('.github/workflows/retrain-beto.yml');
     expect(w).toContain('retrain-beto');
-    expect(w).toMatch(/cron:\s*'0 5 1 \* \*'/);
+    // Sin cron: depende de data/processed/tickets_clean.parquet (no versionado)
+    // y del bucket modelos-ia, así que corre bajo demanda.
+    expect(w).not.toMatch(/cron:/);
     expect(w).toContain('workflow_dispatch');
     expect(w).toContain('build_retrain_dataset.py');
     expect(w).toContain('--baseline-metrics');

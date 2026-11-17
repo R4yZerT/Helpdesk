@@ -22,9 +22,9 @@ jobs:
       - name: Instala deps ML
         run: pip install pandas pyarrow scikit-learn joblib
 
+      # La versión la toma de package.json#packageManager; fijarla aquí rompe
+      # el job con ERR_PNPM_BAD_PM_VERSION.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - uses: actions/setup-node@v4
         with:

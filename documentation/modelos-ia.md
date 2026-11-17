@@ -103,8 +103,8 @@ La prioridad sale del mapa por subcategoría (`getPrioridadPorSubcategoria`).
 Las pantallas (`CreateTicketScreen` web/móvil) disparan con debounce de 800ms,
 muestran la fuente ("modelo BETO" vs "reglas locales") y el % de confianza.
 
-La Edge Function `supabase/functions/classify` (RF-22) es un MVP por keywords
-con los mismos IDs del seed; el camino principal es `ia.ts` → BETO.
+No hay Edge Function de clasificación: la llamada va del cliente a BETO
+(`EXPO_PUBLIC_BETO_URL`) y, si el servicio no responde, cae a las reglas.
 
 ### Loop de validación técnica (cierre RF-22: telemetría modelo-vs-reglas)
 
@@ -131,7 +131,7 @@ La fuente ya se persiste por ticket en `ticket_ia_feedback`
   (RLS del consultante). Tarjeta `PrecisionIa` en el Dashboard del jefe
   (web/móvil) vía `getMetricasIaFeedback` (`shared/src/dashboard.ts`).
 
-### Reentrenamiento mensual (pipeline `retrain-beto.yml`)
+### Reentrenamiento manual (pipeline `retrain-beto.yml`)
 
 1. **Export:** `export_dataset_validado.py` → `dataset_validado.csv`
    (solo `confirmada`/`corregida`).
@@ -147,9 +147,11 @@ La fuente ya se persiste por ticket en `ticket_ia_feedback`
 5. **Despliegue:** descargar la versión del bucket a `/model` del servicio
    `beto` y reiniciar (`serve.py` carga `BET0_MODEL_DIR` al arrancar).
 
-Workflow `.github/workflows/retrain-beto.yml`: mensual (día 1, 05:00 UTC)
-+ `workflow_dispatch` con input `force_publish`. Al promover un modelo
-mejor, actualizar `ml/baseline_beto.json` con su test macro-F1.
+Workflow `.github/workflows/retrain-beto.yml`: **solo `workflow_dispatch`**
+con input `force_publish` (sin cron). No puede correr solo porque necesita
+`data/processed/tickets_clean.parquet`, que se genera fuera del repo desde el
+CSV legacy, y el bucket `modelos-ia`. Al promover un modelo mejor, actualizar
+`ml/baseline_beto.json` con su test macro-F1.
 
 Guía operativa en lenguaje accesible (ciclo, roles, manual vs automático,
 cómo ver la mejora): `documentation/reentrenamiento-ia.md`.
@@ -226,9 +228,9 @@ forecast_7d.json ──upload-pronostico──▶ pronosticos_picos ──▶ ge
   a costa de más avisos; severidad `critica` si forecast ≥ 100 o nivel `pico`,
   `alta` si nivel `pico` con forecast < 100, y `media` si el disparo viene de
   nivel `alta`. El mensaje incluye el rango q10–q90. Dedup 24h.
-  Se dispara por cron diario 06:00 (requiere extensión `pg_cron`) y por la
-  Edge Function `generate-alertas` (solo jefe/admin), que ahora invoca ambas
-  generadoras (reactiva + preventiva).
+  Se dispara por el cron diario 06:00 (`pg_cron`, habilitado en la migración
+  `20261117031826_pg_cron_operativo.sql`) y cada vez que el jefe pulsa
+  "Generar alertas" (RPC `generar_alertas_ia`).
 - **Comunicaciones**: el trigger inserta `notificaciones` tipo `alerta_pico`
   a todos los jefes/admins activos → llegan por Realtime al instante y por
   push vía `send-push` (cron 5 min, ya existente). También aplica a
@@ -245,7 +247,7 @@ ejecutable manual con `workflow_dispatch`):
    (tickets vivos vía REST con `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`)
 2. `python3 ml/src/forecast_picos.py --input data/processed/tickets_live.parquet`
 3. `pnpm upload:pronostico:push` → upsert en `pronosticos_picos`
-4. Invocar `generate-alertas` (o esperar el cron diario 06:00).
+4. El cron diario 06:00 genera las alertas preventivas (`generar_alertas_pronostico`).
 
 Equivalente manual: `pnpm forecast:live` (requiere las env vars y termina
 en dry-run de subida; añade `-- --push` vía `upload:pronostico:push` si se
@@ -255,6 +257,6 @@ quiere publicar). Las fechas del forecast parten del último día de datos.
 
 1. Importar datos nuevos → 2. `python3 ml/src/forecast_picos.py`
 3. `pnpm run upload:pronostico -- --push --sql /tmp/p.sql` + apply vía CLI
-4. Invocar `generate-alertas` (o esperar el cron). Las fechas del forecast
+4. Esperar el cron diario 06:00. Las fechas del forecast
    parten del último día de datos: con datos desactualizados la ventana de
    48h ya pasó y la generadora retorna 0 correctamente.

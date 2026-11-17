@@ -26,6 +26,23 @@ import pandas as pd
 
 PAGE = 1000
 
+# Los nombres de mesa en Supabase cambian (ej. "TIC"), pero las series
+# históricas del forecast usan nombres largos. Normalizar aquí conserva la
+# continuidad de pronosticos_picos entre corridas.
+ALIAS_DEPENDENCIAS = {
+    "tic": "Oficina TIC",
+    "comunicacion": "Oficina de Comunicaciones",
+    "infraestructura": "Secretaría de Infraestructura Fisica",
+}
+
+
+def normalizar_dependencia(nombre: str | None) -> str:
+    clave = (nombre or "").lower()
+    for fragmento, canonico in ALIAS_DEPENDENCIAS.items():
+        if fragmento in clave:
+            return canonico
+    return nombre or "Sin mesa"
+
 
 def fetch_page(base_url: str, service_key: str, offset: int) -> list:
     params = urllib.parse.urlencode({
@@ -71,9 +88,10 @@ def main() -> int:
 
     df = pd.DataFrame([{
         "fecha_parsed": r.get("creado_en"),
-        "dependencia_clean": ((r.get("mesas") or {}).get("nombre")) or "Sin mesa",
+        "dependencia_clean": normalizar_dependencia((r.get("mesas") or {}).get("nombre")),
     } for r in rows])
-    df["fecha_parsed"] = pd.to_datetime(df["fecha_parsed"], utc=True)
+    # format="ISO8601": Supabase mezcla timestamps con y sin microsegundos.
+    df["fecha_parsed"] = pd.to_datetime(df["fecha_parsed"], utc=True, format="ISO8601")
 
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)

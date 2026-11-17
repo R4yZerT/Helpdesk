@@ -45,7 +45,6 @@
 ## Layout (`shared/src/ui/layout/`)
 
 - `AppShell` — `aside w-64 fixed left-0 h-screen flex-col p16 border-r #E2E8F0 bg surfaceAlt` + `ml-64 min-h-screen` + `max-w 1280 mx-auto`. Mobile `<1024` drawer overlay.
-- `TopBar` — `h-64 flex between px-24 bg surface border-b`: left `HelpDesk 14/800 -0.3 + badge V4.8-PROD #EAF3FF + search w240 h36 bg #F6F8FB border #E2E8F0 radius12 + ⌘K`, center `nav 12/600 muted: En Vivo/Mesas/SLA/Técnicos/IA Intel`, right `actions`.
 - `FilterBar` — `sticky top-64 z30 bg white/95 backdrop-blur px-8 py-3`: segmented `Hoy/7d/30d` + `Mesas: TIC blue / Comunicaciones orange / Infra green / EAPSA grey` pills + `Categoría select + Estado Todos (6)` + acciones `Filtros Globales + Exportar PDF/CSV CTA azul`.
 - `Sidebar` — logo `dot 32 bg #0E87E2 + HelpDesk 13/800 + Mesa de Ayuda 10/600 muted`, nav items `12/600 muted -> active #0A5CB8 bg #EAF3FF border #BFDBFE`, userCard `avatar 32 #0F172A`.
 
@@ -73,7 +72,7 @@
 
 ```ts
 import { theme, Card, Badge, Button } from '@helpdesk/shared';
-import { AppShell, TopBar, FilterBar, Sidebar } from '@helpdesk/shared';
+import { AppShell, FilterBar, Sidebar } from '@helpdesk/shared';
 import { KpiCard, DonutEstado, BarsPrioridad, AreaEvolucion, HeatmapCarga, TimelineAlertas } from '@helpdesk/shared';
 import { getKPIs, getStatsPorEstado } from '@helpdesk/shared'; // DashboardFilters
 import { ticketsToRows, toCsv, downloadCsv } from '@helpdesk/shared';
