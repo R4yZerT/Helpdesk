@@ -20,6 +20,8 @@ export E2E_TECNICO_PASS="contraseña-tecnico"
 export E2E_TECNICO_NOMBRE="Nombre visible del técnico en la app"
 export E2E_JEFE_USER="correo-o-cedula-jefatura"
 export E2E_JEFE_PASS="contraseña-jefatura"
+export E2E_ADMIN_USER="correo-o-cedula-administrador"
+export E2E_ADMIN_PASS="contraseña-administrador"
 export E2E_DEMO_MESA="Nombre exacto de la dependencia"
 export E2E_DEMO_CATEGORIA="Nombre exacto de la categoría"
 pnpm --filter web test:e2e:demo
@@ -28,7 +30,8 @@ pnpm --filter web test:e2e:demo
 La mesa y categoría deben existir y estar activas. El formulario no permite
 seleccionar un técnico: un trigger de la base asigna automáticamente uno activo
 de esa mesa según carga de trabajo y riesgo de SLA. `E2E_TECNICO_NOMBRE` y sus
-credenciales deben corresponder al técnico que el trigger asigne al ticket.
+credenciales deben corresponder al técnico que se asignará al ticket después de
+la reasignación administrada del flujo de demo.
 Para que la demo sea reproducible, usa un entorno controlado con carga estable
 y sin otras altas/cierres simultáneos. El test crea un ticket real y lo deja
 cerrado, no lo elimina. Playwright guarda el video en `apps/web/test-results/`

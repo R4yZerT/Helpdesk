@@ -208,7 +208,7 @@ export function AdminMesaTicketsScreen({ navigation }: Props) {
         </FilterToolbar>
       </View>
       <View style={s.exportRow}>
-        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button"><Text style={s.exportBtnText}>CSV</Text></Pressable>
+        <Pressable onPress={onExportCsv} style={s.exportBtn} accessibilityRole="button" accessibilityLabel="Exportar CSV tickets de mi dependencia"><Text style={s.exportBtnText}>CSV</Text></Pressable>
         <Pressable onPress={onExportPng} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PNG</Text></Pressable>
         <Pressable onPress={onExportPdf} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>PDF</Text></Pressable>
         <Pressable onPress={() => { setModoBulk((v) => !v); setSeleccion([]); setResultadoBulk(null); }} style={[s.exportBtn, s.exportBtnGhost]} accessibilityRole="button" accessibilityLabel="Selección en lote"><Text style={[s.exportBtnText, { color: theme.colors.text }]}>{modoBulk ? 'Cancelar selección' : 'Lote'}</Text></Pressable>

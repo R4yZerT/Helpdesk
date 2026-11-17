@@ -14,6 +14,22 @@ export async function loginComo(page: Page, user: string, pass: string): Promise
   await page.getByLabel('Cédula o correo').fill(user);
   await page.getByLabel('Contraseña', { exact: true }).fill(pass);
   await page.getByLabel('Ingresar').click();
+  const errorAutenticacion = page.getByRole('alert');
+  await Promise.race([
+    page.getByLabel('Ingresar').waitFor({ state: 'hidden', timeout: 30_000 }),
+    errorAutenticacion.waitFor({ state: 'visible', timeout: 30_000 }),
+  ]);
+  if (await errorAutenticacion.isVisible()) {
+    throw new Error(`No se pudo iniciar sesión: ${await errorAutenticacion.innerText()}`);
+  }
+  const cerrarOnboarding = page.getByRole('button', { name: 'Omitir guía' });
+  const onboardingPendiente = await page.evaluate(
+    () => localStorage.getItem('onboarding.v1.visto') !== '1',
+  );
+  if (onboardingPendiente) {
+    await cerrarOnboarding.waitFor({ state: 'visible', timeout: 30_000 });
+    await cerrarOnboarding.click();
+  }
 }
 
 // Abre el primer ticket de la bandeja; retorna false si no hay ninguno.
