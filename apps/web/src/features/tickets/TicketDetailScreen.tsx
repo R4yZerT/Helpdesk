@@ -299,8 +299,9 @@ export function TicketDetailScreen({ route, navigation }: Props) {
     } catch { /* ignorado: no bloquea el flujo */ }
   };
   const isOwner = profile?.id === ticket.usuarioId;
-  const canEdit = isOwner && ticket.estado === 'abierto' && !ticket.tecnicoAsignadoId;
-  const canCancel = canEdit;
+  // El ticket se autoasigna al crearse: cancelar no puede depender del técnico.
+  const canCancel = isOwner && ticket.estado === 'abierto';
+  const canEdit = canCancel && !ticket.tecnicoAsignadoId;
   const isTecnicoLike = profile && ['tecnico','jefe','administrador'].includes(profile.rol);
   const isJefeAdmin = profile && ['jefe','administrador'].includes(profile.rol);
   const canReassign = !!isJefeAdmin || (!!isTecnicoLike && ticket.tecnicoAsignadoId === profile?.id);
@@ -351,9 +352,9 @@ export function TicketDetailScreen({ route, navigation }: Props) {
             {ticket.solucionAplicada ? <Text style={s.solText}>{ticket.solucionAplicada}</Text> : <Text style={s.solTextMuted}>Sin detalle de solución — registra el procedimiento aplicado.</Text>}
           </View>
         ) : null}
-        {canEdit && !editing ? (
+        {canCancel && !editing ? (
           <View style={s.actionRow}>
-            <Pressable onPress={startEdit} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Editar</Text></Pressable>
+            {canEdit ? <Pressable onPress={startEdit} style={[s.btn, s.btnGhost]}><Text style={s.btnGhostText}>Editar</Text></Pressable> : null}
             <Pressable onPress={onCancelTicket} style={[s.btn, s.btnDanger]}><Text style={s.btnDangerText}>Cancelar solicitud</Text></Pressable>
           </View>
         ) : null}

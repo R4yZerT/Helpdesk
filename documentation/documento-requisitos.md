@@ -46,7 +46,7 @@ Sistema móvil de mesa de ayuda municipal que permite a los usuarios crear y dar
 | RF-07 | Adjuntar imágenes/documentos a la solicitud | S |
 | RF-08 | Listado de "mis solicitudes" con estado, filtros y búsqueda | M |
 | RF-09 | Ver detalle de una solicitud con historial de estados y comentarios | M |
-| RF-10 | Editar o cancelar una solicitud propia mientras no esté asignada | S |
+| RF-10 | Editar una solicitud propia mientras no tenga técnico asignado, o cancelarla mientras siga **abierta** (la asignación es automática) | S |
 | RF-11 | Registro de **fecha/hora de resolución** y solución aplicada (dato clave para IA) | M |
 
 ### Módulo 3 — Flujo de trabajo del técnico
@@ -298,7 +298,7 @@ Estados: `abierto`, `en_proceso`, `programado`, `solucionado`, `devuelto`, `cerr
 |---|---|---|---|
 | RF-13.2 | Toda transición fuera de la matriz se rechaza fail-fast con error `Transición no permitida: {origen} → {destino}` antes de tocar la BD | M | Implementado |
 | RF-13.3 | `solucionado` y `cerrado` exigen **solución aplicada** de 5–5000 caracteres (dato clave para IA, RF-11); en el resto es opcional pero si se envía respeta los mismos límites | M | Implementado |
-| RF-13.4 | Roles: **técnico** (sus asignados), **jefe** y **administrador** pueden transicionar; el **usuario** solo puede cancelar solicitud propia no asignada (RF-10) | M | Implementado |
+| RF-13.4 | Roles: **técnico** (sus asignados), **jefe** y **administrador** pueden transicionar; el **usuario** solo puede cancelar su solicitud mientras esté `abierto` (RF-10) | M | Implementado |
 | RF-13.5 | Cada transición puede llevar un **comentario** opcional; si su guardado falla, la transición **no** se revierte (no bloquea) | S | Implementado |
 | RF-13.6 | Cada cambio inserta fila en `ticket_estados` (quién, cuándo, origen → destino); el detalle muestra el historial completo (RF-09) | M | Implementado |
 
