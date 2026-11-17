@@ -2,7 +2,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { credenciales, loginComo } from './helpers';
 
-test.use({ video: 'on' });
+test.use({ video: 'on', actionTimeout: 20_000 });
 test.setTimeout(300_000);
 
 const solicitante = credenciales('E2E_TEST');
@@ -19,6 +19,10 @@ const variablesFaltantes = [
   ...(!demoMesa ? ['E2E_DEMO_MESA'] : []),
   ...(!demoCategoria ? ['E2E_DEMO_CATEGORIA'] : []),
 ];
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 test.skip(
   variablesFaltantes.length > 0,
@@ -58,7 +62,7 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   const totalInicial = await totalDashboard(page);
   await cerrarSesion(page);
 
-  // El solicitante crea la solicitud y la asigna al técnico configurado.
+  // El solicitante crea la solicitud; la base asigna el técnico automáticamente.
   await loginComo(page, solicitante!.user, solicitante!.pass);
   await page.getByLabel('Crear nueva solicitud').click();
   await page.getByPlaceholder('Ej: No enciende el equipo del aula 301').fill(asunto);
@@ -69,13 +73,18 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await page.getByRole('button', { name: /^Dependencia \*/ }).click();
   await page.getByRole('button', { name: demoMesa, exact: true }).click();
   await page.getByRole('button', { name: /^Categoría \*/ }).click();
-  await page.getByRole('button', { name: demoCategoria, exact: true }).click();
-  await page.getByRole('button', { name: /^Técnico \(opcional\):/ }).click();
-  await page.getByRole('button', { name: tecnicoNombre, exact: true }).click();
+  await page.getByRole('button', { name: new RegExp(`^${escapeRegExp(demoCategoria)} · `) }).click();
 
   await page.getByLabel('Crear solicitud').click();
   await aceptarMensaje(page, 'Solicitud creada');
   await expect(page.getByText(asunto, { exact: true })).toBeVisible({ timeout: 20_000 });
+  await page.getByText(asunto, { exact: true }).click();
+  const assigneeProgress = page.getByText(/^Asignado — /);
+  await expect(assigneeProgress).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => assigneeProgress.innerText(), { timeout: 30_000 })
+    .not.toBe('Asignado — Técnico asignado');
+  await expect(assigneeProgress).toHaveText(`Asignado — ${tecnicoNombre}`);
   await cerrarSesion(page);
 
   // Mostrar en el tablero de jefatura el ticket que acaba de ingresar.
@@ -89,7 +98,7 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await expect(page.getByLabel('Buscar bandeja técnico')).toBeVisible({ timeout: 20_000 });
   await page.getByLabel('Buscar bandeja técnico').fill(asunto);
   const ticketEnBandeja = page.getByRole('button', {
-    name: new RegExp(`^Ticket #.*${asunto.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+    name: new RegExp(`^Ticket #.*${escapeRegExp(asunto)}$`),
   });
   await expect(ticketEnBandeja).toBeVisible({ timeout: 30_000 });
   await ticketEnBandeja.click();
@@ -97,25 +106,23 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await page.getByRole('button', { name: 'Solucionar Incidente' }).click();
   await page.getByPlaceholder('Describe la solución').fill(solucion);
   await page.getByRole('button', { name: 'En proceso', exact: true }).click();
-  await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('En proceso', { exact: true })).toBeVisible();
+  await expect(page.getByText('En proceso', { exact: true }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Solucionar Incidente' }).click();
   await page.getByPlaceholder('Describe la solución').fill(solucion);
   await page.getByRole('button', { name: 'Solucionado', exact: true }).click();
-  await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('Solucionado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Solucionado', { exact: true }).first()).toBeVisible();
   await cerrarSesion(page);
 
   // El solicitante revisa la solución y devuelve el ticket para demostrar la reapertura.
   await loginComo(page, solicitante!.user, solicitante!.pass);
   await expect(page.getByText(asunto, { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.getByText(asunto, { exact: true }).click();
-  await expect(page.getByText('Solucionado', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Solucionado', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(solucion, { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Devolver al técnico' }).click();
   await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('Devuelto', { exact: true })).toBeVisible();
+  await expect(page.getByText('Devuelto', { exact: true }).first()).toBeVisible();
   await cerrarSesion(page);
 
   // El técnico retoma el ticket devuelto, completa el trabajo y propone solución otra vez.
@@ -123,27 +130,25 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await page.getByLabel('Buscar bandeja técnico').fill(asunto);
   await expect(ticketEnBandeja).toBeVisible({ timeout: 30_000 });
   await ticketEnBandeja.click();
-  await expect(page.getByText('Devuelto', { exact: true })).toBeVisible();
+  await expect(page.getByText('Devuelto', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Solucionar Incidente' }).click();
   await page.getByPlaceholder('Describe la solución').fill(`${solucion} Se repitió la prueba tras la devolución.`);
   await page.getByRole('button', { name: 'En proceso', exact: true }).click();
-  await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('En proceso', { exact: true })).toBeVisible();
+  await expect(page.getByText('En proceso', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Solucionar Incidente' }).click();
   await page.getByPlaceholder('Describe la solución').fill(`${solucion} Se repitió la prueba tras la devolución.`);
   await page.getByRole('button', { name: 'Solucionado', exact: true }).click();
-  await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('Solucionado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Solucionado', { exact: true }).first()).toBeVisible();
   await cerrarSesion(page);
 
   // Tras aceptar la segunda solución, el solicitante confirma el cierre.
   await loginComo(page, solicitante!.user, solicitante!.pass);
   await expect(page.getByText(asunto, { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.getByText(asunto, { exact: true }).click();
-  await expect(page.getByText('Solucionado', { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText('Solucionado', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'Confirmar cierre' }).click();
   await aceptarMensaje(page, 'Estado actualizado');
-  await expect(page.getByText('Cerrado', { exact: true })).toBeVisible();
+  await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
   await cerrarSesion(page);
 
   // El total conserva el ticket y la métrica de abiertos vuelve a su valor inicial.

@@ -266,7 +266,7 @@ export function DetalleTecnicoScreen({ route }: Props) {
             {transError ? <Text style={s.error}>{transError}</Text> : null}
             <View style={{ flexDirection:'row', flexWrap:'wrap', gap: theme.space[2] }}>
               {nextEstados.map((e)=>(
-                <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
+                <Pressable key={e} onPress={()=>onTransition(e)} disabled={!!transLoading} accessibilityRole="button" accessibilityLabel={formatEstado(e as never)} style={[s.btn, s.btnGhost, { paddingHorizontal:12, paddingVertical:8 }]}>
                   {transLoading===e? <ActivityIndicator size="small" color={theme.colors.primary} /> : <Text style={s.btnGhostText}>{formatEstado(e as never)}</Text>}
                 </Pressable>
               ))}
