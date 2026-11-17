@@ -8,6 +8,7 @@ test.setTimeout(300_000);
 const solicitante = credenciales('E2E_TEST');
 const tecnico = credenciales('E2E_TECNICO');
 const jefatura = credenciales('E2E_JEFE');
+const admin = credenciales('E2E_ADMIN');
 const tecnicoNombre = process.env.E2E_TECNICO_NOMBRE?.trim() ?? '';
 const demoMesa = process.env.E2E_DEMO_MESA?.trim() ?? '';
 const demoCategoria = process.env.E2E_DEMO_CATEGORIA?.trim() ?? '';
@@ -15,6 +16,7 @@ const variablesFaltantes = [
   ...(!solicitante ? ['E2E_TEST_USER/PASS'] : []),
   ...(!tecnico ? ['E2E_TECNICO_USER/PASS'] : []),
   ...(!jefatura ? ['E2E_JEFE_USER/PASS'] : []),
+  ...(!admin ? ['E2E_ADMIN_USER/PASS'] : []),
   ...(!tecnicoNombre ? ['E2E_TECNICO_NOMBRE'] : []),
   ...(!demoMesa ? ['E2E_DEMO_MESA'] : []),
   ...(!demoCategoria ? ['E2E_DEMO_CATEGORIA'] : []),
@@ -62,7 +64,7 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   const totalInicial = await totalDashboard(page);
   await cerrarSesion(page);
 
-  // El solicitante crea la solicitud; la base asigna el técnico automáticamente.
+  // La asignación inicial la determina el sistema; el admin elige el técnico de la demo después.
   await loginComo(page, solicitante!.user, solicitante!.pass);
   await page.getByLabel('Crear nueva solicitud').click();
   await page.getByPlaceholder('Ej: No enciende el equipo del aula 301').fill(asunto);
@@ -77,14 +79,31 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
 
   await page.getByLabel('Crear solicitud').click();
   await aceptarMensaje(page, 'Solicitud creada');
+  await cerrarSesion(page);
+
+  // El administrador de TIC reasigna al técnico de la demo tras la autoasignación inicial.
+  await loginComo(page, admin!.user, admin!.pass);
+  await page.getByPlaceholder('Buscar por ticket (#, asunto)').fill(asunto);
+  const ticketEnMesa = page.getByRole('button', {
+    name: new RegExp(`^Ticket #.*${escapeRegExp(asunto)}$`),
+  });
+  await expect(ticketEnMesa).toBeVisible({ timeout: 30_000 });
+  await ticketEnMesa.click();
   await expect(page.getByText(asunto, { exact: true })).toBeVisible({ timeout: 20_000 });
-  await page.getByText(asunto, { exact: true }).click();
-  const assigneeProgress = page.getByText(/^Asignado — /);
-  await expect(assigneeProgress).toBeVisible({ timeout: 30_000 });
-  await expect
-    .poll(() => assigneeProgress.innerText(), { timeout: 30_000 })
-    .not.toBe('Asignado — Técnico asignado');
-  await expect(assigneeProgress).toHaveText(`Asignado — ${tecnicoNombre}`);
+  await page.getByRole('button', { name: 'Reasignar Técnico' }).click();
+  const selectorTecnico = page.getByRole('button', { name: /^Técnico de la dependencia:/ });
+  await expect(selectorTecnico).toBeEnabled({ timeout: 20_000 });
+  await selectorTecnico.click();
+  const opcionTecnico = page.getByRole('button', { name: tecnicoNombre, exact: true });
+  await expect(opcionTecnico).toBeVisible();
+  const tecnicoYaSeleccionado = (await opcionTecnico.innerText()).includes('✓');
+  await opcionTecnico.click();
+  if (tecnicoYaSeleccionado) {
+    await page.getByRole('button', { name: 'Ocultar reasignar' }).click();
+  } else {
+    await page.getByRole('button', { name: 'Confirmar reasignación' }).click();
+    await aceptarMensaje(page, 'Ticket reasignado');
+  }
   await cerrarSesion(page);
 
   // Mostrar en el tablero de jefatura el ticket que acaba de ingresar.
@@ -149,6 +168,11 @@ test('demo end-to-end: ticket, cambios de estado y dashboard por rol', async ({ 
   await page.getByRole('button', { name: 'Confirmar cierre' }).click();
   await aceptarMensaje(page, 'Estado actualizado');
   await expect(page.getByText('Cerrado', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Encuesta de satisfacción', { exact: true })).toBeVisible();
+  await page.getByRole('radio', { name: '5 estrellas' }).click();
+  await page.getByPlaceholder('Comentario opcional').fill('Atención rápida y solución efectiva.');
+  await page.getByRole('button', { name: 'Enviar encuesta' }).click();
+  await expect(page.getByText(/Gracias por compartir su experiencia/)).toBeVisible({ timeout: 20_000 });
   await cerrarSesion(page);
 
   // El total conserva el ticket y la métrica de abiertos vuelve a su valor inicial.
