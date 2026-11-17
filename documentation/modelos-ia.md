@@ -82,6 +82,14 @@ Trunca a 2000 caracteres / 256 tokens, mínimo 5 caracteres, inferencia con
   8001, healthcheck); `web` lo espera (`depends_on: service_healthy`) y
   hornea `EXPO_PUBLIC_BETO_URL` (default `http://localhost:8001` en local;
   en prod, URL pública del servicio BETO).
+- **CORS obligatorio**: el navegador llama a BETO desde otro origen (Netlify,
+  nginx `:3000`, Expo `:8081`), así que `serve.py` monta `CORSMiddleware`.
+  `BETO_CORS_ORIGINS` acepta una lista separada por comas (default `*`, sin
+  cookies ni credenciales). Sin esto el preflight `OPTIONS /classify` devuelve
+  405 y la app cae a las reglas aunque el servicio esté arriba.
+- **Netlify/build estático**: `EXPO_PUBLIC_BETO_URL` se inlinea en el bundle.
+  Si no se define en el build, el navegador apunta a `127.0.0.1:8001` (el
+  localhost del usuario) y la clasificación real son las reglas locales.
 - **Verificado en vivo** (2026-10): `/health` → 13 etiquetas;
   `/classify {"text":"No tengo internet…"}` →
   `tic:Conectividad y redes` con confianza 0.9141.
