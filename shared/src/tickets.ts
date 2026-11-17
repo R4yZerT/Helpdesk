@@ -128,43 +128,79 @@ export type TicketComentario = {
   creadoEn: string;
 };
 
+export type TicketSatisfaccion = {
+  ticketId: string;
+  usuarioId: string;
+  calificacion: number;
+  comentario: string | null;
+  creadoEn: string;
+};
+
 export type TicketSatisfaccionInput = {
-  calidadServicio: number;
-  tiempoRespuesta: number;
-  comunicacion: number;
-  solucionResolvio: number;
+  calificacion: number;
   comentario?: string;
 };
 
 export function validateTicketSatisfaccion(input: TicketSatisfaccionInput): string | null {
-  const scores = [input.calidadServicio, input.tiempoRespuesta, input.comunicacion, input.solucionResolvio];
-  if (scores.some((score) => !Number.isInteger(score) || score < 1 || score > 5)) {
-    return 'Cada respuesta debe ser una calificación entre 1 y 5';
+  if (!Number.isInteger(input.calificacion) || input.calificacion < 1 || input.calificacion > 5) {
+    return 'Selecciona una calificación de 1 a 5 estrellas';
   }
   if ((input.comentario?.trim().length ?? 0) > 1000) return 'El comentario máximo es 1000 caracteres';
   return null;
+}
+
+function mapTicketSatisfaccion(row: Record<string, unknown>): TicketSatisfaccion {
+  return {
+    ticketId: row.ticket_id as string,
+    usuarioId: row.usuario_id as string,
+    calificacion: row.calificacion as number,
+    comentario: (row.comentario as string | null) ?? null,
+    creadoEn: row.creado_en as string,
+  };
+}
+
+export async function fetchTicketSatisfaccion(
+  client: SupabaseClient,
+  ticketId: string,
+): Promise<TicketSatisfaccion | null> {
+  if (!ticketId) throw new Error('ticketId requerido');
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error('Sesión requerida');
+
+  const { data, error } = await client
+    .from('ticket_satisfacciones')
+    .select('ticket_id,usuario_id,calificacion,comentario,creado_en')
+    .eq('ticket_id', ticketId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapTicketSatisfaccion(data as unknown as Record<string, unknown>) : null;
 }
 
 export async function submitTicketSatisfaccion(
   client: SupabaseClient,
   ticketId: string,
   input: TicketSatisfaccionInput,
-): Promise<void> {
+): Promise<TicketSatisfaccion> {
   if (!ticketId) throw new Error('ticketId requerido');
   const validationError = validateTicketSatisfaccion(input);
   if (validationError) throw new Error(validationError);
-  const { data: { user } } = await client.auth.getUser();
-  if (!user) throw new Error('Inicia sesión para enviar la encuesta');
-  const { error } = await client.from('ticket_satisfaccion').insert({
-    ticket_id: ticketId,
-    usuario_id: user.id,
-    calidad_servicio: input.calidadServicio,
-    tiempo_respuesta: input.tiempoRespuesta,
-    comunicacion: input.comunicacion,
-    solucion_resolvio: input.solucionResolvio,
-    comentario: input.comentario?.trim() || null,
-  });
+  const { data: authData, error: authError } = await client.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  if (!authData.user) throw new Error('Sesión requerida');
+
+  const { data, error } = await client
+    .from('ticket_satisfacciones')
+    .insert({
+      ticket_id: ticketId,
+      usuario_id: authData.user.id,
+      calificacion: input.calificacion,
+      comentario: input.comentario?.trim() || null,
+    })
+    .select('ticket_id,usuario_id,calificacion,comentario,creado_en')
+    .single();
   if (error) throw new Error(error.message);
+  return mapTicketSatisfaccion(data as unknown as Record<string, unknown>);
 }
 
 export type TicketDetail = {

@@ -2,21 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { canTransition, validateCreateTicket, validateTicketSatisfaccion } from './tickets.js';
 
 describe('validación de encuesta de satisfacción', () => {
-  const valid = {
-    calidadServicio: 4,
-    tiempoRespuesta: 3,
-    comunicacion: 5,
-    solucionResolvio: 4,
-  };
+  const valid = { calificacion: 4 };
 
-  it('acepta cuatro calificaciones válidas y comentario opcional', () => {
+  it('acepta una calificación válida y comentario opcional', () => {
     expect(validateTicketSatisfaccion(valid)).toBeNull();
     expect(validateTicketSatisfaccion({ ...valid, comentario: 'Buena atención' })).toBeNull();
   });
 
   it('rechaza calificaciones fuera del rango 1–5 o no enteras', () => {
-    expect(validateTicketSatisfaccion({ ...valid, comunicacion: 6 })).toBeTruthy();
-    expect(validateTicketSatisfaccion({ ...valid, comunicacion: 2.5 })).toBeTruthy();
+    expect(validateTicketSatisfaccion({ calificacion: 6 })).toBeTruthy();
+    expect(validateTicketSatisfaccion({ calificacion: 2.5 })).toBeTruthy();
+    expect(validateTicketSatisfaccion({ calificacion: 0 })).toBeTruthy();
   });
 
   it('limita el comentario a 1000 caracteres', () => {
