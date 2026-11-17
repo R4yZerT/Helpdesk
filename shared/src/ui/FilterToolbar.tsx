@@ -23,7 +23,7 @@ export function FilterToolbar({
 }: Props) {
   return (
     <View style={[styles.wrap, layout === 'stack' && styles.stack, style]}>
-      <View style={styles.search}>
+      <View style={[styles.search, layout === 'stack' && styles.searchStack]}>
         <Text style={styles.searchIcon} accessible={false}>⌕</Text>
         <TextInput
           value={value}
@@ -46,7 +46,7 @@ export function FilterToolbar({
           </Pressable>
         ) : null}
       </View>
-      {children ? <View style={styles.filters}>{children}</View> : null}
+      {children ? <View style={[styles.filters, layout === 'stack' && styles.filtersStack]}>{children}</View> : null}
     </View>
   );
 }
@@ -68,9 +68,11 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.surfaceAlt,
   },
+  searchStack: { flex: 0, flexBasis: 'auto', width: '100%' },
   searchIcon: { color: theme.colors.mutedSoft, fontSize: 16 },
   input: { flex: 1, minWidth: 0, height: '100%', paddingVertical: 0, color: theme.colors.text, fontSize: 13 },
   clearButton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.full },
   clearText: { color: theme.colors.muted, fontSize: 18, lineHeight: 20 },
   filters: { flex: 1, flexBasis: 220, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 8 },
+  filtersStack: { flex: 0, flexBasis: 'auto', width: '100%' },
 });

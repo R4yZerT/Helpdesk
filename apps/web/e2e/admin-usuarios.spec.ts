@@ -14,6 +14,10 @@ test('admin lista usuarios y descarga CSV de tickets de su dependencia', async (
 
   await page.getByText('MESAS', { exact: true }).click();
   await expect(page.getByText('Mesas', { exact: true }).first()).toBeVisible({ timeout: 20_000 });
+  const busqueda = page.getByPlaceholder('Buscar por ticket (#, asunto)');
+  await expect(busqueda).toBeVisible();
+  const dimensionesBusqueda = await busqueda.boundingBox();
+  expect(dimensionesBusqueda?.height).toBeLessThan(80);
   const exportarCsv = page.locator('[aria-label="Exportar CSV tickets de mi dependencia"]:visible');
   await expect(exportarCsv).toBeVisible();
   const descarga = page.waitForEvent('download', { timeout: 10_000 }).catch(() => null);
